@@ -3,12 +3,13 @@
 #   사용:
 #     docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
 #     docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d
-#   기본 네임스페이스 trustlink-scs (scripts/push-images.sh 와 일치). 다르면 env 로 지정.
+#   기본 네임스페이스 jkkim7202 (2026-06-22 게시; trustlink-scs org 미보유로 개인 계정 사용).
+#   다른 네임스페이스면 TRUSTLINK_ZOT_IMAGE/TRUSTLINK_ADMIN_IMAGE env 로 지정.
 #   (업스트림 keycloak·step-ca·postgres·dependency-track 는 base compose 가 공개 레지스트리에서 자동 pull)
 services:
   zot:
-    image: ${TRUSTLINK_ZOT_IMAGE:-trustlink-scs/trustlink-zot:latest}
+    image: ${TRUSTLINK_ZOT_IMAGE:-jkkim7202/trustlink-zot:latest}
     pull_policy: missing
   trustlink-admin:
-    image: ${TRUSTLINK_ADMIN_IMAGE:-trustlink-scs/trustlink-admin:latest}
+    image: ${TRUSTLINK_ADMIN_IMAGE:-jkkim7202/trustlink-admin:latest}
     pull_policy: missing

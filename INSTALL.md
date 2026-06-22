@@ -23,10 +23,10 @@ cp .env.example .env
 ## 2. 이미지 확보 — 두 가지 방법
 
 ### (A) Docker Hub — compose-only 설치 [권장, 이미지 게시 후]
-커스텀 이미지(zot·BFF)를 Docker Hub `trustlink-scs/*` 로 게시(배포자 1회):
+커스텀 이미지(zot·BFF)를 Docker Hub 에 게시(배포자 1회). 기본 게시본: **`jkkim7202/trustlink-zot`, `jkkim7202/trustlink-admin`** (2026-06-22):
 ```bash
-docker login                          # trustlink-scs push 권한 계정
-NS=trustlink-scs bash scripts/push-images.sh   # trustlink-scs/trustlink-zot, .../trustlink-admin push
+docker login -u <계정>                  # push 권한 계정
+NS=<계정> bash scripts/push-images.sh   # <계정>/trustlink-zot, .../trustlink-admin push
 ```
 설치측은 빌드 없이 compose 로만:
 ```bash
