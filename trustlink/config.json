@@ -1,0 +1,80 @@
+{
+  "distSpecVersion": "1.1.1",
+  "storage": {
+    "rootDirectory": "/tmp/zot",
+    "dedupe": true,
+    "gc": true,
+    "gcDelay": "1h",
+    "gcInterval": "24h",
+    "retention": {
+      "dryRun": true,
+      "delay": "168h",
+      "policies": [
+        {
+          "repositories": ["innotium/**", "products/**"],
+          "deleteUntagged": true,
+          "deleteReferrers": false,
+          "keepTags": [
+            { "patterns": ["^latest$"] },
+            { "patterns": ["^v?[0-9]+\\.[0-9]+\\.[0-9]+$"], "mostRecentlyPushedCount": 1 }
+          ]
+        }
+      ]
+    }
+  },
+  "http": {
+    "address": "127.0.0.1",
+    "port": "28080",
+    "externalUrl": "http://localhost:28080",
+    "realm": "zot",
+    "auth": {
+      "htpasswd": { "path": "/Users/chris/ZOT/deploy/zot-keycloak/zot/htpasswd" },
+      "apikey": true,
+      "openid": {
+        "providers": {
+          "oidc": {
+            "name": "Keycloak",
+            "issuer": "http://localhost:8085/realms/trustlink",
+            "credentialsfile": "/Users/chris/ZOT/deploy/zot-keycloak/zot/oidc-credentials.json",
+            "scopes": ["openid", "email"],
+            "claimMapping": {
+              "username": "preferred_username",
+              "groups": "groups"
+            }
+          }
+        }
+      }
+    },
+    "accessControl": {
+      "repositories": {
+        "**": { "defaultPolicy": [] },
+        "products/**": {
+          "policies": [
+            { "users": ["ci"],          "actions": ["read", "create", "update"] },
+            { "groups": ["developers"], "actions": ["read", "create", "update"] },
+            { "groups": ["partners"],   "actions": ["read"] },
+            { "groups": ["customers"],  "actions": ["read"] }
+          ],
+          "defaultPolicy": []
+        },
+        "innotium/**": {
+          "policies": [
+            { "users": ["ci"],          "actions": ["read", "create", "update"] },
+            { "groups": ["developers"], "actions": ["read", "create", "update"] },
+            { "groups": ["partners"],   "actions": ["read"] },
+            { "groups": ["customers"],  "actions": ["read"] }
+          ],
+          "defaultPolicy": []
+        }
+      },
+      "adminPolicy": { "groups": ["admins"], "users": ["svc-bff"], "actions": ["read", "create", "update", "delete"] },
+      "metrics": { "users": ["ci", "svc-bff"] }
+    }
+  },
+  "log": { "level": "info", "output": "/tmp/trustlink-zot.log" },
+  "extensions": {
+    "search": { "enable": true },
+    "ui": { "enable": true },
+    "metrics": { "enable": true, "prometheus": { "path": "/metrics" } }
+  }
+}

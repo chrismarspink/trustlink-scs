@@ -1,0 +1,187 @@
+<title>TrustLink SCS — 공급망 보안 도구 확장 설계</title>
+<style>
+  :root{
+    --navy:#16243a; --slate:#475569; --orange:#ea7317; --line:#e2e8f0;
+    --bg:#f8fafc; --card:#fff; --ok:#10b981; --warn:#f59e0b; --crit:#ef4444; --muted:#64748b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    color:var(--navy);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 20px 80px}
+  header{border-bottom:3px solid var(--orange);padding-bottom:18px;margin-bottom:8px}
+  h1{font-size:1.75rem;margin:0 0 6px;letter-spacing:-.02em}
+  .sub{color:var(--slate);font-size:.95rem}
+  h2{font-size:1.2rem;margin:38px 0 12px;padding-left:10px;border-left:4px solid var(--orange)}
+  h3{font-size:1rem;margin:20px 0 8px}
+  p{margin:8px 0}
+  .lead{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px 18px;margin:18px 0}
+  .lead b{color:var(--orange)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0;box-shadow:0 1px 2px rgba(16,36,58,.04)}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;margin:10px 0}
+  .scroll{overflow-x:auto}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f1f5f9;color:var(--slate);font-weight:600;font-size:.8rem;white-space:nowrap}
+  td code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:.85em}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.72rem;font-weight:700;white-space:nowrap}
+  .p-ok{background:#dcfce7;color:#166534}.p-warn{background:#fef3c7;color:#92400e}.p-crit{background:#fee2e2;color:#991b1b}
+  .p-t1{background:var(--orange);color:#fff}.p-t2{background:#1e3a8a;color:#fff}.p-t3{background:#64748b;color:#fff}
+  .eff{font-weight:700}.eff.lo{color:var(--ok)}.eff.mid{color:var(--warn)}.eff.hi{color:var(--crit)}
+  ul{margin:8px 0;padding-left:22px}li{margin:3px 0}
+  .muted{color:var(--muted);font-size:.85rem}
+  svg{width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:10px}
+  .legend{font-size:.8rem;color:var(--slate);margin-top:6px}
+  .grid2{display:grid;gap:14px}
+  @media(min-width:640px){.grid2{grid-template-columns:1fr 1fr}}
+  .tag{font-size:.72rem;color:var(--orange);font-weight:700;letter-spacing:.04em}
+  .foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:.82rem}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>TrustLink SCS — 공급망 보안 도구 확장 설계</h1>
+  <div class="sub">기존 전략(<i>"엔진은 만들지 말고 통합한다"</i>) 위에서, 빈 곳을 채우는 OSS 도구 추천 + 통합 설계</div>
+</header>
+
+<div class="lead">
+  <b>한 줄 요약.</b> 지금 플랫폼은 SBOM·VEX·서명을 zot referrer로 <b>저장</b>하지만 아무것도 <b>검증·집행</b>하지 않습니다.
+  전략 문서가 "P1 핵심·제품 정체성"으로 지목한 <b>수용·검증 게이트</b>가 여전히 미구현입니다.
+  따라서 추가 도구의 1순위는 새 기능을 늘리는 것보다 <b>저장소를 "능동적 검증·집행 계층"으로 바꾸는 3종 세트</b>입니다 —
+  <b>Trivy(실 CVE) · Cosign(서명/검증) · 검증 게이트(BFF 오케스트레이션)</b>.
+</div>
+
+<h2>1. 현황 격차 분석</h2>
+<div class="scroll"><table>
+  <tr><th>공급망 단계</th><th>현재 상태</th><th>비고</th></tr>
+  <tr><td>아티팩트·메타데이터 저장</td><td><span class="pill p-ok">있음</span></td><td>zot referrers: SBOM·VEX·sigstore 번들</td></tr>
+  <tr><td>SBOM 보기/집계</td><td><span class="pill p-ok">있음</span></td><td>제품 상세 + 대시보드 추이</td></tr>
+  <tr><td>VEX 분석·발행</td><td><span class="pill p-ok">있음</span></td><td>Dependency-Track 연동, 인라인 분류·발행</td></tr>
+  <tr><td>CVE 스캔(실데이터)</td><td><span class="pill p-warn">미구성</span></td><td>zot <code>cve</code>(Trivy) 미설정 → 대시보드 취약점이 <b>더미</b></td></tr>
+  <tr><td>서명 <b>검증</b></td><td><span class="pill p-crit">없음</span></td><td>sigstore 번들은 저장만, 검증 안 함</td></tr>
+  <tr><td>SBOM ↔ 바이너리 정합</td><td><span class="pill p-crit">없음</span></td><td>해시/메타 일치 미검사</td></tr>
+  <tr><td>VEX ↔ SBOM 매핑</td><td><span class="pill p-crit">없음</span></td><td>PURL 대상 일치 미검사</td></tr>
+  <tr><td>빌드 출처(SLSA provenance)</td><td><span class="pill p-crit">없음</span></td><td>"어떻게 빌드됐나" 증명 없음</td></tr>
+  <tr><td>집행(fail-closed admission)</td><td><span class="pill p-crit">없음</span></td><td>나쁜 아티팩트도 그대로 pull 가능</td></tr>
+</table></div>
+
+<h2>2. 추천 도구 (우선순위)</h2>
+<p>전략 원칙(통합·CycloneDX 통일·단일 진입점·referrer 불변)에 맞춰 선별. 노력은 PoC 기준 상대값입니다.</p>
+<div class="scroll"><table>
+  <tr><th>순위</th><th>도구</th><th>역할 / 채우는 격차</th><th>노력</th><th>라이선스</th></tr>
+  <tr><td><span class="pill p-t1">T1</span></td><td><b>Trivy</b> <span class="muted">(zot 내장 <code>cve</code>)</span></td><td>실 CVE 스캔 → 대시보드 더미 제거, 게이트의 취약점 임계값 입력</td><td><span class="eff lo">낮음</span><br><span class="muted">설정만</span></td><td>Apache-2.0</td></tr>
+  <tr><td><span class="pill p-t1">T1</span></td><td><b>Cosign</b> <span class="muted">(Sigstore)</span></td><td>아티팩트 서명 + <b>서명 검증</b>. 기존 sigstore referrer 슬롯 활용</td><td><span class="eff mid">중간</span></td><td>Apache-2.0</td></tr>
+  <tr><td><span class="pill p-t1">T1</span></td><td><b>수용·검증 게이트</b> <span class="muted">(BFF 자체)</span></td><td>서명·SBOM↔바이너리·VEX↔SBOM·스키마·CVE 임계 → pass/warn/fail, <b>fail-closed</b></td><td><span class="eff mid">중간</span><br><span class="muted">오케스트레이션</span></td><td>자체</td></tr>
+  <tr><td><span class="pill p-t2">T2</span></td><td><b>Syft</b></td><td>SBOM 없을 때 생성(보조). 전략 P3</td><td><span class="eff mid">중간</span></td><td>Apache-2.0</td></tr>
+  <tr><td><span class="pill p-t2">T2</span></td><td><b>OPA / Rego</b> <span class="muted">(선택)</span></td><td>게이트 정책을 코드 대신 <b>정책-as-code</b>로 — 규칙을 설정으로 분리</td><td><span class="eff mid">중간</span></td><td>Apache-2.0</td></tr>
+  <tr><td><span class="pill p-t2">T2</span></td><td><b>vexctl</b></td><td>OpenVEX 생성/적용·병합. 전략에 이미 포함</td><td><span class="eff lo">낮음</span></td><td>Apache-2.0</td></tr>
+  <tr><td><span class="pill p-t3">T3</span></td><td><b>SLSA provenance + in-toto</b></td><td>빌드 출처 증명을 referrer로 부착·검증 → "주요 공급망 도구" 포지셔닝</td><td><span class="eff hi">높음</span></td><td>Apache-2.0</td></tr>
+  <tr><td><span class="pill p-t3">T3</span></td><td><b>GUAC</b></td><td>SBOM·VEX·SLSA를 그래프로 통합 → "log4j 쓰는 제품?" 영향분석</td><td><span class="eff hi">높음</span></td><td>Apache-2.0</td></tr>
+  <tr><td><span class="pill p-t3">T3</span></td><td><b>Gitleaks / TruffleHog</b></td><td>레이어/아티팩트 시크릿 유출 스캔(다른 위험 축)</td><td><span class="eff mid">중간</span></td><td>MIT / AGPL주의</td></tr>
+</table></div>
+<p class="muted">교차검증용 <b>Grype</b>는 전략의 "보조/교차검증"에 이미 있음. 대용량 스토리지의 MinIO(AGPL)는 SeaweedFS/zot S3로 대체 권장(전략 §3과 동일).</p>
+
+<h2>3. 중심 설계 — 수용·검증 게이트</h2>
+<p>BFF("두뇌")가 push/승격(promote)/pull 시점에 검증을 오케스트레이션하고, 결과를 <b>검증 리포트 referrer</b>로 부착합니다. 위 도구들은 모두 이 게이트의 입력입니다.</p>
+
+<svg viewBox="0 0 860 360" role="img" aria-label="검증 게이트 아키텍처">
+  <defs>
+    <marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#475569"/>
+    </marker>
+  </defs>
+  <!-- push -->
+  <rect x="20" y="150" width="130" height="56" rx="8" fill="#fff" stroke="#16243a" stroke-width="1.5"/>
+  <text x="85" y="173" text-anchor="middle" font-size="13" font-weight="700" fill="#16243a">CI / 개발자</text>
+  <text x="85" y="190" text-anchor="middle" font-size="10" fill="#475569">oras/docker push</text>
+  <line x1="150" y1="178" x2="205" y2="178" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/>
+  <!-- zot -->
+  <rect x="205" y="150" width="120" height="56" rx="8" fill="#fff" stroke="#16243a" stroke-width="1.5"/>
+  <text x="265" y="173" text-anchor="middle" font-size="13" font-weight="700" fill="#16243a">zot</text>
+  <text x="265" y="190" text-anchor="middle" font-size="10" fill="#475569">레지스트리 :28081</text>
+  <!-- event/trigger to gate -->
+  <line x1="265" y1="150" x2="265" y2="92" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="320" y="120" text-anchor="middle" font-size="9.5" fill="#475569">push 이벤트</text>
+  <!-- gate -->
+  <rect x="360" y="30" width="200" height="120" rx="10" fill="#ea7317" stroke="#ea7317"/>
+  <text x="460" y="56" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">수용·검증 게이트</text>
+  <text x="460" y="74" text-anchor="middle" font-size="10" fill="#fff">BFF 오케스트레이션</text>
+  <text x="375" y="95" font-size="10" fill="#fff">① 서명 검증 (cosign)</text>
+  <text x="375" y="110" font-size="10" fill="#fff">② SBOM↔바이너리 해시</text>
+  <text x="375" y="125" font-size="10" fill="#fff">③ VEX↔SBOM PURL</text>
+  <text x="375" y="140" font-size="10" fill="#fff">④ 스키마 · CVE 임계</text>
+  <!-- engines -->
+  <rect x="600" y="20" width="110" height="34" rx="7" fill="#fff" stroke="#16243a" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="655" y="41" text-anchor="middle" font-size="11" fill="#16243a">cosign</text>
+  <rect x="600" y="62" width="110" height="34" rx="7" fill="#fff" stroke="#16243a" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="655" y="83" text-anchor="middle" font-size="11" fill="#16243a">Trivy(zot cve)</text>
+  <rect x="600" y="104" width="110" height="34" rx="7" fill="#fff" stroke="#16243a" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="655" y="125" text-anchor="middle" font-size="11" fill="#16243a">DT · Syft</text>
+  <rect x="600" y="146" width="110" height="34" rx="7" fill="#fff" stroke="#16243a" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <text x="655" y="163" text-anchor="middle" font-size="10.5" fill="#16243a">OPA (정책)</text>
+  <line x1="560" y1="70" x2="600" y2="40" stroke="#475569" stroke-width="1.3" marker-end="url(#ah)"/>
+  <line x1="560" y1="85" x2="600" y2="79" stroke="#475569" stroke-width="1.3" marker-end="url(#ah)"/>
+  <line x1="560" y1="100" x2="600" y2="118" stroke="#475569" stroke-width="1.3" marker-end="url(#ah)"/>
+  <line x1="560" y1="120" x2="600" y2="160" stroke="#475569" stroke-width="1.3" marker-end="url(#ah)"/>
+  <!-- report referrer back to zot -->
+  <line x1="430" y1="150" x2="300" y2="208" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="300" y="240" text-anchor="middle" font-size="9.5" fill="#475569">검증리포트 referrer 부착</text>
+  <!-- verdicts -->
+  <rect x="360" y="270" width="200" height="70" rx="10" fill="#fff" stroke="#16243a" stroke-width="1.5"/>
+  <text x="460" y="292" text-anchor="middle" font-size="12" font-weight="700" fill="#16243a">판정 + 신뢰등급</text>
+  <text x="395" y="312" text-anchor="middle" font-size="11" font-weight="700" fill="#10b981">PASS</text>
+  <text x="460" y="312" text-anchor="middle" font-size="11" font-weight="700" fill="#f59e0b">WARN</text>
+  <text x="525" y="312" text-anchor="middle" font-size="11" font-weight="700" fill="#ef4444">FAIL</text>
+  <text x="460" y="330" text-anchor="middle" font-size="9.5" fill="#475569">FAIL → 승격/배포 차단(fail-closed)</text>
+  <line x1="460" y1="150" x2="460" y2="270" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)" stroke-dasharray="3 3"/>
+  <!-- consumer -->
+  <rect x="20" y="284" width="130" height="56" rx="8" fill="#fff" stroke="#16243a" stroke-width="1.5"/>
+  <text x="85" y="307" text-anchor="middle" font-size="13" font-weight="700" fill="#16243a">소비자 pull</text>
+  <text x="85" y="324" text-anchor="middle" font-size="10" fill="#475569">검증등급 확인</text>
+  <line x1="360" y1="305" x2="155" y2="312" stroke="#475569" stroke-width="1.5" marker-end="url(#ah)"/>
+</svg>
+<div class="legend">점선 박스 = 통합 엔진(내부). 게이트는 결과를 <b>검증 리포트 referrer</b>로 부착해 불변·감사 가능하게 보관하고, FAIL은 승격/배포를 막습니다.</div>
+
+<div class="grid2">
+  <div class="card">
+    <span class="tag">집행 지점</span>
+    <h3>언제 게이트를 거나</h3>
+    <ul>
+      <li><b>push 직후(비동기)</b> — 검증 리포트 생성·부착, 등급 표시</li>
+      <li><b>승격(promote) 시</b> — dev→released 태그 이동 전 <b>fail-closed</b></li>
+      <li><b>pull 정책(선택)</b> — 미검증/FAIL 아티팩트 pull 차단(엄격 모드)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <span class="tag">검증 규칙(초기)</span>
+    <h3>무엇을 검사하나</h3>
+    <ul>
+      <li>서명 유효 + 신뢰 키/identity (cosign)</li>
+      <li>SBOM 존재 + CycloneDX 스키마 + 바이너리 해시 일치</li>
+      <li>VEX의 PURL이 SBOM 컴포넌트와 매핑(대상 일치)</li>
+      <li>VEX 반영 후 잔존 Critical/High CVE ≤ 임계값</li>
+    </ul>
+  </div>
+</div>
+
+<h2>4. 데이터 모델 (zot referrers 확장)</h2>
+<p>전략 §7의 결합 모델에 <b>provenance</b>와 <b>검증 리포트</b>를 추가합니다. 모두 불변·누적·출처 보존 원칙 유지.</p>
+<div class="card" style="font-family:ui-monospace,Menlo,monospace;font-size:.82rem;white-space:pre;overflow-x:auto;line-height:1.5">products/innoecm:1.2.3        <span class="muted"># subject = 바이너리/이미지</span>
+ ├─ source.cdx.json            <span class="muted"># SBOM (Sparrow/업로드)</span>
+ ├─ binary.cdx.json            <span class="muted"># SBOM (xSCAN/Syft 보조)</span>
+ ├─ vex.cdx.json               <span class="muted"># VEX (DT 발행, 최신 1건 반영)</span>
+ ├─ *.sigstore.bundle          <span class="muted"># 서명 (cosign) ← 검증 대상</span>
+ ├─ provenance.slsa.json       <span class="muted"># NEW: 빌드 출처(SLSA/in-toto)</span>
+ └─ verification-report.json   <span class="muted"># NEW: 게이트 판정·등급·근거(불변)</span></div>
+
+<h2>5. 단계별 로드맵</h2>
+<div class="scroll"><table>
+  <tr><th>단계</th><th>도구</th><th>산출</th></tr>
+  <tr><td><b>지금 (Quick win)</b></td><td>Trivy(zot cve) 활성화 + Cosign 검증 + 게이트 MVP</td><td>실 CVE 데이터, 서명 검증, push 시 검증 리포트·등급, 승격 fail-closed</td></tr>
+  <tr><td><b>다음</b></td><td>Syft(SBOM 보조) · OPA(정책 분리) · vexctl(OpenVEX)</td><td>SBOM 자동 채움, 설정형 정책, VEX 병합/CSAF 내보내기</td></tr>
+  <tr><td><b>차별화</b></td><td>SLSA provenance + in-toto · GUAC</td><td>빌드 출처 검증, 교차 아티팩트 영향분석 그래프</td></tr>
+</table></div>
+
+<div class="foot">
+  정합 근거: <code>DESIGN-STRATEGY-v2.md</code>(통합·CycloneDX·단일 진입점·referrer 불변), <code>docs/PRODUCT-ANALYSIS.md</code>(수용·검증 게이트 = 제품 정체성, S1).
+  본 문서는 그 위에서 "추가 도구"를 격차 기준으로 구체화한 설계 제안입니다.
+</div>
+</div>

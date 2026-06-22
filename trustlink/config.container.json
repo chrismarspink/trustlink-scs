@@ -1,0 +1,83 @@
+{
+  "distSpecVersion": "1.1.1",
+  "storage": {
+    "rootDirectory": "/var/lib/registry",
+    "dedupe": true,
+    "gc": true,
+    "gcDelay": "1h",
+    "gcInterval": "24h",
+    "retention": {
+      "dryRun": true,
+      "delay": "168h",
+      "policies": [
+        {
+          "repositories": ["innotium/**", "products/**"],
+          "deleteUntagged": true,
+          "deleteReferrers": false,
+          "keepTags": [
+            { "patterns": ["^latest$"] },
+            { "patterns": ["^v?[0-9]+\\.[0-9]+\\.[0-9]+$"], "mostRecentlyPushedCount": 1 }
+          ]
+        }
+      ]
+    }
+  },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "5000",
+    "externalUrl": "http://trustlink:28080",
+    "realm": "zot",
+    "auth": {
+      "htpasswd": { "path": "/etc/zot/htpasswd" },
+      "apikey": true,
+      "openid": {
+        "providers": {
+          "oidc": {
+            "name": "Keycloak",
+            "issuer": "http://trustlink:28080/auth/realms/trustlink",
+            "credentialsfile": "/etc/zot/oidc-credentials.json",
+            "scopes": ["openid", "email"],
+            "claimMapping": { "username": "preferred_username", "groups": "groups" }
+          }
+        }
+      }
+    },
+    "accessControl": {
+      "repositories": {
+        "**": { "defaultPolicy": [] },
+        "products/**": {
+          "policies": [
+            { "users": ["ci"],          "actions": ["read", "create", "update"] },
+            { "groups": ["developers"], "actions": ["read", "create", "update"] },
+            { "groups": ["partners"],   "actions": ["read"] },
+            { "groups": ["customers"],  "actions": ["read"] }
+          ],
+          "defaultPolicy": []
+        },
+        "innotium/**": {
+          "policies": [
+            { "users": ["ci"],          "actions": ["read", "create", "update"] },
+            { "groups": ["developers"], "actions": ["read", "create", "update"] },
+            { "groups": ["partners"],   "actions": ["read"] },
+            { "groups": ["customers"],  "actions": ["read"] }
+          ],
+          "defaultPolicy": []
+        }
+      },
+      "adminPolicy": { "groups": ["admins"], "users": ["svc-bff"], "actions": ["read", "create", "update", "delete"] },
+      "metrics": { "users": ["ci", "svc-bff"] }
+    }
+  },
+  "log": { "level": "info", "output": "/var/log/zot/zot.log" },
+  "extensions": {
+    "search": {
+      "enable": true,
+      "cve": {
+        "updateInterval": "24h",
+        "trivy": { "dbRepository": "ghcr.io/aquasecurity/trivy-db" }
+      }
+    },
+    "ui": { "enable": true },
+    "metrics": { "enable": true, "prometheus": { "path": "/metrics" } }
+  }
+}

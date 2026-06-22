@@ -1,0 +1,52 @@
+# Dependency-Track (헤드리스 = API Server만, Frontend 미배포) 오버레이.
+# 메인 스택과 함께 기동:
+#   docker compose -f docker-compose.yml -f docker-compose.dtrack.yml up -d
+# 같은 compose 프로젝트(zot-keycloak)로 병합되어 동일 네트워크 → BFF가 http://dtrack-apiserver:8080 로 호출.
+services:
+  dtrack-db:
+    image: postgres:16
+    pull_policy: missing
+    environment:
+      POSTGRES_DB: dtrack
+      POSTGRES_USER: dtrack
+      POSTGRES_PASSWORD: ${DT_DB_PASSWORD}
+    volumes: ["dtrack-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dtrack -d dtrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  dtrack-apiserver:                     # Frontend(dependencytrack/frontend)는 배포하지 않음
+    image: dependencytrack/apiserver:latest
+    pull_policy: missing
+    environment:
+      ALPINE_DATABASE_MODE: external
+      ALPINE_DATABASE_URL: jdbc:postgresql://dtrack-db:5432/dtrack
+      ALPINE_DATABASE_DRIVER: org.postgresql.Driver
+      ALPINE_DATABASE_USERNAME: dtrack
+      ALPINE_DATABASE_PASSWORD: ${DT_DB_PASSWORD}
+    mem_limit: 4608m                    # apiserver 메모리 요구가 큼(~4.5GB). 호스트 여유에 맞춰 조정.
+    ports: ["127.0.0.1:8081:8080"]      # 내부 전용(127.0.0.1). 외부 노출 금지 — TrustLink만 접근.
+    volumes: ["dtrack-data:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    depends_on:
+      dtrack-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # BFF 에 DT 연동 환경변수 주입(메인 정의에 병합). DT_API_KEY 는 dt-bootstrap 후 .env 에 반영.
+  trustlink-admin:
+    environment:
+      DT_BASE_URL: http://dtrack-apiserver:8080
+      DT_API_KEY: ${DT_API_KEY:-}
+
+volumes:
+  dtrack-db:
+  dtrack-data:

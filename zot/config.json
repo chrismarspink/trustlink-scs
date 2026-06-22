@@ -1,0 +1,48 @@
+{
+  "distSpecVersion": "1.1.1",
+  "storage": { "rootDirectory": "/var/lib/registry" },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "5000",
+    "externalUrl": "http://localhost:5002",
+    "realm": "zot",
+    "auth": {
+      "htpasswd": { "path": "/etc/zot/htpasswd" },
+      "apikey": true,
+      "openid": {
+        "providers": {
+          "oidc": {
+            "name": "Keycloak",
+            "issuer": "http://keycloak:8085/realms/trustlink",
+            "credentialsfile": "/etc/zot/oidc-credentials.json",
+            "scopes": ["openid", "email"],
+            "claimMapping": {
+              "username": "preferred_username",
+              "groups": "groups"
+            }
+          }
+        }
+      }
+    },
+    "accessControl": {
+      "repositories": {
+        "**": { "defaultPolicy": [] },
+        "products/**": {
+          "policies": [
+            { "users": ["ci"],          "actions": ["read", "create", "update"] },
+            { "groups": ["developers"], "actions": ["read", "create", "update"] },
+            { "groups": ["partners"],   "actions": ["read"] },
+            { "groups": ["customers"],  "actions": ["read"] }
+          ],
+          "defaultPolicy": []
+        }
+      },
+      "adminPolicy": { "groups": ["admins"], "actions": ["read", "create", "update", "delete"] }
+    }
+  },
+  "log": { "level": "info" },
+  "extensions": {
+    "search": { "enable": true },
+    "ui": { "enable": true }
+  }
+}

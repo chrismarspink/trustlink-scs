@@ -1,0 +1,14 @@
+# Docker Hub 이미지로 compose-only 설치하기 위한 오버레이.
+#   커스텀 이미지(zot 빌드·BFF)를 로컬 빌드(pull_policy:never) 대신 Docker Hub 에서 받도록 교체.
+#   사용:
+#     docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
+#     docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d
+#   <NS> 를 게시 네임스페이스로 치환(예: innotium). 이미지 게시 후 활성화.
+#   (업스트림 keycloak·step-ca·postgres·dependency-track 는 base compose 가 공개 레지스트리에서 자동 pull)
+services:
+  zot:
+    image: ${TRUSTLINK_ZOT_IMAGE:-<NS>/trustlink-zot:latest}
+    pull_policy: missing
+  trustlink-admin:
+    image: ${TRUSTLINK_ADMIN_IMAGE:-<NS>/trustlink-admin:latest}
+    pull_policy: missing

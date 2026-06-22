@@ -1,0 +1,24 @@
+# ===== 시크릿 (절대 커밋 금지 — 공개 repo) =====
+.env
+zot/htpasswd
+zot/oidc-credentials.json
+stepca/ca-password
+# CA 인스턴스 material (배포 시 step-ca 가 생성 — 호스트로 추출되는 사본)
+stepca/*.crt
+stepca/*.key
+stepca/*.pem
+
+# ===== 빌드 산출물 =====
+**/node_modules/
+trustlink-ui/dist/
+admin-bff/ui-dist/
+admin-bff/trustlink-admin
+admin-bff/trustlink-admin-linux
+*.tar
+*.tar.gz
+
+# ===== 스크래치/임시 =====
+/tmp-verify/
+*.p7s
+*.p7m
+*.log

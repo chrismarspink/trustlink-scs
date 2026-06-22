@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --primary: 215 60% 16%;            /* TrustLink navy #0F2139 계열 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 36 92% 55%;              /* orange #F6A623 */
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 215 60% 16%;
+  --radius: 0.6rem;
+}
+
+* { border-color: hsl(var(--border)); }
+body { margin: 0; background: hsl(var(--background)); color: hsl(var(--foreground)); font-family: -apple-system, system-ui, "Apple SD Gothic Neo", sans-serif; }

@@ -1,0 +1,126 @@
+# TrustLink 단일 프론트도어 스택.
+#  - 외부 노출은 trustlink-admin(BFF) 단일 포트(${FRONT_PORT})만. zot/keycloak/DT 포트 비공개(내부 전용).
+#  - BFF가 신규 UI 서빙 + /v2·/zot→zot, /auth→keycloak 프록시 + /admin·/api 자체 처리.
+#  - 단일 오리진 = http://${FRONT_HOST}:${FRONT_PORT}  (브라우저는 /etc/hosts 에 "<IP> ${FRONT_HOST}" 1줄)
+#    issuer = http://${FRONT_HOST}:${FRONT_PORT}/auth/realms/trustlink (컨테이너는 alias '${FRONT_HOST}'→BFF 로 도달)
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    pull_policy: never
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8085"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - kc-data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8085"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  zot:
+    image: trustlink:latest          # zot(평문 HTTP OIDC 쿠키 WithUnsecure 패치 포함)
+    pull_policy: never
+    command: ["serve", "/etc/zot/config.json"]
+    # 레지스트리 직접 진입점: BFF(28080)가 죽어도 pull/push 가 살아있도록 zot 포트를 직접 공개.
+    # /v2 인증/RBAC 는 zot 자신이 강제(htpasswd/apikey/OIDC). UI·관리콘솔은 계속 28080 경유.
+    ports: ["28081:5000"]
+    volumes:
+      - ./trustlink/config.container.json:/etc/zot/config.json:ro
+      - ./zot/htpasswd:/etc/zot/htpasswd:ro
+      - ./zot/oidc-credentials.json:/etc/zot/oidc-credentials.json:ro
+      - tl-data:/var/lib/registry
+      - tl-logs:/var/log/zot
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      trustlink-admin:
+        condition: service_started   # issuer(http://${FRONT_HOST}/auth) discovery 는 BFF 프록시 경유
+    restart: unless-stopped
+
+  trustlink-admin:                   # BFF = 단일 프론트도어
+    image: trustlink-admin:latest
+    pull_policy: never
+    networks:
+      default:
+        aliases: ["${FRONT_HOST}"]   # 컨테이너 내부에서 ${FRONT_HOST} → BFF (issuer 도달)
+    ports: ["${FRONT_PORT}:${FRONT_PORT}"]
+    environment:
+      ADDR: ":${FRONT_PORT}"
+      UI_DIR: /srv/ui
+      KC_PUBLIC: http://${FRONT_HOST}:${FRONT_PORT}/auth      # 브라우저 authorize/logout
+      KC_INTERNAL: http://keycloak:8085/auth                  # admin/token (relative-path 포함)
+      KC_PROXY_TARGET: http://keycloak:8085                   # /auth/* 프록시 타깃(경로 보존)
+      REALM: trustlink
+      CLIENT_ID: trustlink-admin
+      CLIENT_SECRET: ${TRUSTLINK_ADMIN_SECRET}
+      REDIRECT_URI: http://${FRONT_HOST}:${FRONT_PORT}/admin/callback
+      ZOT_API_URL: http://zot:5000
+      ZOT_METRICS_URL: http://zot:5000/metrics
+      ZOT_METRICS_USER: ci
+      ZOT_METRICS_PASS: ${CI_PASSWORD}
+      ZOT_ADMIN_USER: svc-bff
+      ZOT_ADMIN_PASS: ${SVC_BFF_PASS}
+      ZOT_DATA: /var/lib/registry
+      LOG_FILE: /var/log/zot/zot.log
+      CONFIG_FILE: /etc/zot/config.json
+      DT_BASE_URL: http://dtrack-apiserver:8080
+      DT_API_KEY: ${DT_API_KEY:-}
+      # CA(step-ca) 연동 — 평면2. 검증(평면1)은 검증자가 step-ca(28443)에 직접 닿으며 BFF 무관.
+      STEPCA_URL: https://step-ca:9000
+      STEPCA_ROOT: /etc/trustlink/step-root.crt
+      STEPCA_ISSUER: /etc/trustlink/step-issuer.crt              # 발급(중간) CA 인증서 — 다운로드 제공용
+      STEPCA_PROVISIONER: trustlink
+      STEPCA_PROVISIONER_PASSWORD_FILE: /etc/trustlink/ca-password
+      SOR_PATH: /var/lib/trustlink/sor.jsonl
+      SESSIONS_PATH: /var/lib/trustlink/sessions.json        # 로그인 세션 영속(재시작/재배포 유지)
+      # CMS EnvelopedData 암호화 알고리즘 — FIPS 승인값 기본. 배포 OE 검증 모듈에 맞게 교체 가능.
+      CMS_CONTENT_CIPHER: -aes-256-gcm                        # 콘텐츠 대칭 암호(AEAD, FIPS 승인)
+      CMS_RSA_PADDING: oaep                                   # RSA 키전송 패딩(FIPS 권장; pkcs1=레거시)
+    volumes:
+      - ./trustlink/config.container.json:/etc/zot/config.json:ro
+      - tl-data:/var/lib/registry:ro
+      - tl-logs:/var/log/zot:ro
+      - ./stepca/root_ca.crt:/etc/trustlink/step-root.crt:ro   # 신뢰 앵커(CAfile)
+      - ./stepca/issuer_ca.crt:/etc/trustlink/step-issuer.crt:ro # 발급(중간) CA — 다운로드 제공
+      - ./stepca/ca-password:/etc/trustlink/ca-password:ro     # provisioner 비밀번호(평면2 발급)
+      - tl-sor:/var/lib/trustlink                              # 감사 SoR(쓰기)
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      step-ca:
+        condition: service_started   # 평면2 발급 워크플로용. 평면1 검증은 독립.
+    restart: unless-stopped
+
+  # ── 평면 1: 신뢰/검증 평면 (독립·상시, TrustLink 무관) ──
+  # step-ca = "신뢰 영역의 Zot". 독립 포트로 발급/검증/CRL 제공 → TrustLink 죽어도 생존.
+  # 소스 무수정: 공식 이미지 + 설정(env init)만으로 단일 Issuing CA 구동(MVP).
+  step-ca:
+    image: smallstep/step-ca:latest
+    pull_policy: missing
+    environment:
+      DOCKER_STEPCA_INIT_NAME: "TrustLink Issuing CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost,trustlink"
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: "trustlink"
+      DOCKER_STEPCA_INIT_PASSWORD_FILE: "/run/secrets/ca-password"
+      DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT: "false"
+    ports: ["28443:9000"]   # 평면1 독립 진입점 (REST/ACME/CRL). 검증자·CI 직접 접근.
+    volumes:
+      - stepca-data:/home/step
+      - ./stepca/ca-password:/run/secrets/ca-password:ro
+    restart: unless-stopped
+
+volumes:
+  kc-data:
+  tl-data:
+  tl-logs:
+  stepca-data:
+  tl-sor:
