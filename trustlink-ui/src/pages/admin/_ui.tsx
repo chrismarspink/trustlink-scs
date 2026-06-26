@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
+import ReactECharts from 'echarts-for-react';
 import { Card } from '@/components/ui/primitives';
 import { cn } from '@/lib/utils';
+
+// 차트 공용 색(밝은 테마 기준). 축/그리드는 muted, 막대 accent.
+const CHART_AXIS = '#64748b';
+const CHART_GRID = '#e5e7eb';
+const CHART_ACCENT = '#F6A623';
 
 // 관리 페이지 공용 프리미티브 (shadcn/Tailwind 스타일, 소유 컴포넌트)
 
@@ -55,7 +61,7 @@ export function Td({ children, className }: { children?: ReactNode; className?: 
 // 페이지 내 raw <select> 공용 클래스 (primitives 에 select 가 없어 여기서 통일)
 export const selectCls = 'h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-2 focus:ring-ring';
 
-// 가로 막대 차트 — 외부 의존성 없이 div/CSS 로 구현(폐쇄망/오프라인 빌드 원칙).
+// 가로 막대 차트 — Apache ECharts(canvas).
 export function BarChart({
   data,
   fmt,
@@ -66,27 +72,22 @@ export function BarChart({
   empty?: string;
 }) {
   if (data.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
-  const max = Math.max(1, ...data.map((d) => d.value));
-  return (
-    <div className="space-y-2">
-      {data.map((d) => (
-        <div key={d.label} className="flex items-center gap-3">
-          <span className="w-40 shrink-0 truncate font-mono text-xs text-muted-foreground" title={d.label}>
-            {d.label}
-          </span>
-          <div className="h-5 flex-1 overflow-hidden rounded bg-secondary">
-            <div className={cn('h-full rounded transition-[width]', d.color || 'bg-accent')} style={{ width: `${(d.value / max) * 100}%` }} />
-          </div>
-          <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums">
-            {fmt ? fmt(d.value) : d.value}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
+  const f = (v: number) => (fmt ? fmt(v) : String(v));
+  const option = {
+    grid: { left: 8, right: 56, top: 8, bottom: 8, containLabel: true },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: number) => f(v) },
+    xAxis: { type: 'value', axisLabel: { color: CHART_AXIS, formatter: (v: number) => f(v) }, splitLine: { lineStyle: { color: CHART_GRID } } },
+    yAxis: { type: 'category', inverse: true, data: data.map((d) => d.label), axisTick: { show: false }, axisLine: { lineStyle: { color: CHART_GRID } }, axisLabel: { color: CHART_AXIS } },
+    series: [{
+      type: 'bar', barMaxWidth: 22, data: data.map((d) => d.value),
+      itemStyle: { color: CHART_ACCENT, borderRadius: [0, 4, 4, 0] },
+      label: { show: true, position: 'right', color: CHART_AXIS, formatter: (p: { value: number }) => f(p.value) }
+    }]
+  };
+  return <ReactECharts option={option as never} style={{ height: Math.max(120, data.length * 38) }} opts={{ renderer: 'canvas' }} notMerge />;
 }
 
-// 다중 시리즈 라인 차트(버전 추이 등) — 외부 의존성 없이 SVG.
+// 다중 시리즈 라인 차트(버전 추이 등) — Apache ECharts(canvas). 범례 클릭으로 시리즈 토글.
 export type LineSeries = { label: string; color: string; values: number[] };
 export function LineChart({
   categories,
@@ -98,74 +99,38 @@ export function LineChart({
   empty?: string;
 }) {
   if (categories.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
-  const W = 640, H = 240, padL = 34, padR = 14, padT = 10, padB = 34;
-  const n = categories.length;
-  const max = Math.max(1, ...series.flatMap((s) => s.values));
-  const x = (i: number) => (n === 1 ? (padL + W - padR) / 2 : padL + (i * (W - padL - padR)) / (n - 1));
-  const y = (v: number) => padT + (H - padT - padB) * (1 - v / max);
-  const ticks = 4;
-
-  return (
-    <div>
-      <div className="mb-2 flex flex-wrap gap-3 text-xs">
-        {series.map((s) => (
-          <span key={s.label} className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} /> {s.label}
-          </span>
-        ))}
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
-        {/* y 그리드 + 라벨 */}
-        {Array.from({ length: ticks + 1 }, (_, t) => {
-          const val = (max * t) / ticks;
-          const yy = y(val);
-          return (
-            <g key={t}>
-              <line x1={padL} y1={yy} x2={W - padR} y2={yy} stroke="hsl(var(--border))" strokeWidth={1} />
-              <text x={padL - 5} y={yy + 3} textAnchor="end" fontSize={10} fill="hsl(var(--muted-foreground))">
-                {Math.round(val)}
-              </text>
-            </g>
-          );
-        })}
-        {/* x 라벨(버전) */}
-        {categories.map((c, i) => (
-          <text key={c} x={x(i)} y={H - 12} textAnchor="middle" fontSize={10} fill="hsl(var(--muted-foreground))">
-            {c.length > 12 ? c.slice(0, 11) + '…' : c}
-          </text>
-        ))}
-        {/* 시리즈 라인 + 점 */}
-        {series.map((s) => (
-          <g key={s.label}>
-            <polyline
-              fill="none"
-              stroke={s.color}
-              strokeWidth={2}
-              vectorEffect="non-scaling-stroke"
-              points={s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
-            />
-            {s.values.map((v, i) => (
-              <circle key={i} cx={x(i)} cy={y(v)} r={2.8} fill={s.color} />
-            ))}
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
+  const option = {
+    color: series.map((s) => s.color),
+    grid: { left: 8, right: 16, top: 30, bottom: 22, containLabel: true },
+    tooltip: { trigger: 'axis' },
+    legend: { top: 0, data: series.map((s) => s.label), textStyle: { color: CHART_AXIS }, icon: 'roundRect', inactiveColor: '#cbd5e1' },
+    xAxis: { type: 'category', boundaryGap: false, data: categories, axisLine: { lineStyle: { color: CHART_GRID } }, axisLabel: { color: CHART_AXIS, formatter: (c: string) => (c.length > 12 ? c.slice(0, 11) + '…' : c) } },
+    yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: CHART_GRID } }, axisLabel: { color: CHART_AXIS } },
+    series: series.map((s) => ({ name: s.label, type: 'line', data: s.values, smooth: false, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2, color: s.color }, itemStyle: { color: s.color } }))
+  };
+  return <ReactECharts option={option as never} style={{ height: 264 }} opts={{ renderer: 'canvas' }} notMerge />;
 }
 
-// 단일 게이지(사용률 %) — 임계값에 따라 색 변화.
+// 단일 게이지(사용률 %) — Apache ECharts gauge. 임계값에 따라 색 변화.
 export function Gauge({ label, pct, sub }: { label: string; pct: number; sub?: string }) {
-  const color = pct >= 95 ? 'bg-red-500' : pct >= 85 ? 'bg-amber-500' : 'bg-emerald-500';
+  const color = pct >= 95 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#10b981';
+  const option = {
+    series: [{
+      type: 'gauge', startAngle: 210, endAngle: -30, min: 0, max: 100, radius: '92%', center: ['50%', '62%'],
+      progress: { show: true, width: 16, itemStyle: { color } },
+      axisLine: { lineStyle: { width: 16, color: [[1, CHART_GRID]] } },
+      axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false }, pointer: { show: false }, anchor: { show: false }, title: { show: false },
+      detail: { valueAnimation: true, formatter: '{value}%', color, fontSize: 26, offsetCenter: [0, '0%'] },
+      data: [{ value: Math.round(pct) }]
+    }]
+  };
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between">
         <span className="text-sm font-medium">{label}</span>
-        <span className="text-sm tabular-nums text-muted-foreground">{pct}%{sub ? ` · ${sub}` : ''}</span>
+        {sub && <span className="text-xs tabular-nums text-muted-foreground">{sub}</span>}
       </div>
-      <div className="h-3 overflow-hidden rounded-full bg-secondary">
-        <div className={cn('h-full rounded-full', color)} style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
+      <ReactECharts option={option as never} style={{ height: 180 }} opts={{ renderer: 'canvas' }} notMerge />
     </div>
   );
 }

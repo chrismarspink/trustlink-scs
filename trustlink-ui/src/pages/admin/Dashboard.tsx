@@ -9,12 +9,21 @@ import { PageTitle, SectionTitle, StatCard, Loading, Alert, BarChart, Gauge, Lin
 
 const GROUPS = ['admins', 'developers', 'partners', 'customers'];
 
+// VEX 타입(상태) — 차트 시리즈/선택 드롭다운 공용 정의
+const VEX_TYPES = [
+  { key: 'affected', label: '영향있음', color: '#ef4444' },
+  { key: 'not_affected', label: '영향없음', color: '#10b981' },
+  { key: 'fixed', label: '수정됨', color: '#3b82f6' },
+  { key: 'under_investigation', label: '조사중', color: '#f59e0b' }
+] as const;
+
 export default function Dashboard() {
   const [data, setData] = useState<{ mt: Metrics; us: AdminUser[]; h: Health } | null>(null);
   const [err, setErr] = useState('');
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsErr, setStatsErr] = useState('');
   const [repo, setRepo] = useState('');
+  const [vexType, setVexType] = useState<'all' | (typeof VEX_TYPES)[number]['key']>('all');
 
   useEffect(() => {
     Promise.all([adminMetrics(), adminUsers(), adminHealth()])
@@ -121,16 +130,19 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           <Card className="lg:col-span-2">
-            <CardHeader className="font-semibold">VEX 타입별 추이 (영향있음 · 영향없음 · 수정됨 · 조사중)</CardHeader>
+            <CardHeader className="flex flex-wrap items-center gap-3 font-semibold">
+              <span>VEX 타입별 추이</span>
+              <select className={selectCls + ' ml-auto font-normal'} value={vexType} onChange={(e) => setVexType(e.target.value as typeof vexType)}>
+                <option value="all">전체 타입</option>
+                {VEX_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+            </CardHeader>
             <CardContent>
               <LineChart
                 categories={cats}
-                series={[
-                  { label: '영향있음', color: '#ef4444', values: versions.map((v) => v.vex?.affected ?? 0) },
-                  { label: '영향없음', color: '#10b981', values: versions.map((v) => v.vex?.not_affected ?? 0) },
-                  { label: '수정됨', color: '#3b82f6', values: versions.map((v) => v.vex?.fixed ?? 0) },
-                  { label: '조사중', color: '#f59e0b', values: versions.map((v) => v.vex?.under_investigation ?? 0) }
-                ]}
+                series={VEX_TYPES
+                  .filter((t) => vexType === 'all' || t.key === vexType)
+                  .map((t) => ({ label: t.label, color: t.color, values: versions.map((v) => v.vex?.[t.key] ?? 0) }))}
               />
             </CardContent>
           </Card>
