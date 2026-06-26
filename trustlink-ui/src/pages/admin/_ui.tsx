@@ -134,3 +134,27 @@ export function Gauge({ label, pct, sub }: { label: string; pct: number; sub?: s
     </div>
   );
 }
+
+// 도넛(파이) 차트 — 구성비(제품별 사용량 등). Apache ECharts.
+export function Donut({
+  data,
+  fmt,
+  empty = '데이터 없음'
+}: {
+  data: { label: string; value: number }[];
+  fmt?: (v: number) => string;
+  empty?: string;
+}) {
+  if (data.length === 0 || data.every((d) => d.value === 0)) return <p className="text-sm text-muted-foreground">{empty}</p>;
+  const f = (v: number) => (fmt ? fmt(v) : String(v));
+  const option = {
+    tooltip: { trigger: 'item', formatter: (p: { name: string; value: number; percent: number }) => `${p.name}<br/>${f(p.value)} (${p.percent}%)` },
+    legend: { type: 'scroll', orient: 'vertical', right: 4, top: 'middle', textStyle: { color: CHART_AXIS }, formatter: (n: string) => (n.length > 18 ? n.slice(0, 17) + '…' : n) },
+    series: [{
+      type: 'pie', radius: ['46%', '72%'], center: ['34%', '50%'], avoidLabelOverlap: true,
+      itemStyle: { borderColor: '#fff', borderWidth: 2 }, label: { show: false }, labelLine: { show: false },
+      data: data.map((d) => ({ name: d.label, value: d.value }))
+    }]
+  };
+  return <ReactECharts option={option as never} style={{ height: 220 }} opts={{ renderer: 'canvas' }} notMerge />;
+}

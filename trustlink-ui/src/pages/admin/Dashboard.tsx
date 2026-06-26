@@ -5,7 +5,7 @@ import {
 } from '@/lib/api';
 import { fmtBytes } from '@/lib/utils';
 import { Card, CardHeader, CardContent, Badge } from '@/components/ui/primitives';
-import { PageTitle, SectionTitle, StatCard, Loading, Alert, BarChart, Gauge, LineChart, selectCls } from './_ui';
+import { PageTitle, SectionTitle, StatCard, Loading, Alert, BarChart, Gauge, LineChart, Donut, selectCls } from './_ui';
 
 const GROUPS = ['admins', 'developers', 'partners', 'customers'];
 
@@ -48,7 +48,13 @@ export default function Dashboard() {
   const byGroup: Record<string, number> = {};
   us.forEach((u) => (u.groups || []).forEach((g) => (byGroup[g] = (byGroup[g] || 0) + 1)));
   const groupData = GROUPS.map((g) => ({ label: g, value: byGroup[g] || 0 }));
-  const repoData = [...(mt.repos || [])].sort((a, b) => b.bytes - a.bytes).slice(0, 8).map((r) => ({ label: r.repo, value: r.bytes }));
+  const repoSorted = [...(mt.repos || [])].sort((a, b) => b.bytes - a.bytes);
+  const repoData = repoSorted.slice(0, 8).map((r) => ({ label: r.repo, value: r.bytes }));
+  // 제품별 디스크 사용량(도넛): 상위 8 + 나머지는 '기타'로 합산
+  const TOPN = 8;
+  const productSizes = repoSorted.slice(0, TOPN).map((r) => ({ label: r.repo.split('/').pop() || r.repo, value: r.bytes }));
+  const restBytes = repoSorted.slice(TOPN).reduce((s, r) => s + r.bytes, 0);
+  if (restBytes > 0) productSizes.push({ label: `기타 ${repoSorted.length - TOPN}개`, value: restBytes });
 
   const versions = selected?.versions || [];
   const cats = versions.map((v) => v.tag);
@@ -69,8 +75,15 @@ export default function Dashboard() {
       {disk && (
         <Card className="mt-4">
           <CardHeader className="font-semibold">디스크 사용량</CardHeader>
-          <CardContent>
-            <Gauge label={disk.path || '저장소'} pct={disk.usedPct ?? 0} sub={`${fmtBytes(disk.freeBytes || 0)} 여유 / ${fmtBytes(disk.totalBytes || 0)}`} />
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Gauge label={disk.path || '저장소'} pct={disk.usedPct ?? 0} sub={`${fmtBytes(disk.freeBytes || 0)} 여유 / ${fmtBytes(disk.totalBytes || 0)}`} />
+              <p className="mt-2 text-xs text-muted-foreground">레지스트리 총 {fmtBytes(mt.repoTotalBytes || 0)} · 제품 {mt.repoCount ?? 0}개</p>
+            </div>
+            <div>
+              <div className="mb-1 text-sm font-medium">제품별 사용량 (레지스트리)</div>
+              <Donut data={productSizes} fmt={fmtBytes} empty="제품 사용량 데이터 없음" />
+            </div>
           </CardContent>
         </Card>
       )}
