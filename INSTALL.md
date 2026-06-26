@@ -45,6 +45,18 @@ bash scripts/install.sh
 
 즉 DT·step-ca 는 외부 비노출·BFF 뒤에 있어 **별도 로그인이 없고**, 사람 인증은 Keycloak 하나로 통일된다. (DT 자체 웹 UI 를 OIDC 로 직접 붙이는 건 본선 비목표 — 필요 시 DT `ALPINE_OIDC_*` 로 별도 구성 가능.)
 
+## 2-c. CA·서명 모드 (내장 vs 외부 bigfoot)
+
+CA·CMS 서명은 두 방식 중 선택:
+- **내장 step-ca** (`docker-compose.deploy.yml` + `install.sh`): TrustLink 가 step-ca 를 함께 띄움. `BIGFOOT_URL` 미설정.
+- **외부 bigfoot 위임** (`docker-compose.bigfoot.yml`, **모듈 독립 최대화·한방 기동**): TrustLink 는 step-ca·키를 보유하지 않고 외부 [bigfoot](https://github.com/chrismarspink/bigfoot) CA 어플라이언스에 발급/서명/암호화를 위임. 인증서 마운트가 없어 chicken-egg 가 사라짐.
+  ```bash
+  # bigfoot 을 먼저 별도로 기동(자체 repo) 후:
+  BIGFOOT_URL=http://<bigfoot>:9100 docker compose -f docker-compose.bigfoot.yml up -d
+  ```
+  - BFF 는 `BIGFOOT_URL` 이 있으면 `share/sign`·`share/package` 를 bigfoot `/api/sign`·`/api/encrypt` 로 위임하고, 검증 Root 는 bigfoot `/api/ca/root` 에서 런타임 조회. TrustLink 가 죽어도 bigfoot 검증/CRL 독립 생존.
+  - 인증서 암호화(.p7m) 시 `recipientId` 는 **bigfoot 수신자 레지스트리 ID**.
+
 ## 4. 검증
 ```bash
 bash scripts/verify.sh          # 인증/RBAC/엔드포인트 자동 점검 (모두 PASS)

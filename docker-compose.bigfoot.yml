@@ -1,0 +1,133 @@
+# TrustLink SCS — bigfoot 백엔드 배포(모듈 독립 최대화).
+#   내장 step-ca 를 제거하고 CA·서명을 외부 bigfoot 어플라이언스(BIGFOOT_URL)에 위임한다.
+#   → TrustLink 는 키·CA·인증서 파일을 보유하지 않음. 인증서 chicken-egg 없음 → 한방 기동.
+#   bigfoot 은 별도로 운영(자체 repo: github.com/chrismarspink/bigfoot, 자체 step-ca·UI).
+#   BIGFOOT_URL 을 bigfoot 콘솔 주소로 지정(같은 도커망이면 http://bigfoot:9100, 외부면 그 URL).
+#   사용: BIGFOOT_URL=http://<bigfoot> docker compose -f docker-compose.bigfoot.yml up -d
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    pull_policy: missing
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8085"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes: [ "kc-data:/opt/keycloak/data" ]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8085"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  zot:
+    image: ${TRUSTLINK_ZOT_IMAGE:-jkkim7202/trustlink-zot:latest}
+    pull_policy: missing
+    command: ["serve", "/etc/zot/config.json"]
+    ports: ["28081:5000"]
+    volumes:
+      - ./trustlink/config.container.json:/etc/zot/config.json:ro
+      - ./zot/htpasswd:/etc/zot/htpasswd:ro
+      - ./zot/oidc-credentials.json:/etc/zot/oidc-credentials.json:ro
+      - tl-data:/var/lib/registry
+      - tl-logs:/var/log/zot
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      trustlink-admin:
+        condition: service_started
+    restart: unless-stopped
+
+  trustlink-admin:                   # BFF = 단일 프론트도어. CA/서명은 bigfoot 위임(키 미보유).
+    image: ${TRUSTLINK_ADMIN_IMAGE:-jkkim7202/trustlink-admin:latest}
+    pull_policy: missing
+    networks:
+      default:
+        aliases: ["${FRONT_HOST}"]
+    ports: ["${FRONT_PORT}:${FRONT_PORT}"]
+    environment:
+      ADDR: ":${FRONT_PORT}"
+      UI_DIR: /srv/ui
+      KC_PUBLIC: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_INTERNAL: http://keycloak:8085/auth
+      KC_PROXY_TARGET: http://keycloak:8085
+      REALM: trustlink
+      CLIENT_ID: trustlink-admin
+      CLIENT_SECRET: ${TRUSTLINK_ADMIN_SECRET}
+      REDIRECT_URI: http://${FRONT_HOST}:${FRONT_PORT}/admin/callback
+      ZOT_API_URL: http://zot:5000
+      ZOT_METRICS_URL: http://zot:5000/metrics
+      ZOT_METRICS_USER: ci
+      ZOT_METRICS_PASS: ${CI_PASSWORD}
+      ZOT_ADMIN_USER: svc-bff
+      ZOT_ADMIN_PASS: ${SVC_BFF_PASS}
+      ZOT_DATA: /var/lib/registry
+      LOG_FILE: /var/log/zot/zot.log
+      CONFIG_FILE: /etc/zot/config.json
+      DT_BASE_URL: http://dtrack-apiserver:8080
+      DT_API_KEY: ${DT_API_KEY:-}
+      # CA·서명 위임 대상. 예: http://bigfoot:9100
+      BIGFOOT_URL: "${BIGFOOT_URL:?bigfoot 주소 필요}"
+      SOR_PATH: /var/lib/trustlink/sor.jsonl
+      SESSIONS_PATH: /var/lib/trustlink/sessions.json
+    volumes:
+      - ./trustlink/config.container.json:/etc/zot/config.json:ro
+      - tl-data:/var/lib/registry:ro
+      - tl-logs:/var/log/zot:ro
+      - tl-sor:/var/lib/trustlink
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dtrack-db:
+    image: postgres:16
+    pull_policy: missing
+    environment:
+      POSTGRES_DB: dtrack
+      POSTGRES_USER: dtrack
+      POSTGRES_PASSWORD: ${DT_DB_PASSWORD}
+    volumes: ["dtrack-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dtrack -d dtrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  dtrack-apiserver:
+    image: dependencytrack/apiserver:latest
+    pull_policy: missing
+    environment:
+      ALPINE_DATABASE_MODE: external
+      ALPINE_DATABASE_URL: jdbc:postgresql://dtrack-db:5432/dtrack
+      ALPINE_DATABASE_DRIVER: org.postgresql.Driver
+      ALPINE_DATABASE_USERNAME: dtrack
+      ALPINE_DATABASE_PASSWORD: ${DT_DB_PASSWORD}
+    mem_limit: 4608m
+    ports: ["127.0.0.1:8081:8080"]
+    volumes: ["dtrack-data:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    depends_on:
+      dtrack-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  kc-data:
+  tl-data:
+  tl-logs:
+  tl-sor:
+  dtrack-db:
+  dtrack-data:

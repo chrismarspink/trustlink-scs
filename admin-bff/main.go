@@ -50,6 +50,9 @@ type Config struct {
 	DTApiKey      string // DT 서비스 API 키 (X-Api-Key)
 	UIDir         string // 신규 trustlink-ui dist 경로 (단일 프론트도어 서빙)
 	KCProxyTarget string // /auth/* 리버스 프록시 타깃 (relative-path 미포함 베이스)
+	// 외부 CA·서명 어플라이언스(bigfoot) 위임. 설정 시 발급/서명/암호화를 bigfoot API 로 위임
+	// (TrustLink 는 키·step-ca 미보유 → 모듈 독립). 미설정 시 아래 내장 step-ca 사용.
+	BigfootURL string // http://bigfoot:9100 (예). 빈 값이면 내장 CA.
 	// CA(step-ca) 연동 — 평면2. 미설정 시 CA 기능 비활성.
 	StepCaURL         string // https://step-ca:9000 (평면1 독립 엔드포인트)
 	StepCaRoot        string // 신뢰 앵커(CAfile) 경로
@@ -94,6 +97,7 @@ func loadConfig() Config {
 		UIDir:             env("UI_DIR", ""),
 		KCProxyTarget:     env("KC_PROXY_TARGET", env("KC_INTERNAL", "http://localhost:8085")),
 		StepCaURL:         env("STEPCA_URL", ""),
+		BigfootURL:        env("BIGFOOT_URL", ""),
 		StepCaRoot:        env("STEPCA_ROOT", "/etc/trustlink/step-root.crt"),
 		StepCaIssuer:      env("STEPCA_ISSUER", "/etc/trustlink/step-issuer.crt"),
 		StepCaProvisioner: env("STEPCA_PROVISIONER", "trustlink"),

@@ -127,8 +127,8 @@ func (s *Server) bindCMSReferrer(repo, tag, subjectDigest string, p7s []byte, se
 
 // POST /api/share/sign {repo, tag} — 발급→CMS 서명→referrer 바인딩→SoR.
 func (s *Server) apiShareSign(w http.ResponseWriter, r *http.Request) {
-	if !s.caEnabled() {
-		writeJSON(w, 503, map[string]string{"error": "CA 미구성"})
+	if !s.signingAvailable() {
+		writeJSON(w, 503, map[string]string{"error": "서명 불가(CA/bigfoot 미구성)"})
 		return
 	}
 	var in struct{ Repo, Tag string }
@@ -146,35 +146,28 @@ func (s *Server) apiShareSign(w http.ResponseWriter, r *http.Request) {
 	}
 	manifestBytes, _ := json.Marshal(bm)
 
-	// 2) 서명 인증서 발급(평면2, 짧은 수명)
+	// 2) CMS 서명 — bigfoot 위임 또는 내장 step-ca (3) 자체검증
 	cn := fmt.Sprintf("trustlink-release/%s:%s", in.Repo, in.Tag)
-	ic, err := s.ca.IssueCert(actor, cn, nil, "24h")
+	p7s, serial, err := s.signContent(actor, cn, manifestBytes)
 	if err != nil {
-		writeJSON(w, 502, map[string]string{"error": "발급 실패: " + err.Error()})
+		writeJSON(w, 502, map[string]string{"error": "CMS 서명 실패: " + err.Error()})
 		return
 	}
-
-	// 3) CMS 서명 + 자체검증
-	p7s, err := cmsSign(manifestBytes, ic.CertPEM, ic.KeyPEM)
-	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "CMS 서명 실패: " + err.Error()})
-		return
-	}
-	verified, _, vdetail := cmsVerify(p7s, s.cfg.StepCaRoot)
+	verified, vdetail := s.verifyCMS(p7s)
 	fipsOn, fipsDetail := fipsStatus()
 
 	// 4) Zot referrer 바인딩
-	refDigest, err := s.bindCMSReferrer(in.Repo, in.Tag, subjectDigest, p7s, ic.Serial, actor)
+	refDigest, err := s.bindCMSReferrer(in.Repo, in.Tag, subjectDigest, p7s, serial, actor)
 	if err != nil {
 		writeJSON(w, 502, map[string]string{"error": "referrer 바인딩 실패: " + err.Error()})
 		return
 	}
 
 	// 5) SoR
-	_ = s.sor.append(SoREvent{Actor: actor, Action: "sign", Serial: ic.Serial, Subject: cn, Repo: in.Repo, Tag: in.Tag,
+	_ = s.sor.append(SoREvent{Actor: actor, Action: "sign", Serial: serial, Subject: cn, Repo: in.Repo, Tag: in.Tag,
 		Status: map[bool]string{true: "verified", false: "verify-failed"}[verified],
-		Detail: map[string]any{"p7sSize": len(p7s), "fips": fipsOn, "artifacts": len(bm.Artifacts)}})
-	_ = s.sor.append(SoREvent{Actor: actor, Action: "bind", Serial: ic.Serial, Repo: in.Repo, Tag: in.Tag,
+		Detail: map[string]any{"p7sSize": len(p7s), "fips": fipsOn, "artifacts": len(bm.Artifacts), "bigfoot": s.bigfootEnabled()}})
+	_ = s.sor.append(SoREvent{Actor: actor, Action: "bind", Serial: serial, Repo: in.Repo, Tag: in.Tag,
 		Detail: map[string]any{"referrer": refDigest, "subject": subjectDigest}})
 
 	writeJSON(w, 200, map[string]any{
@@ -182,7 +175,7 @@ func (s *Server) apiShareSign(w http.ResponseWriter, r *http.Request) {
 		"repo":       in.Repo,
 		"tag":        in.Tag,
 		"subject":    subjectDigest,
-		"serial":     ic.Serial,
+		"serial":     serial,
 		"referrer":   refDigest,
 		"p7sSize":    len(p7s),
 		"artifacts":  bm.Artifacts,
@@ -227,22 +220,11 @@ func (s *Server) apiSharePackage(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "서명 또는 암호화 중 하나는 필요"})
 		return
 	}
-	if doSign && !s.caEnabled() {
-		writeJSON(w, 503, map[string]string{"error": "CA 미구성(서명 불가)"})
+	if doSign && !s.signingAvailable() {
+		writeJSON(w, 503, map[string]string{"error": "서명 불가(CA/bigfoot 미구성)"})
 		return
 	}
 	actor := w.Header().Get("X-User")
-
-	// 수신자(인증서 암호화 시)
-	var recip *Recipient
-	if recipID != "" {
-		var err error
-		recip, err = s.recipientByID(recipID)
-		if err != nil {
-			writeJSON(w, 404, map[string]string{"error": err.Error()})
-			return
-		}
-	}
 
 	// 1) 산출물 번들(zip) — svc 자격으로 수집
 	caller := s.svcCaller()
@@ -257,55 +239,75 @@ func (s *Server) apiSharePackage(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 502, map[string]string{"error": "번들 수집 실패(빈 산출물)"})
 		return
 	}
+	cn := fmt.Sprintf("trustlink-release/%s:%s", repo, tag)
+	bundleBytes := bundle.Bytes()
 
-	// 2) (선택) CMS 서명 — 서명 시에만 인증서 발급
-	content := bundle.Bytes()
-	serial := ""
-	if doSign {
-		cn := fmt.Sprintf("trustlink-release/%s:%s", repo, tag)
-		ic, err := s.ca.IssueCert(actor, cn, nil, "24h")
-		if err != nil {
-			writeJSON(w, 502, map[string]string{"error": "발급 실패: " + err.Error()})
-			return
-		}
-		content, err = cmsSign(content, ic.CertPEM, ic.KeyPEM)
-		if err != nil {
-			writeJSON(w, 500, map[string]string{"error": "CMS 서명 실패: " + err.Error()})
-			return
-		}
-		serial = ic.Serial
-	}
-
-	// 3) (선택) 암호화 — 인증서 또는 패스워드. 암호화하면 .p7m, 아니면 .p7s
-	out, ext, ctype, mode := content, "p7s", "application/pkcs7-signature", "sign"
+	// 2) 서명/암호화 — bigfoot 위임(BIGFOOT_URL) 또는 내장 step-ca. 결과 .p7s/.p7m
+	out, ext, ctype, mode, serial, recipName := bundleBytes, "p7s", "application/pkcs7-signature", "sign", "", ""
 	switch {
-	case recip != nil:
-		enc, err := cmsEncrypt(content, [][]byte{[]byte(recip.CertPEM)}, s.cfg.CMSContentCipher, s.cfg.CMSRsaPadding)
-		if err != nil {
-			writeJSON(w, 500, map[string]string{"error": "인증서 암호화 실패: " + err.Error()})
-			return
-		}
-		out, ext, ctype = enc, "p7m", "application/pkcs7-mime"
+	case recipID != "": // 인증서 암호화 → .p7m
+		ext, ctype = "p7m", "application/pkcs7-mime"
 		mode = map[bool]string{true: "sign+encrypt-cert", false: "encrypt-cert"}[doSign]
-	case password != "":
-		enc, err := cmsEncryptPassword(content, password)
-		if err != nil {
-			writeJSON(w, 500, map[string]string{"error": "패스워드 암호화 실패: " + err.Error()})
+		if s.bigfootEnabled() {
+			// bigfoot 가 (서명 후) 수신자 암호화. recipientId = bigfoot 수신자 레지스트리 ID.
+			o, sn, e := s.bigfootEncrypt(bundleBytes, []string{recipID}, cn, doSign)
+			if e != nil {
+				writeJSON(w, 502, map[string]string{"error": "bigfoot 암호화 실패: " + e.Error()})
+				return
+			}
+			out, serial, recipName = o, sn, recipID
+		} else {
+			recip, e := s.recipientByID(recipID)
+			if e != nil {
+				writeJSON(w, 404, map[string]string{"error": e.Error()})
+				return
+			}
+			content := bundleBytes
+			if doSign {
+				if content, serial, e = s.signContent(actor, cn, content); e != nil {
+					writeJSON(w, 502, map[string]string{"error": "CMS 서명 실패: " + e.Error()})
+					return
+				}
+			}
+			o, e := cmsEncrypt(content, [][]byte{[]byte(recip.CertPEM)}, s.cfg.CMSContentCipher, s.cfg.CMSRsaPadding)
+			if e != nil {
+				writeJSON(w, 500, map[string]string{"error": "인증서 암호화 실패: " + e.Error()})
+				return
+			}
+			out, recipName = o, recip.Subject
+		}
+	case password != "": // 패스워드 암호화 → .p7m (PWRI 는 키 불필요 → 로컬). 서명은 bigfoot/로컬.
+		ext, ctype = "p7m", "application/pkcs7-mime"
+		mode = map[bool]string{true: "sign+encrypt-pw", false: "encrypt-pw"}[doSign]
+		content := bundleBytes
+		if doSign {
+			c, sn, e := s.signContent(actor, cn, content)
+			if e != nil {
+				writeJSON(w, 502, map[string]string{"error": "CMS 서명 실패: " + e.Error()})
+				return
+			}
+			content, serial = c, sn
+		}
+		o, e := cmsEncryptPassword(content, password)
+		if e != nil {
+			writeJSON(w, 500, map[string]string{"error": "패스워드 암호화 실패: " + e.Error()})
 			return
 		}
-		out, ext, ctype = enc, "p7m", "application/pkcs7-mime"
-		mode = map[bool]string{true: "sign+encrypt-pw", false: "encrypt-pw"}[doSign]
+		out = o
+	default: // 서명만 → .p7s
+		o, sn, e := s.signContent(actor, cn, bundleBytes)
+		if e != nil {
+			writeJSON(w, 502, map[string]string{"error": "CMS 서명 실패: " + e.Error()})
+			return
+		}
+		out, serial = o, sn
 	}
 
-	// 4) SoR
+	// 3) SoR
 	fipsOn, _ := fipsStatus()
-	recipName := ""
-	if recip != nil {
-		recipName = recip.Subject
-	}
 	_ = s.sor.append(SoREvent{Actor: actor, Action: "sign", Serial: serial, Repo: repo, Tag: tag,
 		Status: "packaged", Detail: map[string]any{"mode": mode, "format": ext, "bundleSize": bundle.Len(),
-			"outSize": len(out), "recipient": recipName, "fips": fipsOn}})
+			"outSize": len(out), "recipient": recipName, "fips": fipsOn, "bigfoot": s.bigfootEnabled()}})
 
 	// 5) 다운로드 스트림
 	base := nonName.ReplaceAllString(path.Base(repo)+"-"+tag, "_")
