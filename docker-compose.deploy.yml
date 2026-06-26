@@ -1,15 +1,161 @@
-# Docker Hub 이미지로 compose-only 설치하기 위한 오버레이.
-#   커스텀 이미지(zot 빌드·BFF)를 로컬 빌드(pull_policy:never) 대신 Docker Hub 에서 받도록 교체.
-#   사용:
-#     docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-#     docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d
-#   기본 네임스페이스 jkkim7202 (2026-06-22 게시; trustlink-scs org 미보유로 개인 계정 사용).
-#   다른 네임스페이스면 TRUSTLINK_ZOT_IMAGE/TRUSTLINK_ADMIN_IMAGE env 로 지정.
-#   (업스트림 keycloak·step-ca·postgres·dependency-track 는 base compose 가 공개 레지스트리에서 자동 pull)
+# TrustLink SCS — 설치/배포용 단일 compose (자기완결).
+#   커스텀 이미지(zot·BFF)는 Docker Hub 에서, 나머지(keycloak·step-ca·postgres·dependency-track)는
+#   공식 오픈소스 이미지를 자동 pull. `docker compose -f docker-compose.deploy.yml ...` 단독 사용.
+#   초기 설정(realm/사용자/시크릿/CA 인증서/DT)은 순서가 있어 scripts/install.sh 로 자동화한다.
+#   (개발용 로컬빌드 compose 는 docker-compose.yml + docker-compose.dtrack.yml)
+#
+#   이미지 override: TRUSTLINK_ZOT_IMAGE / TRUSTLINK_ADMIN_IMAGE 로 네임스페이스 교체 가능.
 services:
-  zot:
-    image: ${TRUSTLINK_ZOT_IMAGE:-jkkim7202/trustlink-zot:latest}
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
     pull_policy: missing
-  trustlink-admin:
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8085"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - kc-data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8085"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  zot:
+    image: ${TRUSTLINK_ZOT_IMAGE:-jkkim7202/trustlink-zot:latest}   # 공식 zot + 평문HTTP OIDC 쿠키 패치
+    pull_policy: missing
+    command: ["serve", "/etc/zot/config.json"]
+    ports: ["28081:5000"]
+    volumes:
+      - ./trustlink/config.container.json:/etc/zot/config.json:ro
+      - ./zot/htpasswd:/etc/zot/htpasswd:ro
+      - ./zot/oidc-credentials.json:/etc/zot/oidc-credentials.json:ro
+      - tl-data:/var/lib/registry
+      - tl-logs:/var/log/zot
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      trustlink-admin:
+        condition: service_started
+    restart: unless-stopped
+
+  trustlink-admin:                   # BFF = 단일 프론트도어(Keycloak 단일 로그인 → 전 모듈 중개)
     image: ${TRUSTLINK_ADMIN_IMAGE:-jkkim7202/trustlink-admin:latest}
     pull_policy: missing
+    networks:
+      default:
+        aliases: ["${FRONT_HOST}"]
+    ports: ["${FRONT_PORT}:${FRONT_PORT}"]
+    environment:
+      ADDR: ":${FRONT_PORT}"
+      UI_DIR: /srv/ui
+      KC_PUBLIC: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_INTERNAL: http://keycloak:8085/auth
+      KC_PROXY_TARGET: http://keycloak:8085
+      REALM: trustlink
+      CLIENT_ID: trustlink-admin
+      CLIENT_SECRET: ${TRUSTLINK_ADMIN_SECRET}
+      REDIRECT_URI: http://${FRONT_HOST}:${FRONT_PORT}/admin/callback
+      ZOT_API_URL: http://zot:5000
+      ZOT_METRICS_URL: http://zot:5000/metrics
+      ZOT_METRICS_USER: ci
+      ZOT_METRICS_PASS: ${CI_PASSWORD}
+      ZOT_ADMIN_USER: svc-bff
+      ZOT_ADMIN_PASS: ${SVC_BFF_PASS}
+      ZOT_DATA: /var/lib/registry
+      LOG_FILE: /var/log/zot/zot.log
+      CONFIG_FILE: /etc/zot/config.json
+      DT_BASE_URL: http://dtrack-apiserver:8080
+      DT_API_KEY: ${DT_API_KEY:-}
+      STEPCA_URL: https://step-ca:9000
+      STEPCA_ROOT: /etc/trustlink/step-root.crt
+      STEPCA_ISSUER: /etc/trustlink/step-issuer.crt
+      STEPCA_PROVISIONER: trustlink
+      STEPCA_PROVISIONER_PASSWORD_FILE: /etc/trustlink/ca-password
+      SOR_PATH: /var/lib/trustlink/sor.jsonl
+      SESSIONS_PATH: /var/lib/trustlink/sessions.json
+      CMS_CONTENT_CIPHER: -aes-256-gcm
+      CMS_RSA_PADDING: oaep
+    volumes:
+      - ./trustlink/config.container.json:/etc/zot/config.json:ro
+      - tl-data:/var/lib/registry:ro
+      - tl-logs:/var/log/zot:ro
+      - ./stepca/root_ca.crt:/etc/trustlink/step-root.crt:ro
+      - ./stepca/issuer_ca.crt:/etc/trustlink/step-issuer.crt:ro
+      - ./stepca/ca-password:/etc/trustlink/ca-password:ro
+      - tl-sor:/var/lib/trustlink
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      step-ca:
+        condition: service_started
+    restart: unless-stopped
+
+  step-ca:                           # 평면1: 발급/검증/CRL 독립 (공식 이미지 + env init)
+    image: smallstep/step-ca:latest
+    pull_policy: missing
+    environment:
+      DOCKER_STEPCA_INIT_NAME: "TrustLink Issuing CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost,trustlink"
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: "trustlink"
+      DOCKER_STEPCA_INIT_PASSWORD_FILE: "/run/secrets/ca-password"
+      DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT: "false"
+    ports: ["28443:9000"]
+    volumes:
+      - stepca-data:/home/step
+      - ./stepca/ca-password:/run/secrets/ca-password:ro
+    restart: unless-stopped
+
+  dtrack-db:                         # Dependency-Track DB (공식 postgres)
+    image: postgres:16
+    pull_policy: missing
+    environment:
+      POSTGRES_DB: dtrack
+      POSTGRES_USER: dtrack
+      POSTGRES_PASSWORD: ${DT_DB_PASSWORD}
+    volumes: ["dtrack-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dtrack -d dtrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  dtrack-apiserver:                  # Dependency-Track API (헤드리스, 내부 전용)
+    image: dependencytrack/apiserver:latest
+    pull_policy: missing
+    environment:
+      ALPINE_DATABASE_MODE: external
+      ALPINE_DATABASE_URL: jdbc:postgresql://dtrack-db:5432/dtrack
+      ALPINE_DATABASE_DRIVER: org.postgresql.Driver
+      ALPINE_DATABASE_USERNAME: dtrack
+      ALPINE_DATABASE_PASSWORD: ${DT_DB_PASSWORD}
+    mem_limit: 4608m
+    ports: ["127.0.0.1:8081:8080"]
+    volumes: ["dtrack-data:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    depends_on:
+      dtrack-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  kc-data:
+  tl-data:
+  tl-logs:
+  stepca-data:
+  tl-sor:
+  dtrack-db:
+  dtrack-data:

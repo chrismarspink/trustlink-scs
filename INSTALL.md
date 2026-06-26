@@ -20,48 +20,30 @@ cp .env.example .env
 ```
 > ⚠️ `.env`·`zot/htpasswd`·`zot/oidc-credentials.json`·`stepca/*`·키 파일은 **절대 커밋 금지**(이미 `.gitignore`).
 
-## 2. 이미지 확보 — 두 가지 방법
+## 2. 원커맨드 설치 [권장]
 
-### (A) Docker Hub — compose-only 설치 [권장, 이미지 게시 후]
-커스텀 이미지(zot·BFF)를 Docker Hub 에 게시(배포자 1회). 기본 게시본: **`jkkim7202/trustlink-zot`, `jkkim7202/trustlink-admin`** (2026-06-22):
+통합 compose(`docker-compose.deploy.yml`, 자기완결)로 **이미지 다운로드 + 기동 + 초기 설정**을 한 번에:
 ```bash
-docker login -u <계정>                  # push 권한 계정
-NS=<계정> bash scripts/push-images.sh   # <계정>/trustlink-zot, .../trustlink-admin push
+bash scripts/install.sh
 ```
-설치측은 빌드 없이 compose 로만:
-```bash
-docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d
-```
-> 다른 네임스페이스면 `TRUSTLINK_ZOT_IMAGE`/`TRUSTLINK_ADMIN_IMAGE` env 로 지정. 미게시 상태면 (B) 사용.
+수행 내용(순서 자동화): 이미지 pull → 시크릿/htpasswd(ci·svc-bff) → Keycloak·step-ca·DT 기동 → realm/clients(zot·trustlink-admin)/groups/users 구성 → CA Root/Intermediate 추출 → zot·BFF 기동 → DT 부트스트랩.
 
-### (B) 소스 빌드 [이미지 미게시 시]
-```bash
-# zot 이미지(trustlink:latest): zot 소스에서 빌드 (make binary-minimal / docker build)
-# BFF 이미지(trustlink-admin:latest) + UI: 동봉 스크립트
-bash admin-bff/build.sh        # UI 빌드 → go 빌드 → 이미지 빌드 → recreate
-```
-업스트림 이미지(keycloak·step-ca·postgres·dependency-track)는 compose 가 공개 레지스트리에서 자동 pull.
+- 커스텀 이미지는 Docker Hub `jkkim7202/trustlink-zot`·`jkkim7202/trustlink-admin`(공식 zot + 평문HTTP OIDC 패치 / BFF). 나머지(keycloak·step-ca·postgres·dependency-track)는 **공식 오픈소스 이미지 자동 pull**.
+- 이미지 네임스페이스 교체: `TRUSTLINK_ZOT_IMAGE`/`TRUSTLINK_ADMIN_IMAGE` env.
 
-## 3. 기동 + 초기 설정
+> 왜 스크립트인가: BFF 가 step-ca 가 생성하는 Root/Issuer 인증서를 마운트하므로, 단순 `docker compose up` 한 번으로는 **인증서 생성→추출→BFF 기동 순서**를 맞출 수 없다. install.sh 가 이 순서를 처리한다.
 
-```bash
-# 3-1) Keycloak 렐름/클라이언트/사용자 + htpasswd(ci) + OIDC 시크릿 자동 구성 + zot 기동
-bash scripts/bootstrap.sh
+### (대안) 소스 빌드 후 설치
+이미지를 직접 빌드해 쓰려면: zot 이미지는 zot 소스에서 빌드(`make`/docker build), BFF 는 `bash admin-bff/build.sh`. 그 후 `TRUSTLINK_*_IMAGE` 를 로컬 태그로 지정하고 `bash scripts/install.sh`.
 
-# 3-2) step-ca 기동 (Root/Intermediate 자동 init, CRL 활성)
-docker compose up -d step-ca
-#   신뢰 앵커·발급 CA 를 호스트로 추출(BFF 가 마운트해 다운로드/검증에 사용)
-docker compose exec -T step-ca cat /home/step/certs/root_ca.crt         > stepca/root_ca.crt
-docker compose exec -T step-ca cat /home/step/certs/intermediate_ca.crt > stepca/issuer_ca.crt
-#   (재현성 주의: ca.json 의 crl.enabled=true, provisioner claims.maxTLSCertDuration=8760h 패치 필요 — SPEC §11)
+## 2-b. 통합 인증(Keycloak SSO) 구조
 
-# 3-3) Dependency-Track 부트스트랩(팀/권한/API 키 → .env 의 DT_API_KEY)
-bash scripts/dt-bootstrap.sh
+**BFF(trustlink-admin)가 단일 프론트도어**(포트 28080)다. 사용자는 **Keycloak 1회 로그인**으로 전부 접근:
+- 제품/관리 UI·zot 레지스트리(`/v2`) → Keycloak OIDC (zot·trustlink-admin 클라이언트)
+- Dependency-Track → BFF 가 서버측 API 키로 중개(사용자 직접 로그인 없음, 내부 전용)
+- step-ca → BFF 어댑터가 발급/조회 중개(평면2). 검증자는 step-ca(28443)에 직접(평면1)
 
-# 3-4) 전체 스택 기동
-docker compose up -d
-```
+즉 DT·step-ca 는 외부 비노출·BFF 뒤에 있어 **별도 로그인이 없고**, 사람 인증은 Keycloak 하나로 통일된다. (DT 자체 웹 UI 를 OIDC 로 직접 붙이는 건 본선 비목표 — 필요 시 DT `ALPINE_OIDC_*` 로 별도 구성 가능.)
 
 ## 4. 검증
 ```bash

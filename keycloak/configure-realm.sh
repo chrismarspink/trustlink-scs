@@ -7,6 +7,10 @@ KC=/opt/keycloak/bin/kcadm.sh
 REALM=trustlink
 ADMIN="${KC_ADMIN:-admin}"
 ADMIN_PW="${KC_ADMIN_PASSWORD:?set KC_ADMIN_PASSWORD}"
+FRONT_HOST="${FRONT_HOST:-trustlink}"
+FRONT_PORT="${FRONT_PORT:-28080}"
+ORIGIN="http://${FRONT_HOST}:${FRONT_PORT}"
+ADMIN_SECRET="${TRUSTLINK_ADMIN_SECRET:-}"   # BFF(trustlink-admin) 클라이언트 시크릿(.env)
 
 $KC config credentials --server http://localhost:8085 --realm master --user "$ADMIN" --password "$ADMIN_PW"
 
@@ -24,7 +28,7 @@ if [ -z "${CID}" ]; then
   CID=$($KC create clients -r $REALM -i \
     -s clientId=zot -s enabled=true -s protocol=openid-connect \
     -s publicClient=false -s standardFlowEnabled=true -s directAccessGrantsEnabled=true \
-    -s 'redirectUris=["http://localhost:28080/zot/auth/callback/oidc","http://localhost:28080/*","http://localhost:5002/zot/auth/callback/oidc","http://localhost:5002/*"]' \
+    -s "redirectUris=[\"${ORIGIN}/zot/auth/callback/oidc\",\"${ORIGIN}/*\",\"http://localhost:28080/*\",\"http://localhost:5002/*\"]" \
     -s 'webOrigins=["+"]')
   echo "client zot created ($CID)"
 else
@@ -41,6 +45,28 @@ $KC create clients/$CID/protocol-mappers/models -r $REALM \
   -s 'config."id.token.claim"=true' \
   -s 'config."access.token.claim"=true' \
   -s 'config."userinfo.token.claim"=true' 2>/dev/null && echo "mapper created" || echo "mapper exists"
+
+# 3-b) client(trustlink-admin = BFF 단일 프론트도어). confidential + standard flow.
+#      시크릿은 .env 의 TRUSTLINK_ADMIN_SECRET 로 고정(BFF env 와 일치해야 로그인 성공).
+AID=$($KC get clients -r $REALM -q clientId=trustlink-admin --fields id --format csv --noquotes 2>/dev/null | tail -1)
+if [ -z "${AID}" ]; then
+  AID=$($KC create clients -r $REALM -i \
+    -s clientId=trustlink-admin -s enabled=true -s protocol=openid-connect \
+    -s publicClient=false -s standardFlowEnabled=true -s directAccessGrantsEnabled=true \
+    -s "redirectUris=[\"${ORIGIN}/admin/callback\"]" -s 'webOrigins=["+"]')
+  echo "client trustlink-admin created ($AID)"
+else
+  echo "client trustlink-admin exists ($AID)"
+fi
+[ -n "${ADMIN_SECRET}" ] && $KC update clients/$AID -r $REALM -s secret="${ADMIN_SECRET}" 2>/dev/null \
+  && echo "trustlink-admin secret set" || echo "WARN: TRUSTLINK_ADMIN_SECRET 미설정 — BFF 로그인 실패할 수 있음"
+# groups 매퍼(동일 — 토큰에 groups 클레임)
+$KC create clients/$AID/protocol-mappers/models -r $REALM \
+  -s name=groups -s protocol=openid-connect \
+  -s protocolMapper=oidc-group-membership-mapper \
+  -s 'config."claim.name"=groups' -s 'config."full.path"=false' \
+  -s 'config."id.token.claim"=true' -s 'config."access.token.claim"=true' \
+  -s 'config."userinfo.token.claim"=true' 2>/dev/null && echo "admin mapper created" || echo "admin mapper exists"
 
 # 5) 샘플 사용자(역할별 1명) + 그룹 배정
 # 컨테이너에 awk 가 없어 csv(id,name) 를 grep/cut 로 파싱한다.
