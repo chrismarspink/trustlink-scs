@@ -16,7 +16,7 @@
           "deleteReferrers": false,
           "keepTags": [
             { "patterns": ["^latest$"] },
-            { "patterns": ["^v?[0-9]+\\.[0-9]+\\.[0-9]+$"], "mostRecentlyPushedCount": 1 }
+            { "patterns": [".*"], "mostRecentlyPushedCount": 10 }
           ]
         }
       ]
