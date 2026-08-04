@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # TrustLink 자기 dogfooding: 스택 구성요소(자체 + 서브모듈) + 설정을 버전별로 TrustLink(zot)에
-# 올리고, 컴포넌트별로 SBOM 생성 → 취약점 분석(DT) → VEX 발행 → CMS 서명까지 수행한다.
+# 올리고, 컴포넌트별로 SBOM 생성 → 취약점 분석(DT) → VEX 발행 까지 수행한다.
 #
 # 파이프라인(컴포넌트당):
 #   syft → CycloneDX SBOM
 #   oras push(descriptor 주체) + attach(SBOM referrer)          [ci 자격]
 #   BFF /api/vex/upload → DT 분석 → 대기 → /api/vex/publish(VEX) [admin 세션 + ci basic]
-#   BFF /api/share/sign → CMS 서명 .p7s referrer 바인딩          [admin 세션]
 #
 # 필요 도구: syft, oras, curl, python3, docker. 기본값은 PoC 데모 자격.
 set -u
@@ -25,7 +24,6 @@ COMPONENTS="
 trustlink-admin|trustlink-admin:latest|TrustLink BFF (자체)
 zot|trustlink:latest|아티팩트 레지스트리 zot (자체 빌드)
 keycloak|quay.io/keycloak/keycloak:latest|인증 (Keycloak)
-step-ca|smallstep/step-ca:latest|CA (step-ca)
 dependency-track|dependencytrack/apiserver:latest|취약점 분석 (Dependency-Track)
 postgres|postgres:16|DT 데이터베이스 (PostgreSQL)
 "
@@ -81,11 +79,6 @@ PY
   curl -s -b "$JAR" -u "$CI_USER:$CI_PASS" -H "Content-Type: application/json" \
     -d "{\"repo\":\"$repo\",\"tag\":\"$VER\"}" "$BFF/api/vex/publish" \
     | python3 -c "import json,sys;d=json.load(sys.stdin);print('  VEX:', d.get('status',d.get('error')))" 2>/dev/null
-
-  # CMS 서명 + referrer 바인딩
-  curl -s -b "$JAR" -H "Content-Type: application/json" \
-    -d "{\"repo\":\"$repo\",\"tag\":\"$VER\"}" "$BFF/api/share/sign" \
-    | python3 -c "import json,sys;d=json.load(sys.stdin);print('  서명:', d.get('status',d.get('error')),'verified=',d.get('verified'),'serial=',d.get('serial'))" 2>/dev/null
 }
 
 push_config() {
@@ -95,9 +88,6 @@ push_config() {
   ( cd "$WORK" && oras push --plain-http -u "$CI_USER" -p "$CI_PASS" "$REG/$repo:$VER" \
       --artifact-type application/vnd.trustlink.config.v1+tar \
       "$tar":application/gzip >/dev/null 2>&1 ) && echo "  push: $repo:$VER ($(wc -c < "$WORK/$tar") bytes)"
-  curl -s -b "$JAR" -H "Content-Type: application/json" \
-    -d "{\"repo\":\"$repo\",\"tag\":\"$VER\"}" "$BFF/api/share/sign" \
-    | python3 -c "import json,sys;d=json.load(sys.stdin);print('  서명:', d.get('status',d.get('error')),'verified=',d.get('verified'))" 2>/dev/null
 }
 
 echo "TrustLink dogfooding — VER=$VER REG=$REG NS=$NS"

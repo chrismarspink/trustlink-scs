@@ -1,5 +1,5 @@
 # TrustLink SCS — 설치/배포용 단일 compose (자기완결).
-#   커스텀 이미지(zot·BFF)는 Docker Hub 에서, 나머지(keycloak·step-ca·postgres·dependency-track)는
+#   커스텀 이미지(zot·BFF)는 Docker Hub 에서, 나머지(keycloak·postgres·dependency-track)는
 #   공식 오픈소스 이미지를 자동 pull. `docker compose -f docker-compose.deploy.yml ...` 단독 사용.
 #   초기 설정(realm/사용자/시크릿/CA 인증서/DT)은 순서가 있어 scripts/install.sh 로 자동화한다.
 #   (개발용 로컬빌드 compose 는 docker-compose.yml + docker-compose.dtrack.yml)
@@ -74,43 +74,16 @@ services:
       CONFIG_FILE: /etc/zot/config.json
       DT_BASE_URL: http://dtrack-apiserver:8080
       DT_API_KEY: ${DT_API_KEY:-}
-      STEPCA_URL: https://step-ca:9000
-      STEPCA_ROOT: /etc/trustlink/step-root.crt
-      STEPCA_ISSUER: /etc/trustlink/step-issuer.crt
-      STEPCA_PROVISIONER: trustlink
-      STEPCA_PROVISIONER_PASSWORD_FILE: /etc/trustlink/ca-password
       SOR_PATH: /var/lib/trustlink/sor.jsonl
       SESSIONS_PATH: /var/lib/trustlink/sessions.json
-      CMS_CONTENT_CIPHER: -aes-256-gcm
-      CMS_RSA_PADDING: oaep
     volumes:
       - ./trustlink/config.container.json:/etc/zot/config.json:ro
       - tl-data:/var/lib/registry:ro
       - tl-logs:/var/log/zot:ro
-      - ./stepca/root_ca.crt:/etc/trustlink/step-root.crt:ro
-      - ./stepca/issuer_ca.crt:/etc/trustlink/step-issuer.crt:ro
-      - ./stepca/ca-password:/etc/trustlink/ca-password:ro
       - tl-sor:/var/lib/trustlink
     depends_on:
       keycloak:
         condition: service_healthy
-      step-ca:
-        condition: service_started
-    restart: unless-stopped
-
-  step-ca:                           # 평면1: 발급/검증/CRL 독립 (공식 이미지 + env init)
-    image: smallstep/step-ca:latest
-    pull_policy: missing
-    environment:
-      DOCKER_STEPCA_INIT_NAME: "TrustLink Issuing CA"
-      DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost,trustlink"
-      DOCKER_STEPCA_INIT_PROVISIONER_NAME: "trustlink"
-      DOCKER_STEPCA_INIT_PASSWORD_FILE: "/run/secrets/ca-password"
-      DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT: "false"
-    ports: ["28443:9000"]
-    volumes:
-      - stepca-data:/home/step
-      - ./stepca/ca-password:/run/secrets/ca-password:ro
     restart: unless-stopped
 
   dtrack-db:                         # Dependency-Track DB (공식 postgres)
@@ -155,7 +128,6 @@ volumes:
   kc-data:
   tl-data:
   tl-logs:
-  stepca-data:
   tl-sor:
   dtrack-db:
   dtrack-data:

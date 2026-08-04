@@ -50,21 +50,8 @@ type Config struct {
 	DTApiKey      string // DT 서비스 API 키 (X-Api-Key)
 	UIDir         string // 신규 trustlink-ui dist 경로 (단일 프론트도어 서빙)
 	KCProxyTarget string // /auth/* 리버스 프록시 타깃 (relative-path 미포함 베이스)
-	// 외부 CA·서명 어플라이언스(bigfoot) 위임. 설정 시 발급/서명/암호화를 bigfoot API 로 위임
-	// (TrustLink 는 키·step-ca 미보유 → 모듈 독립). 미설정 시 아래 내장 step-ca 사용.
-	BigfootURL string // http://bigfoot:9100 (예). 빈 값이면 내장 CA.
-	// CA(step-ca) 연동 — 평면2. 미설정 시 CA 기능 비활성.
-	StepCaURL         string // https://step-ca:9000 (평면1 독립 엔드포인트)
-	StepCaRoot        string // 신뢰 앵커(CAfile) 경로
-	StepCaIssuer      string // 발급(중간) CA 인증서 경로 (다운로드 제공용)
-	StepCaProvisioner string // JWK provisioner 이름
-	StepCaPassFile    string // provisioner 비밀번호 파일
-	SoRPath           string // 감사 SoR(JSONL) 경로
-	RecipientsPath    string // 수신자 인증서 레지스트리 경로
-	SessionsPath      string // 로그인 세션 영속 파일 경로 (재시작/재배포 시 세션 유지)
-	// CMS EnvelopedData 암호화 알고리즘 — FIPS 승인값을 기본으로 두되 배포 OE 에서 env 로 교체 가능.
-	CMSContentCipher string // 콘텐츠 암호화 (기본 -aes-256-gcm, FIPS 승인 AEAD)
-	CMSRsaPadding    string // RSA 키전송 패딩 (기본 oaep, FIPS 권장; pkcs1 은 레거시)
+	SoRPath       string // 감사 SoR(JSONL) 경로
+	SessionsPath  string // 로그인 세션 영속 파일 경로 (재시작/재배포 시 세션 유지)
 }
 
 func env(k, def string) string {
@@ -96,17 +83,8 @@ func loadConfig() Config {
 		DTApiKey:          env("DT_API_KEY", ""),
 		UIDir:             env("UI_DIR", ""),
 		KCProxyTarget:     env("KC_PROXY_TARGET", env("KC_INTERNAL", "http://localhost:8085")),
-		StepCaURL:         env("STEPCA_URL", ""),
-		BigfootURL:        env("BIGFOOT_URL", ""),
-		StepCaRoot:        env("STEPCA_ROOT", "/etc/trustlink/step-root.crt"),
-		StepCaIssuer:      env("STEPCA_ISSUER", "/etc/trustlink/step-issuer.crt"),
-		StepCaProvisioner: env("STEPCA_PROVISIONER", "trustlink"),
-		StepCaPassFile:    env("STEPCA_PROVISIONER_PASSWORD_FILE", "/etc/trustlink/ca-password"),
 		SoRPath:           env("SOR_PATH", "/var/lib/trustlink/sor.jsonl"),
-		RecipientsPath:    env("RECIPIENTS_PATH", "/var/lib/trustlink/recipients.json"),
 		SessionsPath:      env("SESSIONS_PATH", "/var/lib/trustlink/sessions.json"),
-		CMSContentCipher:  env("CMS_CONTENT_CIPHER", "-aes-256-gcm"),
-		CMSRsaPadding:     env("CMS_RSA_PADDING", "oaep"),
 	}
 }
 
@@ -223,10 +201,8 @@ type Server struct {
 	saExp  time.Time
 	states map[string]stateData // oauth state 임시 저장 (만료 + 로그인 후 복귀 경로)
 	stMu   sync.Mutex
-	ca     CAAdapter       // 평면2 CA 어댑터 (nil = 미구성)
-	sor    *SoR            // 감사 기록
-	recips *RecipientStore // 수신자 인증서 레지스트리
-	oidc   *oidcVerifier   // OIDC 액세스 토큰 서명/클레임 검증기
+	sor  *SoR          // 감사 기록(SBOM 생성 등)
+	oidc *oidcVerifier // OIDC 액세스 토큰 서명/클레임 검증기
 }
 
 // stateData: OIDC state 에 만료시각과 로그인 후 복귀 경로를 함께 보관.
@@ -249,12 +225,7 @@ func main() {
 		states: map[string]stateData{},
 	}
 	s.sor = newSoR(cfg.SoRPath)
-	s.recips = newRecipientStore(cfg.RecipientsPath)
 	s.oidc = newOIDCVerifier(cfg, s.http)
-	if cfg.StepCaURL != "" {
-		s.ca = NewStepCaAdapter(cfg, s.sor, s.http)
-		log.Printf("CA 어댑터 활성: step-ca=%s provisioner=%s", cfg.StepCaURL, cfg.StepCaProvisioner)
-	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /admin/login", s.handleLogin)
@@ -289,24 +260,7 @@ func main() {
 	mux.HandleFunc("PUT /api/vex/analysis", vexEdit(s.apiVexAnalysis))
 	mux.HandleFunc("GET /api/vex/export", vexEdit(s.apiVexExport))
 	mux.HandleFunc("POST /api/vex/publish", vexEdit(s.apiVexPublish)) // DT VEX → OCI 새 referrer 발행
-	// CA(step-ca) 관리 — 평면2·3. 읽기는 admins guard, 쓰기(발급)는 admins.
-	mux.HandleFunc("GET /api/ca/info", s.guard(s.apiCAInfo))
-	mux.HandleFunc("GET /api/ca/certs", s.guard(s.apiCACerts))
-	mux.HandleFunc("GET /api/ca/crl", s.guard(s.apiCACRL))
-	mux.HandleFunc("GET /api/ca/root", s.guard(s.apiCARoot))     // 루트(신뢰앵커) PEM 다운로드
-	mux.HandleFunc("GET /api/ca/issuer", s.guard(s.apiCAIssuer)) // 발급(중간) CA PEM 다운로드
-	mux.HandleFunc("GET /api/ca/audit", s.guard(s.apiCAAudit))
-	mux.HandleFunc("POST /api/ca/issue", s.guard(s.apiCAIssue))
-	mux.HandleFunc("POST /api/ca/sign-csr", s.guard(s.apiCASignCSR)) // 고객 CSR 서명
-	mux.HandleFunc("POST /api/ca/revoke", s.guard(s.apiCARevoke))
-	mux.HandleFunc("POST /api/ca/reissue", s.guard(s.apiCAReissue))
-	mux.HandleFunc("GET /api/ca/recipients", s.guard(s.apiRecipientsList))
-	mux.HandleFunc("POST /api/ca/recipients", s.guard(s.apiRecipientImport))
-	mux.HandleFunc("DELETE /api/ca/recipients/{id}", s.guard(s.apiRecipientDelete))
-	// 신뢰된 외부 공유: 게이트 통과분 CMS 서명 + Zot referrer 바인딩 (고가치 → admins).
 	mux.HandleFunc("POST /api/sbom/generate", s.guard(s.apiSBOMGenerate)) // syft 자체 SBOM 생성·부착
-	mux.HandleFunc("POST /api/share/sign", s.guard(s.apiShareSign))
-	mux.HandleFunc("GET /api/share/package", s.guard(s.apiSharePackage)) // 서명+암호화 .p7m 다운로드(외부 협력사)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 
 	// 단일 프론트도어: 신규 UI 서빙 + /v2·/zot·/auth 리버스 프록시 (UI_DIR 설정 시 활성)

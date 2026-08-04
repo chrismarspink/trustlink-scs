@@ -3,28 +3,27 @@ import { DocTitle, Section, Glossary, ArchDiagram, FlowDiagram } from './_shared
 export default function GettingStarted() {
   const host = window.location.host;
   const reg = `${window.location.hostname}:28081`;
-  const ca = `${window.location.hostname}:28443`;
   return (
     <>
-      <DocTitle title="시작하기" lead="TrustLink SCS — 공급망 보안 아티팩트 레지스트리. 컨테이너/바이너리와 그 SBOM·VEX·서명을 한곳에서 관리·검증·배포합니다." />
+      <DocTitle title="시작하기" lead="TrustLink SCS — 공급망 보안 아티팩트 레지스트리. 컨테이너/바이너리와 그 SBOM·VEX를 한곳에서 관리·검증·배포합니다." />
 
       <Section title="개요">
         <p>
-          TrustLink SCS 는 OCI 레지스트리 <b>zot</b> 위에 인증(Keycloak)·취약점 분석(Dependency-Track)·서명(step-ca + CMS)을 결합한
-          공급망 보안 플랫폼입니다. 산출물과 그 <b>SBOM·VEX·서명·검증 리포트</b>를 OCI <i>referrers</i> 로 함께 보관합니다.
+          TrustLink SCS 는 OCI 레지스트리 <b>zot</b> 위에 인증(Keycloak)·취약점 분석(Dependency-Track)을 결합한
+          공급망 보안 플랫폼입니다. 산출물과 그 <b>SBOM·VEX</b>를 OCI <i>referrers</i> 로 함께 보관합니다.
         </p>
         <ul className="list-disc pl-5">
-          <li>업로드된 SBOM/VEX/서명은 <b>덮어쓰지 않고</b> 새 referrer 로 누적 — 출처·이력 보존</li>
-          <li>표준 포맷: <b>CycloneDX</b>(SBOM·VEX), <b>CMS/RFC 5652</b>(서명)</li>
-          <li>게이트 통과분만 서명·반출(신뢰된 외부 공유)</li>
+          <li>업로드된 SBOM/VEX 는 <b>덮어쓰지 않고</b> 새 referrer 로 누적 — 출처·이력 보존</li>
+          <li>표준 포맷: <b>CycloneDX</b>(SBOM·VEX)</li>
+          <li>레포별 RBAC(그룹 기반)로 접근 통제 — fail-closed</li>
         </ul>
       </Section>
 
       <Section title="구성도">
         <ArchDiagram />
         <p className="text-xs text-muted-foreground">
-          웹/관리는 TrustLink(:28080), 레지스트리 pull/push 는 zot(:28081), 인증서 발급·검증·CRL 은 step-ca(:28443)로 접근합니다.
-          각 백엔드는 독립 평면으로, TrustLink 가 멈춰도 레지스트리·검증은 동작합니다.
+          웹/관리는 TrustLink(:28080), 레지스트리 pull/push 는 zot(:28081)로 접근합니다.
+          각 백엔드는 독립 평면으로, TrustLink 가 멈춰도 레지스트리는 동작합니다.
         </p>
       </Section>
 
@@ -32,14 +31,13 @@ export default function GettingStarted() {
         <ul className="list-disc pl-5">
           <li><b>웹 콘솔·관리·로그인</b> — <code>http://{host}</code> (TrustLink/BFF)</li>
           <li><b>레지스트리 pull/push</b> — <code>http://{reg}</code> (zot 직접)</li>
-          <li><b>인증서·검증·CRL</b> — <code>https://{ca}</code> (step-ca, TLS·자체서명 → 루트 신뢰 필요)</li>
         </ul>
       </Section>
 
       <Section title="빠른 시작">
         <p>1) 브라우저로 <code>http://{host}</code> 접속 → Keycloak 로그인 → 제품 목록.</p>
         <p>2) 제품 카드 → 버전 선택 → 개요·SBOM/VEX·다운로드·취약점 분석 확인.</p>
-        <p>3) CLI 업로드/다운로드는 <b>업로드·다운로드</b> 문서, 서명 검증은 <b>신뢰·검증(CA)</b> 문서를 참고하세요.</p>
+        <p>3) CLI 업로드/다운로드는 <b>업로드·다운로드</b> 문서를 참고하세요.</p>
       </Section>
 
       <Section title="처리 흐름">

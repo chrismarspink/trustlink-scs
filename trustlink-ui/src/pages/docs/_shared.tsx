@@ -86,21 +86,18 @@ export function ArchDiagram() {
     <svg viewBox="0 0 720 320" className="w-full" style={{ background: LIGHT, borderRadius: 8 }}>
       <ArrowDefs />
       <Box x={20} y={30} w={150} h={50} label="사용자" sub="브라우저 (웹 UI)" />
-      <Box x={20} y={130} w={150} h={52} label="CI/CD · 개발자" sub="oras / docker (CLI)" />
-      <Box x={20} y={240} w={150} h={50} label="검증자 (협력사)" sub="openssl / CRL" />
+      <Box x={20} y={150} w={150} h={52} label="CI/CD · 개발자" sub="oras / docker (CLI)" />
 
-      <Box x={250} y={28} w={160} h={70} label="TrustLink (BFF)" sub=":28080 웹 · 관리" accent />
+      <Box x={250} y={40} w={160} h={70} label="TrustLink (BFF)" sub=":28080 웹 · 관리" accent />
 
       <text x={595} y={18} textAnchor="middle" fontSize={11} fill={SLATE}>── 내부 전용 / 독립 평면 ──</text>
-      <Box x={490} y={28} w={210} h={42} label="Keycloak" sub="OIDC 인증" dashed />
-      <Box x={490} y={120} w={210} h={52} label="zot — OCI 레지스트리" sub=":28081 직접 pull/push" accent />
-      <Box x={490} y={238} w={210} h={52} label="step-ca — CA" sub=":28443 발급·검증·CRL" accent />
+      <Box x={490} y={40} w={210} h={42} label="Keycloak" sub="OIDC 인증" dashed />
+      <Box x={490} y={140} w={210} h={52} label="zot — OCI 레지스트리" sub=":28081 직접 pull/push" accent />
 
-      <Arrow x1={170} y1={55} x2={250} y2={55} />
-      <Arrow x1={410} y1={50} x2={490} y2={49} />
-      <Arrow x1={410} y1={80} x2={490} y2={140} />
-      <Arrow x1={170} y1={150} x2={490} y2={145} />
-      <Arrow x1={170} y1={262} x2={490} y2={262} />
+      <Arrow x1={170} y1={65} x2={250} y2={65} />
+      <Arrow x1={410} y1={62} x2={490} y2={61} />
+      <Arrow x1={410} y1={92} x2={490} y2={160} />
+      <Arrow x1={170} y1={170} x2={490} y2={165} />
     </svg>
   );
 }
@@ -111,8 +108,7 @@ export function FlowDiagram() {
     { t: '1. 산출물 Push', s: 'oras/docker → zot' },
     { t: '2. SBOM/VEX 첨부', s: 'referrers' },
     { t: '3. 취약점 분석', s: 'Dependency-Track' },
-    { t: '4. VEX·CMS 서명', s: 'TrustLink + step-ca' },
-    { t: '5. 검증·반출', s: 'openssl cms · CRL' }
+    { t: '4. VEX 발행', s: 'TrustLink + DT' }
   ];
   const w = 124, gap = 25, y = 60, h = 56;
   return (
@@ -128,7 +124,7 @@ export function FlowDiagram() {
         );
       })}
       <text x={370} y={30} textAnchor="middle" fontSize={11} fill={SLATE}>
-        업로드된 SBOM/VEX/서명은 덮어쓰지 않고 새 referrer 로 누적 → 출처(provenance) 보존
+        업로드된 SBOM/VEX 는 덮어쓰지 않고 새 referrer 로 누적 → 출처(provenance) 보존
       </text>
     </svg>
   );

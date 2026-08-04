@@ -2,6 +2,10 @@
 
 > 이 파일이 할 일(backlog)의 단일 소스다. "할 일 뭐 있지?" 물으면 여기를 참조한다.
 > 상세 배경/분석은 [docs/PRODUCT-ANALYSIS.md](docs/PRODUCT-ANALYSIS.md) 참조.
+>
+> **⚠️ 2026 단순화 리팩토링: 인증서버(step-ca)·CMS 서명/암호화(share/sign·share/package·수신자·bigfoot 위임)를 전부 제거함.**
+> TrustLink 는 이제 코어(레지스트리·SBOM·VEX·취약점·대시보드·RBAC)에 집중. CA/파일서명이 필요하면 별도 어플라이언스(bigfoot)로 분리 운영.
+> 아래 CA/CMS 관련 완료·backlog 항목은 **역사적 기록**(현재는 미해당).
 
 ## (b) 인증/세션 통합 — BFF 인증 게이트웨이 [우선]
 **배경:** 현재 제품 페이지(zot 세션)와 관리 콘솔(BFF 세션 `tl_admin_sid`)이 **이중 세션**이다.

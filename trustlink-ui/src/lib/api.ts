@@ -292,41 +292,6 @@ export type ProductStat = { repo: string; versions: VersionStat[] };
 export type Stats = { products: ProductStat[] };
 export const adminStats = () => aj<Stats>('/api/stats');
 
-// ── CA(step-ca) / 신뢰 — 평면2·3 (읽기 우선) ──
-export type CAInfo = {
-  enabled: boolean;
-  url?: string;
-  provisioner?: string;
-  rootSubject?: string;
-  rootFingerprint?: string;
-  rootNotAfter?: string;
-  reachable?: boolean;
-};
-export type CACert = { serial: string; subject: string; notAfter: string; issuedAt: string; status: string; actor?: string };
-export type CAEvent = {
-  time: string; actor?: string; action: string; serial?: string;
-  subject?: string; repo?: string; tag?: string; status?: string; detail?: Record<string, unknown>;
-};
-export const caInfo = () => aj<CAInfo>('/api/ca/info');
-export const caCerts = () => aj<{ certs: CACert[] }>('/api/ca/certs');
-export const caAudit = () => aj<{ events: CAEvent[] }>('/api/ca/audit');
-
-// 쓰기(발급/폐기/재발급/CSR 서명) — admins. §7: 이중확인 후 호출.
-export const caIssue = (body: { cn: string; sans?: string[]; notAfter?: string }) =>
-  aj<{ serial: string; subject: string; notAfter: string }>('/api/ca/issue', jsonInit('POST', body));
-export const caSignCSR = (body: { csr: string; notAfter?: string }) =>
-  aj<{ serial: string; subject: string; notAfter: string; cert: string }>('/api/ca/sign-csr', jsonInit('POST', body));
-export const caRevoke = (serial: string, reason: string) =>
-  aj<{ status: string; serial: string }>('/api/ca/revoke', jsonInit('POST', { serial, reason }));
-export const caReissue = (serial: string, notAfter?: string) =>
-  aj<{ status: string; serial: string; subject: string }>('/api/ca/reissue', jsonInit('POST', { serial, notAfter }));
-
-// 수신자 인증서 레지스트리 (EnvelopedData 수신자 — 임포트)
-export type Recipient = { id: string; subject: string; notAfter: string; importedAt: string; importedBy: string; certPem: string };
-export const caRecipients = () => aj<{ recipients: Recipient[] }>('/api/ca/recipients');
-export const caRecipientImport = (cert: string) => aj<{ id: string; subject: string; notAfter: string }>('/api/ca/recipients', jsonInit('POST', { cert }));
-export const caRecipientDelete = (id: string) => aj<{ status: string }>('/api/ca/recipients/' + encodeURIComponent(id), { method: 'DELETE' });
-
 // 이미지 여부 감지 — config.mediaType 가 컨테이너 이미지 config 면 docker pull 가능.
 // (oras artifact 는 empty/커스텀 config → oras 전용). index 면 첫 child 로 판별.
 const IMAGE_CONFIG_TYPES = [
@@ -350,31 +315,6 @@ export async function getPullInfo(repo: string, tag: string): Promise<{ isImage:
   }
 }
 
-// CMS 패키지 다운로드 — 4모드: 서명(.p7s) / 암호화(인증서·.p7m) / 서명+암호화(인증서·.p7m) / 서명+암호화(패스워드·.p7m).
-// 성공 시 브라우저 다운로드를 트리거. 실패 시 BFF JSON 오류를 throw.
-export async function downloadSharePackage(
-  repo: string, tag: string,
-  opts: { sign?: boolean; recipientId?: string; password?: string } = {}
-) {
-  const p = new URLSearchParams({ repo, tag });
-  if (opts.sign === false) p.set('sign', '0');
-  if (opts.recipientId) p.set('recipientId', opts.recipientId);
-  if (opts.password) p.set('password', opts.password);
-  const url = `/api/share/package?${p.toString()}`;
-  const r = await zfetch(url);
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({ error: r.statusText }));
-    throw new Error((j as { error?: string }).error || `다운로드 실패 (${r.status})`);
-  }
-  const blob = await r.blob();
-  const fn = r.headers.get('Content-Disposition')?.match(/filename=([^;]+)/)?.[1]?.trim() || 'package.signed.p7m';
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = fn;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  return { fips: r.headers.get('X-TrustLink-Fips'), serial: r.headers.get('X-TrustLink-Serial'), filename: fn };
-}
 
 // referrer(SBOM/VEX) 본문 조회: manifest → layer blob
 export async function getReferrerContent(name: string, digest: string): Promise<string> {

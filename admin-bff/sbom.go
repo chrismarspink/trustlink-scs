@@ -23,6 +23,15 @@ import (
 
 const sbomArtifactType = "application/vnd.cyclonedx+json"
 
+// svcCaller: svc-bff 관리 자격을 실은 요청(pushBlob/subjectDescriptor 재사용용).
+func (s *Server) svcCaller() *http.Request {
+	r, _ := http.NewRequest("GET", s.cfg.ZotAPIURL+"/", nil)
+	if s.cfg.ZotAdminUser != "" {
+		r.SetBasicAuth(s.cfg.ZotAdminUser, s.cfg.ZotAdminPass)
+	}
+	return r
+}
+
 // runSyft: target(파일/디렉토리/`dir:` 등)을 스캔해 CycloneDX(JSON) 바이트 + 컴포넌트 수 반환.
 func runSyft(target string) ([]byte, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)

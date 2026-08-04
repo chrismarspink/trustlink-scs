@@ -146,19 +146,18 @@ bash scripts/dogfood-sbom.sh
 # 특정 버전 지정: VER=20260621-162005 bash scripts/dogfood-sbom.sh
 ```
 
-컴포넌트당 자동 수행: **syft → CycloneDX SBOM → `innotium/<comp>:<ver>` push + SBOM referrer 부착 → DT 업로드·분석 → VEX 발행 → CMS 서명**. 대상 = `trustlink-admin`·`zot`·`keycloak`·`step-ca`·`dependency-track`·`postgres` + `trustlink-config`(compose+설정 tar). 결과는 관리 콘솔 대시보드(버전별 컴포넌트 수·취약점·VEX 그래프)와 산출물 페이지에서 확인. 외부 기밀 반출은 CA·수신자 페이지의 **서명+암호화 패키지(.p7m)**.
+컴포넌트당 자동 수행: **syft → CycloneDX SBOM → `innotium/<comp>:<ver>` push + SBOM referrer 부착 → DT 업로드·분석 → VEX 발행**. 대상 = `trustlink-admin`·`zot`·`keycloak`·`dependency-track`·`postgres` + `trustlink-config`(compose+설정 tar). 결과는 관리 콘솔 대시보드(버전별 컴포넌트 수·취약점·VEX 그래프)와 산출물 페이지에서 확인.
 
 **구현 함정(스크립트에 반영됨):**
 - `oras push/pull` 은 **절대경로 파일을 거부**(path validation). 반드시 basename(상대경로)으로 push — 그래야 수신자가 pull 할 때 path-traversal 차단에 안 걸린다.
 - 큰 SBOM 의 base64 를 셸 argv 로 넘기면 "Argument list too long" → python 이 파일에서 직접 인코딩.
-- VEX 발행/서명은 BFF 세션(admin) + zot 쓰기 자격(ci basic)을 함께 전달해야 referrer 바인딩이 된다.
+- VEX 발행은 BFF 세션(admin) + zot 쓰기 자격(ci basic)을 함께 전달해야 referrer 바인딩이 된다.
 - `$(ls f && echo f:type)` 는 ls 출력까지 인자로 새어 oras 인자 오염 → `[ -f f ] && echo f:type` 사용.
 
 ### 9.2 전체 스택 배포 패키지 + 가이드 + 프로젝트 SBOM
 
-- **전체 스택 push** [scripts/push-stack.sh](../scripts/push-stack.sh): 6개 이미지를 `docker save|gzip`→`oras push` 로 `innotium/<comp>-image:<ver>` 아티팩트화(air-gap·oras 일관·데몬 insecure 불필요). 경량 설치 패키지 `innotium/trustlink-install:<ver>`(compose+config+images.txt+INSTALL.md) push 후 **CMS 서명(.p7s)**. ci 자격 PoC 기본 내장(운영은 env). 설치: install 패키지 oras pull→검증→images.txt 각 이미지 pull+`docker load`→`docker compose up`.
-- **zot 프로젝트 SBOM** [scripts/zot-sbom.sh](../scripts/zot-sbom.sh): zot Go 소스(`/Users/chris/ZOT`) syft 스캔→`innotium/zot-source:<ver>` SBOM(소스 의존성, 3052 comps)+DT 취약점+VEX+서명. 이미지 SBOM(`innotium/zot`)과 구분.
-- **CMS 서명 포맷 (`GET /api/share/package`)**: 서명키는 항상 있으므로 **기본 `.p7s`(SignedData, 수신자 불필요·루트로 검증)**, 수신자 인증서 지정 시 **`.p7m`(EnvelopedData 암호화)**. GUI(수신자 페이지)에서 라디오로 선택.
+- **전체 스택 push** [scripts/push-stack.sh](../scripts/push-stack.sh): 6개 이미지를 `docker save|gzip`→`oras push` 로 `innotium/<comp>-image:<ver>` 아티팩트화(air-gap·oras 일관·데몬 insecure 불필요). 경량 설치 패키지 `innotium/trustlink-install:<ver>`(compose+config+images.txt+INSTALL.md) push. ci 자격 PoC 기본 내장(운영은 env). 설치: install 패키지 oras pull→images.txt 각 이미지 pull+`docker load`→`docker compose up`.
+- **zot 프로젝트 SBOM** [scripts/zot-sbom.sh](../scripts/zot-sbom.sh): zot Go 소스(`/Users/chris/ZOT`) syft 스캔→`innotium/zot-source:<ver>` SBOM(소스 의존성)+DT 취약점+VEX. 이미지 SBOM(`innotium/zot`)과 구분.
 - **매뉴얼/가이드**: 전용 업로드 기능은 없으나 **OCI referrer 로 첨부**하면(`oras attach --artifact-type application/vnd.trustlink.guide+markdown ... guide.md:text/markdown`) 아티팩트 "전체 다운로드(zip)"의 `docs/` 에 포함되어 함께 받아진다(`kindDir` 가 guide/manual/markdown/pdf→`docs`).
 - **pull 명령 표시**: 아티팩트 페이지가 `oras pull` 을 항상 표시, 컨테이너 이미지(config.mediaType 가 image config)면 `docker pull` 도 자동 표시.
 

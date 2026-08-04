@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, ShieldAlert, FileText, ChevronsUpDown, Search, Check, Download, Copy } from 'lucide-react';
 import VexPanel from './VexPanel';
-import { getImage, listTags, getReferrerContent, getPullInfo, caRecipients, downloadSharePackage, type ImageDetail, type Referrer, type Recipient } from '@/lib/api';
+import { getImage, listTags, getReferrerContent, getPullInfo, type ImageDetail, type Referrer } from '@/lib/api';
 import { Card, CardContent, CardHeader, Badge, Button } from '@/components/ui/primitives';
 import { fmtBytes, cn } from '@/lib/utils';
 
@@ -200,70 +200,6 @@ function DownloadCard({ repo, tag }: { repo: string; tag: string }) {
   );
 }
 
-// CMS 서명·암호화 카드: 4모드 선택 → 다운로드
-function CmsCard({ repo, tag }: { repo: string; tag: string }) {
-  type Mode = 'sign' | 'enc-cert' | 'sign-enc-cert' | 'sign-enc-pw';
-  const [mode, setMode] = useState<Mode>('sign');
-  const [recips, setRecips] = useState<Recipient[]>([]);
-  const [recip, setRecip] = useState('');
-  const [pw, setPw] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const needCert = mode === 'enc-cert' || mode === 'sign-enc-cert';
-  const needPw = mode === 'sign-enc-pw';
-  useEffect(() => {
-    if (needCert && recips.length === 0) caRecipients().then((r) => setRecips(r.recipients || [])).catch(() => {});
-  }, [needCert, recips.length]);
-  const fieldCls = 'rounded-md border bg-card px-3 py-1.5 text-sm';
-  const opts: Record<Mode, { sign?: boolean; recipientId?: string; password?: string }> = {
-    'sign': {},
-    'enc-cert': { sign: false, recipientId: recip },
-    'sign-enc-cert': { recipientId: recip },
-    'sign-enc-pw': { password: pw },
-  };
-  const go = async () => {
-    setBusy(true); setMsg('');
-    try {
-      const res = await downloadSharePackage(repo, tag, opts[mode]);
-      setMsg(`다운로드: ${res.filename}${res.serial ? ` (serial ${res.serial})` : ''}`);
-    } catch (e) {
-      setMsg('실패: ' + (e as Error).message);
-    }
-    setBusy(false);
-  };
-  const M = ({ v, label }: { v: Mode; label: string }) => (
-    <label className="flex items-center gap-2"><input type="radio" name="cmsmode" checked={mode === v} onChange={() => setMode(v)} /> {label}</label>
-  );
-  return (
-    <Card className="mb-5">
-      <CardHeader className="flex items-center gap-2 font-semibold">
-        <ShieldCheck size={16} /> CMS 서명·암호화
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-col gap-1.5 text-sm">
-          <M v="sign" label="서명 (.p7s) — 루트로 누구나 검증, 복호 불필요" />
-          <M v="enc-cert" label="암호화·인증서 (.p7m) — 수신자만 복호" />
-          <M v="sign-enc-cert" label="서명+암호화·인증서 (.p7m)" />
-          <M v="sign-enc-pw" label="서명+암호화·패스워드 (.p7m)" />
-        </div>
-        {needCert && (
-          <select className={fieldCls} value={recip} onChange={(e) => setRecip(e.target.value)}>
-            <option value="">수신자 인증서 선택… (수신자 페이지에서 임포트)</option>
-            {recips.map((r) => <option key={r.id} value={r.id}>{r.subject}</option>)}
-          </select>
-        )}
-        {needPw && (
-          <input type="password" className={fieldCls} placeholder="공유 패스워드 (수신측 복호에 필요)" value={pw} onChange={(e) => setPw(e.target.value)} />
-        )}
-        <Button onClick={go} disabled={busy || (needCert && !recip) || (needPw && !pw)}>
-          <Download size={14} /> 생성·다운로드
-        </Button>
-        {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-      </CardContent>
-    </Card>
-  );
-}
-
 function ReferrerRow({ name, referrer: rf, isCurrent }: { name: string; referrer: Referrer; isCurrent?: boolean }) {
   const blobUrl = `/api/artifact/blob?repo=${encodeURIComponent(name)}&digest=${encodeURIComponent(rf.digest)}`;
   const [open, setOpen] = useState(false);
@@ -365,7 +301,6 @@ export default function ArtifactDetail() {
           </Card>
 
           <DownloadCard repo={repo} tag={img.tag} />
-          <CmsCard repo={repo} tag={img.tag} />
 
           <h2 className="mb-2 text-lg font-semibold">SBOM / VEX (Referrers)</h2>
           {img.referrers.length === 0 ? (

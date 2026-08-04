@@ -1,6 +1,6 @@
 # TrustLink SCS — 설치·설정 가이드 (타 시스템)
 
-zot(OCI 레지스트리) + Keycloak(OIDC) + step-ca(CA) + Dependency-Track(취약점) + TrustLink BFF 로 구성된
+zot(OCI 레지스트리) + Keycloak(OIDC) + Dependency-Track(취약점) + TrustLink BFF 로 구성된
 공급망 보안(SCS) 스택을 새 시스템에 설치하는 절차.
 
 ## 0. 사전 요구
@@ -26,12 +26,12 @@ cp .env.example .env
 ```bash
 bash scripts/install.sh
 ```
-수행 내용(순서 자동화): 이미지 pull → 시크릿/htpasswd(ci·svc-bff) → Keycloak·step-ca·DT 기동 → realm/clients(zot·trustlink-admin)/groups/users 구성 → CA Root/Intermediate 추출 → zot·BFF 기동 → DT 부트스트랩.
+수행 내용(순서 자동화): 이미지 pull → 시크릿/htpasswd(ci·svc-bff) → Keycloak·DT 기동 → realm/clients(zot·trustlink-admin)/groups/users 구성 → zot·BFF 기동 → DT 부트스트랩.
 
-- 커스텀 이미지는 Docker Hub `jkkim7202/trustlink-zot`·`jkkim7202/trustlink-admin`(공식 zot + 평문HTTP OIDC 패치 / BFF). 나머지(keycloak·step-ca·postgres·dependency-track)는 **공식 오픈소스 이미지 자동 pull**.
+- 커스텀 이미지는 Docker Hub `jkkim7202/trustlink-zot`·`jkkim7202/trustlink-admin`(공식 zot + 평문HTTP OIDC 패치 / BFF). 나머지(keycloak·postgres·dependency-track)는 **공식 오픈소스 이미지 자동 pull**.
 - 이미지 네임스페이스 교체: `TRUSTLINK_ZOT_IMAGE`/`TRUSTLINK_ADMIN_IMAGE` env.
 
-> 왜 스크립트인가: BFF 가 step-ca 가 생성하는 Root/Issuer 인증서를 마운트하므로, 단순 `docker compose up` 한 번으로는 **인증서 생성→추출→BFF 기동 순서**를 맞출 수 없다. install.sh 가 이 순서를 처리한다.
+> 왜 스크립트인가: Keycloak realm/클라이언트/사용자 구성과 DT API 키 발급은 API 호출이 필요해 단순 `docker compose up` 만으로는 완결되지 않는다. install.sh 가 이 순서를 처리한다.
 
 ### (대안) 소스 빌드 후 설치
 이미지를 직접 빌드해 쓰려면: zot 이미지는 zot 소스에서 빌드(`make`/docker build), BFF 는 `bash admin-bff/build.sh`. 그 후 `TRUSTLINK_*_IMAGE` 를 로컬 태그로 지정하고 `bash scripts/install.sh`.
@@ -41,21 +41,8 @@ bash scripts/install.sh
 **BFF(trustlink-admin)가 단일 프론트도어**(포트 28080)다. 사용자는 **Keycloak 1회 로그인**으로 전부 접근:
 - 제품/관리 UI·zot 레지스트리(`/v2`) → Keycloak OIDC (zot·trustlink-admin 클라이언트)
 - Dependency-Track → BFF 가 서버측 API 키로 중개(사용자 직접 로그인 없음, 내부 전용)
-- step-ca → BFF 어댑터가 발급/조회 중개(평면2). 검증자는 step-ca(28443)에 직접(평면1)
 
-즉 DT·step-ca 는 외부 비노출·BFF 뒤에 있어 **별도 로그인이 없고**, 사람 인증은 Keycloak 하나로 통일된다. (DT 자체 웹 UI 를 OIDC 로 직접 붙이는 건 본선 비목표 — 필요 시 DT `ALPINE_OIDC_*` 로 별도 구성 가능.)
-
-## 2-c. CA·서명 모드 (내장 vs 외부 bigfoot)
-
-CA·CMS 서명은 두 방식 중 선택:
-- **내장 step-ca** (`docker-compose.deploy.yml` + `install.sh`): TrustLink 가 step-ca 를 함께 띄움. `BIGFOOT_URL` 미설정.
-- **외부 bigfoot 위임** (`docker-compose.bigfoot.yml`, **모듈 독립 최대화·한방 기동**): TrustLink 는 step-ca·키를 보유하지 않고 외부 [bigfoot](https://github.com/chrismarspink/bigfoot) CA 어플라이언스에 발급/서명/암호화를 위임. 인증서 마운트가 없어 chicken-egg 가 사라짐.
-  ```bash
-  # bigfoot 을 먼저 별도로 기동(자체 repo) 후:
-  BIGFOOT_URL=http://<bigfoot>:9100 docker compose -f docker-compose.bigfoot.yml up -d
-  ```
-  - BFF 는 `BIGFOOT_URL` 이 있으면 `share/sign`·`share/package` 를 bigfoot `/api/sign`·`/api/encrypt` 로 위임하고, 검증 Root 는 bigfoot `/api/ca/root` 에서 런타임 조회. TrustLink 가 죽어도 bigfoot 검증/CRL 독립 생존.
-  - 인증서 암호화(.p7m) 시 `recipientId` 는 **bigfoot 수신자 레지스트리 ID**.
+즉 DT 는 외부 비노출·BFF 뒤에 있어 **별도 로그인이 없고**, 사람 인증은 Keycloak 하나로 통일된다. (DT 자체 웹 UI 를 OIDC 로 직접 붙이는 건 본선 비목표 — 필요 시 DT `ALPINE_OIDC_*` 로 별도 구성 가능.)
 
 ## 4. 검증
 ```bash
@@ -69,11 +56,8 @@ bash scripts/verify.sh          # 인증/RBAC/엔드포인트 자동 점검 (모
 |---|---|---|
 | 그룹↔레포 RBAC | `trustlink/config.container.json` `accessControl` | fail-closed, 경로별 read/create/update/delete |
 | 사용자/그룹 | Keycloak (또는 관리 콘솔 사용자 탭) | developers/partners/customers/admins |
-| CMS 암호 알고리즘 | compose env `CMS_CONTENT_CIPHER`/`CMS_RSA_PADDING` | FIPS 승인값 기본(AES-256-GCM/OAEP) |
-| FIPS 검증 모듈 | 배포 OE | alpine→RHEL UBI/Ubuntu Pro FIPS 교체(SPEC §12) |
 | 세션 영속 | compose env `SESSIONS_PATH` | 재시작/재배포 로그인 유지 |
 
 ## 6. 운영 주의
 - **PoC 기본 비밀번호**(`docs/DEMO-ACCOUNTS.md`)는 시연용 — 운영 전 **전부 교체 + 계정 정리 + TLS 적용**.
 - TLS 미적용(평문 HTTP) 배포에서는 OIDC 쿠키가 `WithUnsecure` 로 동작(콜백 정상화). 운영은 전 구간 TLS + 쿠키 `Secure`.
-- 자세한 CA 운영(발급·갱신·폐기·CRL/OCSP)은 `docs/CMS-STEPCA-SPEC.md` §6b·§6c.

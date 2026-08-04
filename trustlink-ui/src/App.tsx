@@ -6,7 +6,6 @@ import Artifacts from '@/pages/Artifacts';
 import ArtifactDetail from '@/pages/ArtifactDetail';
 import GettingStarted from '@/pages/docs/GettingStarted';
 import ShareGuide from '@/pages/docs/ShareGuide';
-import Trust from '@/pages/docs/Trust';
 import Vuln from '@/pages/docs/Vuln';
 import Rbac from '@/pages/docs/Rbac';
 
@@ -41,7 +40,6 @@ function ProductApp() {
         <Route path="/" element={<Artifacts />} />
         <Route path="/docs" element={<GettingStarted />} />
         <Route path="/docs/share" element={<ShareGuide />} />
-        <Route path="/docs/trust" element={<Trust />} />
         <Route path="/docs/vuln" element={<Vuln />} />
         <Route path="/docs/rbac" element={<Rbac />} />
         <Route path="/artifact/:name/:tag" element={<ArtifactDetail />} />

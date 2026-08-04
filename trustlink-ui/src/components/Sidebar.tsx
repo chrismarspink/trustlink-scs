@@ -3,8 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
-  ScrollText, Boxes, Activity, KeyRound, Database, ShieldCheck,
-  ChevronRight, Rocket, Download, Bug, FilePlus2, FileBadge, Inbox, History
+  ScrollText, Boxes, Activity, KeyRound, Database,
+  ChevronRight, Rocket, Download, Bug
 } from 'lucide-react';
 import { getSession, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -19,13 +19,12 @@ const PRODUCT: Item[] = [
     to: '/docs', label: '문서', icon: BookOpen, children: [
       { to: '/docs', label: '시작하기', icon: Rocket, end: true },
       { to: '/docs/share', label: '업로드·다운로드', icon: Download },
-      { to: '/docs/trust', label: '신뢰·검증(CA)', icon: ShieldCheck },
       { to: '/docs/vuln', label: '취약점·VEX', icon: Bug },
       { to: '/docs/rbac', label: '권한·참고', icon: KeyRound }
     ]
   }
 ];
-// 관리 콘솔 섹션 — admins 일 때 노출. "인증서·신뢰(CA)"는 하위 트리.
+// 관리 콘솔 섹션 — admins 일 때 노출.
 const ADMIN: Item[] = [
   { to: '/admin', label: '대시보드', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: '사용자', icon: Users },
@@ -34,15 +33,6 @@ const ADMIN: Item[] = [
   { to: '/admin/registry', label: '레지스트리', icon: Boxes },
   { to: '/admin/system', label: '시스템 상태', icon: Activity },
   { to: '/admin/acl', label: '권한 매트릭스', icon: KeyRound },
-  {
-    to: '/admin/ca', label: '인증서·신뢰(CA)', icon: ShieldCheck, children: [
-      { to: '/admin/ca', label: '개요', icon: ShieldCheck, end: true },
-      { to: '/admin/ca/issue', label: '발급·서명', icon: FilePlus2 },
-      { to: '/admin/ca/certs', label: '인증서', icon: FileBadge },
-      { to: '/admin/ca/recipients', label: '수신자', icon: Inbox },
-      { to: '/admin/ca/audit', label: '감사', icon: History }
-    ]
-  },
   { to: '/admin/storage', label: '설정·스토리지', icon: Database }
 ];
 

@@ -1,13 +1,12 @@
 # TrustLink SCS
 
-zot(OCI 레지스트리) + Keycloak(OIDC) + step-ca(CA) + Dependency-Track(취약점) + TrustLink BFF 로 구성된
+zot(OCI 레지스트리) + Keycloak(OIDC) + Dependency-Track(취약점) + TrustLink BFF 로 구성된
 **공급망 보안(Software Supply-chain Security) 스택**.
 - **사람**(브라우저) → Keycloak OIDC 로그인 / **기계·CLI**(oras·docker) → htpasswd 또는 API 키
 - **그룹 기반 RBAC**(developers / partners / customers / admins) fail-closed
-- **SBOM·취약점·VEX**(syft·Dependency-Track), **CMS 서명·암호화 배포**(step-ca + openssl, .p7s/.p7m)
+- **SBOM·취약점·VEX**(syft · Dependency-Track) — 산출물에 OCI referrer 로 부착·관리
 
-> **설치(타 시스템)**: [INSTALL.md](INSTALL.md) — 소스 빌드 / Docker Hub compose-only 두 경로.
-> 전체 제품 설계(BFF·CA·CMS·FIPS): [docs/CMS-STEPCA-SPEC.md](docs/CMS-STEPCA-SPEC.md). 데모 계정: [docs/DEMO-ACCOUNTS.md](docs/DEMO-ACCOUNTS.md).
+> **설치(타 시스템)**: [INSTALL.md](INSTALL.md). 데모 계정: [docs/DEMO-ACCOUNTS.md](docs/DEMO-ACCOUNTS.md).
 > ⚠️ PoC 기본 비밀번호는 시연용 — 운영 전 전부 교체 + TLS 적용.
 
 ## 1. 역할 → 그룹 → 권한
