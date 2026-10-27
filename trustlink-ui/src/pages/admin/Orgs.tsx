@@ -20,9 +20,12 @@ export default function Orgs() {
   }
   useEffect(() => { load(); }, []);
 
+  // 서버 규칙(reOrgName)과 동일 — 비었거나 형식이 틀리면 버튼 비활성 + 안내.
+  const valid = /^[a-z0-9][a-z0-9-]{1,30}$/.test(name.trim().toLowerCase());
+
   async function create() {
     const n = name.trim().toLowerCase();
-    if (!n) return;
+    if (!valid) return;
     try {
       await adminCreateOrg(n);
       setName('');
@@ -56,8 +59,11 @@ export default function Orgs() {
       <div className="mb-5 flex items-center gap-2">
         <Input className="w-64" placeholder="고객사 ID (예: acme)" value={name}
           onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && create()} />
-        <Button variant="accent" size="sm" onClick={create}><Plus size={15} /> 추가</Button>
-        <span className="text-xs text-muted-foreground">영소문자·숫자·- (2~31자)</span>
+        <Button variant="accent" size="sm" onClick={create} disabled={!valid}
+          title={valid ? '' : '고객사 ID 를 먼저 입력하세요'}><Plus size={15} /> 추가</Button>
+        <span className={name.trim() && !valid ? 'text-xs text-red-600' : 'text-xs text-muted-foreground'}>
+          {name.trim() && !valid ? '형식 오류: ' : ''}영소문자·숫자·- (2~31자)
+        </span>
       </div>
 
       <Table>
