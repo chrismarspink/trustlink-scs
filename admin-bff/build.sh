@@ -11,7 +11,8 @@ ARCH="${ARCH:-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')}"
 IMAGE="$(cd .. && docker compose config --images 2>/dev/null | grep trustlink-admin || echo trustlink-admin:latest)"
 
 echo "[1/4] UI 빌드 + ui-dist 동기화"
-( cd ../trustlink-ui && npm run build )
+# package-lock.json 이 설치본보다 새로우면(의존성 변경) npm ci 로 맞춘다
+( cd ../trustlink-ui && { [ node_modules/.package-lock.json -nt package-lock.json ] || npm ci; } && npm run build )
 rm -rf ui-dist && cp -R ../trustlink-ui/dist ui-dist
 
 echo "[2/4] go 빌드 (linux/$ARCH, golang:1.22)"
