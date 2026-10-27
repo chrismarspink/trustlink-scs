@@ -73,7 +73,7 @@ function notice(c: CredentialInfo): string {
       push ? '[TrustLink 업로드용 기계 계정 안내]' : '[TrustLink 자동 다운로드 계정 안내]',
       `레지스트리: ${reg} (oras 명령에 --plain-http 필요)`,
       `계정: ${c.username}`,
-      `비밀값: ${c.password}`,
+      `토큰: ${c.password}`,
       `권한: ${push ? '업로드(쓰기)' : '다운로드(읽기)'} — ${(c.products || []).join(', ') || '(관리자가 제품 권한에서 지정)'}`,
       `만료: ${c.expires ? c.expires.slice(0, 10) : '없음'}`,
       '',
@@ -120,7 +120,7 @@ export default function CredentialDialog({ cred, onClose }: { cred: CredentialIn
 
         <div className="space-y-2">
           <Field label="계정" value={cred.username} />
-          <Field label={cred.kind === 'user' ? '임시 비밀번호' : cred.kind === 'robot' ? '비밀값' : '비밀번호'} value={cred.password} />
+          <Field label={cred.kind === 'user' ? '임시 비밀번호' : cred.kind === 'robot' ? '토큰' : '비밀번호'} value={cred.password} />
         </div>
 
         <div className="mt-4 mb-1 flex items-center justify-between">
@@ -135,7 +135,7 @@ export default function CredentialDialog({ cred, onClose }: { cred: CredentialIn
             {cred.kind === 'ci'
               ? '공용 계정입니다. 메일·메신저 대신 CI 시크릿 변수에 직접 등록하도록 전달하세요. 조회 기록은 감사 로그에 남습니다.'
               : cred.kind === 'robot'
-                ? '이 창을 닫으면 비밀값을 다시 볼 수 없습니다(필요 시 재발급 — 기존 값은 즉시 무효). 담당 시스템 관리자에게만 전달하세요.'
+                ? '이 창을 닫으면 토큰을 다시 볼 수 없습니다(필요 시 토큰 재발급 — 기존 토큰은 즉시 무효). 담당 시스템 관리자에게만 전달하세요.'
                 : '이 창을 닫으면 비밀번호를 다시 볼 수 없습니다(필요 시 재설정). 본인에게만 전달하세요.'}
           </Alert>
         </div>

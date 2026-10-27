@@ -56,13 +56,13 @@ export default function Robots() {
   }
 
   async function reissue(r: RobotAccount) {
-    if (!confirm(`${r.name} 의 비밀값을 재발급할까요?\n기존 비밀값은 즉시 사용할 수 없게 됩니다(연결된 시스템 설정을 바꿔야 함).`)) return;
+    if (!confirm(`${r.name} 의 토큰을 재발급할까요?\n기존 토큰은 즉시 사용할 수 없게 됩니다(연결된 시스템 설정을 바꿔야 함).`)) return;
     try {
       const x = await adminReissueRobot(r.name);
       setCred({ kind: 'robot', username: x.username, password: x.password, robotKind: x.kind, products: r.products, expires: x.expires });
       await load();
     } catch (e) {
-      alert('재발급 실패: ' + e);
+      alert('토큰 재발급 실패: ' + e);
     }
   }
 
@@ -84,7 +84,7 @@ export default function Robots() {
       <PageTitle>기계 계정</PageTitle>
       {cred && <CredentialDialog cred={cred} onClose={() => setCred(null)} />}
       <p className="mb-4 text-sm text-muted-foreground">
-        사람이 아닌 시스템이 oras 로 접속할 때 쓰는 계정입니다. 비밀값은 발급 때 한 번만 표시되며, 만료일이 지나면 자동으로 로그인이 차단됩니다.
+        사람이 아닌 시스템이 oras 로 접속할 때 쓰는 계정입니다. 인증 토큰은 발급·재발급 때 한 번만 표시되며, 만료일이 지나면 자동으로 로그인이 차단됩니다.
       </p>
 
       <SectionTitle>발급</SectionTitle>
@@ -144,7 +144,7 @@ export default function Robots() {
               <Td className="text-xs text-muted-foreground">{fmtDate(r.created)}<br />{r.createdBy}</Td>
               <Td>
                 <div className="flex gap-1.5">
-                  <Button size="sm" variant="outline" onClick={() => reissue(r)}><RefreshCw size={14} /> 재발급</Button>
+                  <Button size="sm" variant="outline" onClick={() => reissue(r)}><RefreshCw size={14} /> 토큰 재발급</Button>
                   <Button size="sm" variant="outline" onClick={() => remove(r)} title="폐기"><Trash2 size={14} /></Button>
                 </div>
               </Td>
