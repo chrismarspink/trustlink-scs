@@ -277,6 +277,8 @@ configs:
 
   # zot 설정 원본(무수정 공식 zot 의 표준 설정 형식). 제품별 권한(products/<제품>)은 관리 콘솔에서 설정하며
   # BFF 가 accessControl 에 덧붙여 렌더한다. 여기 규칙은 "개별 설정이 없는 레포"의 기본값 = 내부 전용.
+  # search.cve(Trivy) 는 끈다: 취약점 분석은 Dependency-Track 이 담당하며, Trivy DB(~1GB) 다운로드·갱신 중에는
+  # zot 설정 리로드가 수 분간 막혀 권한 변경·계정 회수가 지연된다(실측).
   zot-config:
     content: |
       {
@@ -347,10 +349,7 @@ configs:
         },
         "log": { "level": "info", "output": "/var/log/zot/zot.log" },
         "extensions": {
-          "search": {
-            "enable": true,
-            "cve": { "updateInterval": "24h", "trivy": { "dbRepository": "ghcr.io/aquasecurity/trivy-db" } }
-          },
+          "search": { "enable": true },
           "ui": { "enable": true },
           "metrics": { "enable": true, "prometheus": { "path": "/metrics" } }
         }
