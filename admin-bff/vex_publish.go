@@ -126,6 +126,12 @@ func (s *Server) apiVexPublish(w http.ResponseWriter, r *http.Request) {
 	if !s.requireRepo(w, r, in.Repo, "create") {
 		return
 	}
+	// 쓰기 권한은 위에서 zot 과 같은 규칙으로 확인했다 → zot 기록은 BFF 서비스 자격으로(관리 콘솔 세션엔 zot 세션이 없음).
+	// 개발 모드(접근 정책 비활성)에서는 기존처럼 호출자 자격을 그대로 전달한다.
+	writer := r
+	if s.access != nil {
+		writer = s.svcCaller()
+	}
 	if in.Project == "" {
 		in.Project = path.Base(in.Repo)
 	}
@@ -157,12 +163,12 @@ func (s *Server) apiVexPublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3) blob push: 빈 config + VEX layer (호출자 권한 → zot 쓰기 RBAC 강제)
-	cfgDigest, err := s.pushBlob(r, in.Repo, []byte("{}"))
+	cfgDigest, err := s.pushBlob(writer, in.Repo, []byte("{}"))
 	if err != nil {
 		writeJSON(w, httpStatus(err), map[string]string{"error": "config blob push 실패(쓰기 권한 필요)"})
 		return
 	}
-	vexDigest, err := s.pushBlob(r, in.Repo, vex)
+	vexDigest, err := s.pushBlob(writer, in.Repo, vex)
 	if err != nil {
 		writeJSON(w, httpStatus(err), map[string]string{"error": "VEX blob push 실패"})
 		return
@@ -202,7 +208,7 @@ func (s *Server) apiVexPublish(w http.ResponseWriter, r *http.Request) {
 	mBytes, _ := json.Marshal(manifest)
 	mDigest := "sha256:" + sha256hex(mBytes)
 	putReq, _ := http.NewRequest("PUT", s.cfg.ZotAPIURL+"/v2/"+in.Repo+"/manifests/"+mDigest, bytes.NewReader(mBytes))
-	applyCaller(r, putReq)
+	applyCaller(writer, putReq)
 	putReq.Header.Set("Content-Type", ociManifestType)
 	presp, err := s.http.Do(putReq)
 	if err != nil {
@@ -215,6 +221,7 @@ func (s *Server) apiVexPublish(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, httpStatus(&zotStatusErr{presp.StatusCode}), map[string]string{"error": "manifest push 실패", "detail": string(pb)})
 		return
 	}
+	_ = s.sor.append(SoREvent{Actor: author, Action: "vex-publish", Repo: in.Repo, Tag: in.Tag, Detail: map[string]any{"digest": mDigest}})
 	writeJSON(w, 200, map[string]any{
 		"status":   "published",
 		"digest":   mDigest,
