@@ -33,10 +33,14 @@ echo "[4/4] hairpin 규칙 확인"
   IP=$(docker inspect "$C" --format "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}")
   CUR=$(sudo -n iptables -t nat -S PREROUTING | grep -- "--dport 28080" | grep -oE "to-destination [0-9.]+" | cut -d" " -f2 || true)
   echo "  BFF IP=$IP, DNAT=${CUR:-없음}"
-  if [ -n "$CUR" ] && [ "$CUR" != "$IP" ]; then
-    sudo -n iptables -t nat -S PREROUTING | grep -- "--dport 28080" | sed "s/^-A/-D/" | while read -r r; do sudo -n iptables -t nat $r; done
+  if [ -n "$CUR" ] && [ "$CUR" != "$IP" ]; then   # DNAT + MASQUERADE 둘 다 BFF IP 를 가리켜야 함
+    for CH in PREROUTING POSTROUTING; do
+      sudo -n iptables -t nat -S $CH | grep -- "--dport 28080" | sed "s/^-A/-D/" | while read -r r; do sudo -n iptables -t nat $r; done
+    done
     sudo -n iptables -t nat -I PREROUTING 1 -p tcp -s 172.16.0.0/12 -d '"$HOST"' --dport 28080 -j DNAT --to-destination "$IP:28080"
-    echo "  DNAT 갱신 → $IP"
+    sudo -n iptables -t nat -I POSTROUTING 1 -p tcp -s 172.16.0.0/12 -d "$IP" --dport 28080 -j MASQUERADE
+    docker compose restart zot >/dev/null   # issuer 도달 실패로 재시작 중이던 zot 복구
+    echo "  DNAT·MASQUERADE 갱신 → $IP"
   fi
   sleep 3; curl -s -o /dev/null -w "  healthz %{http_code}\n" http://127.0.0.1:28080/healthz'
 echo "완료. http://$HOST:28080"
