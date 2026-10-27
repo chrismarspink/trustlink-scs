@@ -63,6 +63,10 @@ function TagPicker({ tags, value, onChange }: { tags: string[]; value: string; o
 }
 
 const isVex = (t: string) => /vex/i.test(t);
+// referrer 종류 라벨(BFF bundle.go kindDir 와 같은 기준)
+const kindLabel = (t: string) =>
+  isVex(t) ? 'VEX' : /spdx|cyclonedx/i.test(t) ? 'SBOM' : /guide|manual|markdown|pdf/i.test(t) ? '문서'
+    : /sigstore|cosign|signature/i.test(t) ? '서명' : '기타';
 
 // TrustLink가 발행한 VEX 중 가장 최신(created)이 "현재 유효" 본. 발행물은 불변, 최신이 권위.
 function currentVexDigest(refs: Referrer[]): string {
@@ -226,7 +230,7 @@ function ReferrerRow({ name, referrer: rf, isCurrent }: { name: string; referrer
         <div className="flex flex-wrap items-center gap-2">
           <FileText size={16} className="text-accent" />
           <span className="font-medium text-sm">{rf.artifactType}</span>
-          <Badge variant={isVex(rf.artifactType) ? 'warn' : 'muted'}>{isVex(rf.artifactType) ? 'VEX' : 'SBOM'}</Badge>
+          <Badge variant={isVex(rf.artifactType) ? 'warn' : 'muted'}>{kindLabel(rf.artifactType)}</Badge>
           {isCurrent && <Badge variant="success">현재 유효 VEX</Badge>}
           {rf.annotations['com.trustlink.vex.author'] && (
             <span className="text-xs text-muted-foreground">발행: {rf.annotations['com.trustlink.vex.author']}</span>
