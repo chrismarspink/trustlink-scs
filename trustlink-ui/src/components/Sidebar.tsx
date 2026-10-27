@@ -91,7 +91,8 @@ function SectionLabel({ children }: { children: string }) {
 }
 
 // 제품·관리 공용 사이드바 — 아티팩트와 관리 콘솔 항목을 한 곳에 함께 노출(트리 구조).
-// 관리 섹션은 확정 비-admin(BFF 세션 있고 admins 아님)일 때만 숨김(판별 불가면 노출, 실제 접근은 /admin 게이트가 강제).
+// 관리 섹션은 admins 로 확인된 경우에만 노출(외부 고객 화면에 관리 메뉴가 보이지 않게).
+// 제품 화면으로만 로그인해 관리 콘솔 세션이 없으면 숨김 → 관리자는 /admin 으로 진입(SSO), 이후 노출. 실제 접근은 /admin 게이트가 강제.
 export function Sidebar() {
   const [sess, setSess] = useState<Session | null | undefined>(undefined);
 
@@ -99,7 +100,7 @@ export function Sidebar() {
     getSession().then(setSess).catch(() => setSess(null));
   }, []);
 
-  const showAdmin = !(sess && !sess.groups?.includes('admins'));
+  const showAdmin = !!sess?.groups?.includes('admins');
 
   return (
     <nav className="w-52 shrink-0 border-r bg-card pb-3">

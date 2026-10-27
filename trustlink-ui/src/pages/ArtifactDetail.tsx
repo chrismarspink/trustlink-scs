@@ -160,7 +160,8 @@ function CmdBox({ cmd }: { cmd: string }) {
 
 // 다운로드 카드: 전체 zip + pull 명령(oras 항상, 컨테이너 이미지면 docker 도)
 function DownloadCard({ repo, tag }: { repo: string; tag: string }) {
-  const host = window.location.host;
+  // 레지스트리는 웹(28080)이 아니라 zot 직접 진입점(28081). 사람 계정은 웹 비밀번호 대신 '내 API 키'로 로그인.
+  const host = `${window.location.hostname}:28081`;
   const ref = `${host}/${repo}:${tag}`;
   const bundleUrl = `/api/artifact/bundle?repo=${encodeURIComponent(repo)}&tag=${encodeURIComponent(tag)}`;
   const [isImage, setIsImage] = useState(false);
@@ -174,7 +175,7 @@ function DownloadCard({ repo, tag }: { repo: string; tag: string }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <p className="mb-1 text-sm text-muted-foreground">전체(바이너리 + SBOM/VEX/서명)를 한 번에</p>
+          <p className="mb-1 text-sm text-muted-foreground">전체(바이너리 + SBOM/VEX/문서)를 한 번에</p>
           <a href={bundleUrl}>
             <Button variant="accent">
               <Download size={14} /> 전체 다운로드 (zip)
@@ -183,8 +184,9 @@ function DownloadCard({ repo, tag }: { repo: string; tag: string }) {
         </div>
         <div>
           <p className="mb-1 text-sm text-muted-foreground">
-            ORAS (CLI) — 먼저 로그인: <code>oras login {host} -u ci -p &lt;PW&gt; --plain-http</code>
+            ORAS (CLI) — 먼저 로그인(비밀번호 자리에 <Link to="/apikeys" className="underline">내 API 키</Link>, 자동화는 관리자가 발급한 기계 계정):
           </p>
+          <CmdBox cmd={`printf '%s' '<API 키>' | oras login ${host} -u <내 ID> --password-stdin --plain-http`} />
           <CmdBox cmd={`oras pull --plain-http ${ref} -o ./download`} />
         </div>
         {isImage && (
@@ -264,7 +266,15 @@ export default function ArtifactDetail() {
   const [img, setImg] = useState<ImageDetail | null>(null);
   const [err, setErr] = useState('');
 
-  useEffect(() => { listTags(repo).then(setTags); }, [repo]);
+  // latest 태그가 없는 제품은 가장 높은 버전을 기본으로
+  useEffect(() => {
+    listTags(repo).then((ts) => {
+      setTags(ts);
+      if (ts.length && !ts.includes(sel)) {
+        setSel([...ts].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0]);
+      }
+    });
+  }, [repo]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setImg(null); setErr('');
     getImage(repo, sel).then(setImg).catch((e) => setErr(String(e)));
@@ -294,8 +304,8 @@ export default function ArtifactDetail() {
               <div><span className="text-muted-foreground">태그</span> · {img.tag}</div>
               <div><span className="text-muted-foreground">크기</span> · {fmtBytes(img.size)}</div>
               <div className="md:col-span-2 break-all"><span className="text-muted-foreground">digest</span> · {img.digest}</div>
-              {img.vulnerabilities?.Count != null && (
-                <div><span className="text-muted-foreground">취약점</span> · {img.vulnerabilities.Count} ({img.vulnerabilities.MaxSeverity})</div>
+              {(img.vulnerabilities?.Count ?? 0) > 0 && (
+                <div><span className="text-muted-foreground">취약점</span> · {img.vulnerabilities?.Count} ({img.vulnerabilities?.MaxSeverity})</div>
               )}
             </CardContent>
           </Card>

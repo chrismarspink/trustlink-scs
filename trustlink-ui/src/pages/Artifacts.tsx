@@ -61,10 +61,9 @@ export default function Artifacts() {
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>{fmtBytes(r.size || 0)}</span>
-                      {r.vulnerabilities?.Count != null && (
-                        <Badge variant={r.vulnerabilities.Count > 0 ? 'warn' : 'success'}>
-                          CVE {r.vulnerabilities.Count}
-                        </Badge>
+                      {/* 0 은 미스캔과 구분 불가(zot Trivy 비활성) → 1 이상일 때만 표시 */}
+                      {(r.vulnerabilities?.Count ?? 0) > 0 && (
+                        <Badge variant="warn">CVE {r.vulnerabilities?.Count}</Badge>
                       )}
                     </div>
                   </div>
