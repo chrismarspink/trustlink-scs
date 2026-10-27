@@ -49,8 +49,7 @@
           "policies": [
             { "users": ["ci"],          "actions": ["read", "create", "update"] },
             { "groups": ["developers"], "actions": ["read", "create", "update"] },
-            { "groups": ["partners"],   "actions": ["read"] },
-            { "groups": ["customers"],  "actions": ["read"] }
+            { "groups": ["users"],      "actions": ["read"] }
           ],
           "defaultPolicy": []
         },
@@ -58,8 +57,7 @@
           "policies": [
             { "users": ["ci"],          "actions": ["read", "create", "update"] },
             { "groups": ["developers"], "actions": ["read", "create", "update"] },
-            { "groups": ["partners"],   "actions": ["read"] },
-            { "groups": ["customers"],  "actions": ["read"] }
+            { "groups": ["users"],      "actions": ["read"] }
           ],
           "defaultPolicy": []
         }

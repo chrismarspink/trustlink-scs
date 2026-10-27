@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { UserPlus, Search, ChevronLeft, ChevronRight, ShieldCheck, Code, Handshake, Building2, User as UserIcon } from 'lucide-react';
+import { UserPlus, Search, ChevronLeft, ChevronRight, ShieldCheck, Code, Handshake, Building2, User as UserIcon, KeyRound } from 'lucide-react';
 import {
-  adminUsers, adminGroups, adminCreateUser, adminSetUserGroup, type AdminUser
+  adminUsers, adminGroups, adminCreateUser, adminSetUserGroup, adminResetPassword, adminCICredential, type AdminUser
 } from '@/lib/api';
 import { Button, Input, Badge } from '@/components/ui/primitives';
 import { PageTitle, SectionTitle, Loading, Alert, Table, Th, Td, selectCls } from './_ui';
+import CredentialDialog, { type CredentialInfo } from './CredentialDialog';
 
 const PER_PAGE = 8;
 
@@ -43,6 +44,9 @@ export default function Users() {
   const [np, setNp] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // 자격 전달 창(발급 직후 1회 표시)
+  const [cred, setCred] = useState<CredentialInfo | null>(null);
+
   async function load() {
     setErr('');
     try {
@@ -71,13 +75,33 @@ export default function Users() {
     if (!nu.trim()) { alert('username 을 입력하세요'); return; }
     setBusy(true);
     try {
-      await adminCreateUser({ username: nu.trim(), email: ne.trim(), group: ng, password: np });
+      const r = await adminCreateUser({ username: nu.trim(), email: ne.trim(), group: ng, password: np });
+      setCred({ kind: 'user', username: r.username, password: r.password, group: r.group });
       setNu(''); setNe(''); setNp('');
       await load();
     } catch (e) {
       alert('생성 실패: ' + e);
     }
     setBusy(false);
+  }
+
+  async function resetPassword(u: AdminUser) {
+    if (!confirm(`${u.username} 의 비밀번호를 새 임시 비밀번호로 재설정할까요?\n기존 비밀번호는 즉시 사용할 수 없게 됩니다.`)) return;
+    try {
+      const r = await adminResetPassword(u.id, u.username);
+      setCred({ kind: 'user', username: r.username, password: r.password, group: u.groups?.[0] });
+    } catch (e) {
+      alert('재설정 실패: ' + e);
+    }
+  }
+
+  async function showCI() {
+    try {
+      const r = await adminCICredential();
+      setCred({ kind: 'ci', username: r.username, password: r.password });
+    } catch (e) {
+      alert('조회 실패: ' + e);
+    }
   }
 
   async function changeGroup(id: string, group: string) {
@@ -95,6 +119,7 @@ export default function Users() {
   return (
     <>
       <PageTitle>사용자 관리</PageTitle>
+      {cred && <CredentialDialog cred={cred} onClose={() => setCred(null)} />}
 
       <SectionTitle>신규 생성</SectionTitle>
       <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -103,10 +128,16 @@ export default function Users() {
         <select className={selectCls} value={ng} onChange={(e) => setNg(e.target.value)}>
           {groups.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
-        <Input className="w-52" placeholder="임시PW (기본 Passw0rd!)" value={np} onChange={(e) => setNp(e.target.value)} />
+        <Input className="w-52" placeholder="임시PW (비우면 자동 생성)" value={np} onChange={(e) => setNp(e.target.value)} />
         <Button variant="accent" size="sm" onClick={create} disabled={busy}>
           <UserPlus size={15} /> {busy ? '생성중…' : '생성'}
         </Button>
+      </div>
+
+      <SectionTitle>업로드(CI) 계정</SectionTitle>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <span className="text-sm text-muted-foreground">빌드 서버 자동 업로드용 공용 계정(products/**, innotium/** 쓰기). 조회 시 감사 로그에 기록됩니다.</span>
+        <Button size="sm" variant="outline" onClick={showCI}><KeyRound size={14} /> 계정 정보 전달</Button>
       </div>
 
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -119,14 +150,14 @@ export default function Users() {
 
       <Table>
         <thead>
-          <tr><Th>사용자</Th><Th>이메일</Th><Th>그룹</Th><Th>그룹 변경</Th></tr>
+          <tr><Th>사용자</Th><Th>이메일</Th><Th>그룹</Th><Th>그룹 변경</Th><Th>비밀번호</Th></tr>
         </thead>
         <tbody>
           {paged.map((u) => (
-            <UserRow key={u.id} u={u} groups={groups} onChange={changeGroup} />
+            <UserRow key={u.id} u={u} groups={groups} onChange={changeGroup} onReset={resetPassword} />
           ))}
           {paged.length === 0 && (
-            <tr><Td className="text-muted-foreground" >검색 결과 없음</Td><Td> </Td><Td> </Td><Td> </Td></tr>
+            <tr><Td className="text-muted-foreground" >검색 결과 없음</Td><Td> </Td><Td> </Td><Td> </Td><Td> </Td></tr>
           )}
         </tbody>
       </Table>
@@ -140,7 +171,7 @@ export default function Users() {
   );
 }
 
-function UserRow({ u, groups, onChange }: { u: AdminUser; groups: string[]; onChange: (id: string, g: string) => void }) {
+function UserRow({ u, groups, onChange, onReset }: { u: AdminUser; groups: string[]; onChange: (id: string, g: string) => void; onReset: (u: AdminUser) => void }) {
   const current = u.groups?.[0] || groups[0] || '';
   const [sel, setSel] = useState(current);
   return (
@@ -165,6 +196,9 @@ function UserRow({ u, groups, onChange }: { u: AdminUser; groups: string[]; onCh
           </select>
           <Button size="sm" variant="outline" onClick={() => onChange(u.id, sel)}>적용</Button>
         </div>
+      </Td>
+      <Td>
+        <Button size="sm" variant="outline" onClick={() => onReset(u)}><KeyRound size={14} /> 재설정</Button>
       </Td>
     </tr>
   );

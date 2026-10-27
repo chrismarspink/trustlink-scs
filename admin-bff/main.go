@@ -232,23 +232,25 @@ func main() {
 	mux.HandleFunc("GET /admin/callback", s.handleCallback)
 	mux.HandleFunc("GET /admin/logout", s.handleLogout)
 	// /admin·/admin/* 은 신규 React UI(SPA)가 프론트도어(serveUI)로 서빙한다. (구 vanilla 콘솔 제거)
-	mux.HandleFunc("GET /api/me", s.guard(s.apiMe))
+	mux.HandleFunc("GET /api/me", s.guardSession(s.apiMe)) // 로그인 사용자 본인 정보(그룹) — UI 메뉴 게이팅용
 	mux.HandleFunc("GET /api/users", s.guard(s.apiUsers))
 	mux.HandleFunc("GET /api/groups", s.guard(s.apiGroups))
 	mux.HandleFunc("POST /api/users", s.guard(s.apiCreateUser))
 	mux.HandleFunc("POST /api/users/{id}/group", s.guard(s.apiSetUserGroup))
+	mux.HandleFunc("POST /api/users/{id}/reset-password", s.guard(s.apiResetPassword)) // 임시 비밀번호 재발급(1회 표시)
+	mux.HandleFunc("GET /api/credentials/ci", s.guard(s.apiCICredential))              // 공용 업로드(ci) 계정 전달
 	mux.HandleFunc("GET /api/metrics", s.guard(s.apiMetrics))
 	mux.HandleFunc("GET /api/logs", s.guard(s.apiLogs))
 	mux.HandleFunc("GET /api/health", s.guard(s.apiHealth))
-	mux.HandleFunc("GET /api/repos", s.guard(s.apiRepos))
+	mux.HandleFunc("GET /api/repos", s.guardSession(s.apiRepos)) // 제품 열람: 로그인 사용자(그룹 read 는 zot RBAC 이 최종 판정)
 	mux.HandleFunc("POST /api/registry/delete-tag", s.guard(s.apiDeleteTag))
 	mux.HandleFunc("GET /api/retention", s.guard(s.apiRetention))
 	mux.HandleFunc("GET /api/acl", s.guard(s.apiACL))
-	mux.HandleFunc("GET /api/artifact/blob", s.apiArtifactBlob)     // 단일 파일 다운로드
-	mux.HandleFunc("GET /api/artifact/bundle", s.apiArtifactBundle) // 전체 zip 다운로드
+	mux.HandleFunc("GET /api/artifact/blob", s.guardSession(s.apiArtifactBlob))     // 웹 다운로드: 로그인 사용자(본인 자격으로 zot RBAC)
+	mux.HandleFunc("GET /api/artifact/bundle", s.guardSession(s.apiArtifactBundle)) // 웹 다운로드: 로그인 사용자(본인 자격으로 zot RBAC)
 	mux.HandleFunc("GET /api/storage", s.guard(s.apiStorageGet))
 	mux.HandleFunc("POST /api/storage/preview", s.guard(s.apiStoragePreview))
-	mux.HandleFunc("GET /api/stats", s.guard(s.apiStats)) // 버전별 SBOM/VEX 통계(대시보드)
+	mux.HandleFunc("GET /api/stats", s.guardSession(s.apiStats)) // 대시보드 통계: 로그인 사용자
 	// 제품 페이지용 경량 세션(그룹 무관, 로그인만)
 	mux.HandleFunc("GET /api/session", s.guardSession(s.apiSession))
 	// Dependency-Track 헤드리스 연동 (취약점 분석 → VEX). security/developers/admins 편집 가능.
@@ -593,8 +595,13 @@ func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "username, group 필수"})
 		return
 	}
-	if in.Password == "" {
-		in.Password = "Passw0rd!"
+	if in.Password == "" { // 미입력 시 무작위 임시 비밀번호 자동 생성(응답으로 1회 전달)
+		pw, err := genTempPassword()
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": err.Error()})
+			return
+		}
+		in.Password = pw
 	}
 	if in.Email == "" {
 		in.Email = in.Username + "@innotium.local"
@@ -619,16 +626,17 @@ func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 임시 비밀번호
-	pwBody, _ := json.Marshal(map[string]any{"type": "password", "value": in.Password, "temporary": true})
-	rp, _ := s.kcAdmin("PUT", "/users/"+uid+"/reset-password", strings.NewReader(string(pwBody)))
-	if rp != nil {
-		rp.Body.Close()
+	if err := s.setTempPassword(uid, in.Password); err != nil {
+		writeJSON(w, 502, map[string]string{"error": "임시 비밀번호 설정 실패: " + err.Error()})
+		return
 	}
 	if err := s.setUserGroup(uid, in.Group); err != nil {
 		writeJSON(w, 502, map[string]string{"error": "그룹 배정 실패: " + err.Error()})
 		return
 	}
-	writeJSON(w, 201, map[string]string{"id": uid, "username": in.Username, "group": in.Group})
+	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-create", Subject: in.Username, Detail: map[string]any{"group": in.Group}})
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, 201, map[string]string{"id": uid, "username": in.Username, "group": in.Group, "password": in.Password})
 }
 
 func (s *Server) apiSetUserGroup(w http.ResponseWriter, r *http.Request) {

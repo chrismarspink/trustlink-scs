@@ -45,11 +45,15 @@ func (s *Server) zotGet(caller *http.Request, path, accept string) (*http.Respon
 	if accept != "" {
 		req.Header.Set("Accept", accept)
 	}
-	if c := caller.Header.Get("Cookie"); c != "" {
-		req.Header.Set("Cookie", c) // zot OIDC 세션 쿠키
-	}
+	// 자격 우선순위: ① CLI·API 클라이언트가 보낸 Authorization(본인 API key/basic → per-user RBAC)
+	// ② 브라우저 세션(웹 다운로드): Authorization 없음 → svc-bff 서버측 자격으로 대리.
+	//    (로그인은 guardSession 으로 이미 검증됨. zot /v2 는 Basic 만 수용하므로 BFF 세션쿠키는 무의미해 미전달)
 	if a := caller.Header.Get("Authorization"); a != "" {
-		req.Header.Set("Authorization", a) // Basic/Bearer (CLI·API 클라이언트)
+		req.Header.Set("Authorization", a)
+	} else if s.cfg.ZotAdminUser != "" {
+		req.SetBasicAuth(s.cfg.ZotAdminUser, s.cfg.ZotAdminPass)
+	} else if c := caller.Header.Get("Cookie"); c != "" {
+		req.Header.Set("Cookie", c) // zot OIDC 세션 쿠키(폴백)
 	}
 	return s.http.Do(req)
 }

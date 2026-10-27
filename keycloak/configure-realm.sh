@@ -12,13 +12,13 @@ FRONT_PORT="${FRONT_PORT:-28080}"
 ORIGIN="http://${FRONT_HOST}:${FRONT_PORT}"
 ADMIN_SECRET="${TRUSTLINK_ADMIN_SECRET:-}"   # BFF(trustlink-admin) 클라이언트 시크릿(.env)
 
-$KC config credentials --server http://localhost:8085 --realm master --user "$ADMIN" --password "$ADMIN_PW"
+$KC config credentials --server http://localhost:8085/auth --realm master --user "$ADMIN" --password "$ADMIN_PW"
 
 # 1) realm
 $KC create realms -s realm=$REALM -s enabled=true 2>/dev/null && echo "realm created" || echo "realm exists"
 
 # 2) groups
-for g in developers partners customers admins; do
+for g in users developers admins; do
   $KC create groups -r $REALM -s name="$g" 2>/dev/null && echo "group $g created" || echo "group $g exists"
 done
 
@@ -53,6 +53,7 @@ if [ -z "${AID}" ]; then
   AID=$($KC create clients -r $REALM -i \
     -s clientId=trustlink-admin -s enabled=true -s protocol=openid-connect \
     -s publicClient=false -s standardFlowEnabled=true -s directAccessGrantsEnabled=true \
+    -s serviceAccountsEnabled=true \
     -s "redirectUris=[\"${ORIGIN}/admin/callback\"]" -s 'webOrigins=["+"]')
   echo "client trustlink-admin created ($AID)"
 else
@@ -60,6 +61,15 @@ else
 fi
 [ -n "${ADMIN_SECRET}" ] && $KC update clients/$AID -r $REALM -s secret="${ADMIN_SECRET}" 2>/dev/null \
   && echo "trustlink-admin secret set" || echo "WARN: TRUSTLINK_ADMIN_SECRET 미설정 — BFF 로그인 실패할 수 있음"
+# 로그아웃 후 앱 홈(ORIGIN/) 복귀용 post-logout redirect URI. 없으면 로그아웃 시 "잘못된 리디렉션 URI".
+$KC update clients/$AID -r $REALM -s 'attributes."post.logout.redirect.uris"='"${ORIGIN}"'/*' 2>/dev/null \
+  && echo "trustlink-admin post-logout URI 설정" || true
+# 서비스계정 활성화(멱등) + BFF가 Keycloak Admin API(사용자/그룹 조회)를 호출하도록 realm-management 읽기 역할 부여.
+# 없으면 대시보드/사용자에서 "no service-account token"(502) 발생.
+$KC update clients/$AID -r $REALM -s serviceAccountsEnabled=true 2>/dev/null || true
+$KC add-roles -r $REALM --uusername service-account-trustlink-admin --cclientid realm-management \
+  --rolename view-users --rolename query-users --rolename query-groups 2>/dev/null \
+  && echo "trustlink-admin service-account roles(view-users) 부여" || echo "SA roles 이미부여/보류"
 # groups 매퍼(동일 — 토큰에 groups 클레임)
 $KC create clients/$AID/protocol-mappers/models -r $REALM \
   -s name=groups -s protocol=openid-connect \
@@ -91,15 +101,16 @@ create_user() { # $1 user  $2 group
     echo "  WARN: could not resolve uid/gid for $1 -> $2 (uid=$uid gid=$gid)"
   fi
 }
-# 역할별 테스트 사용자 (각 그룹 2명) — 공통 비밀번호 Passw0rd! (PoC 전용)
-#  developers: README 편집 / VEX 첨부·수정 / 서명 검증 (read+create+update)
-#  partners/customers: 조회(read)  |  admins: 전체(+delete) + 관리 콘솔
+# 역할별 테스트 사용자 — 공통 비밀번호 Passw0rd! (PoC 전용). (A) 모델:
+#  admins        : TrustLink 관리 + 전체 + 사용자관리 (관리 콘솔)
+#  developers    : 레지스트리 사용자 = 웹 + API key 발급 → push/pull(read+create+update) + VEX 편집
+#  users         : 웹 사용자 = 웹 로그인 + 제품 열람 + 다운로드(read)
 create_user dev1     developers
 create_user dev2     developers
-create_user partner1 partners
-create_user partner2 partners
-create_user acme1    customers
-create_user acme2    customers
+create_user partner1 users
+create_user partner2 users
+create_user acme1    users
+create_user acme2    users
 create_user admin1   admins
 create_user admin2   admins
 

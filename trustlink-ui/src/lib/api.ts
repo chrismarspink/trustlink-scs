@@ -214,8 +214,12 @@ export const adminMe = () => aj<Me>('/api/me');
 export type AdminUser = { id: string; username: string; email: string; enabled: boolean; groups: string[] };
 export const adminUsers = () => aj<AdminUser[]>('/api/users');
 export const adminGroups = () => aj<string[]>('/api/groups');
+export type IssuedCredential = { username: string; password: string };
 export const adminCreateUser = (b: { username: string; email: string; group: string; password: string }) =>
-  aj('/api/users', jsonInit('POST', b));
+  aj<IssuedCredential & { id: string; group: string }>('/api/users', jsonInit('POST', b));
+export const adminResetPassword = (id: string, username: string) =>
+  aj<IssuedCredential>(`/api/users/${id}/reset-password`, jsonInit('POST', { username }));
+export const adminCICredential = () => aj<IssuedCredential>('/api/credentials/ci');
 export const adminSetUserGroup = (id: string, group: string) =>
   aj(`/api/users/${id}/group`, jsonInit('POST', { group }));
 
