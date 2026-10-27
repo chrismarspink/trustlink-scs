@@ -364,3 +364,24 @@ export async function getReferrerContent(name: string, digest: string): Promise<
   if (!br.ok) throw new Error(`blob ${br.status}`);
   return br.text();
 }
+
+// 내 API 키(zot 기본 기능) — oras 로그인용 개인 토큰. zot 웹 세션(제품 화면 로그인)으로 발급·삭제.
+//   권한은 계정의 역할·고객사·제품 권한을 그대로 따른다(범위 지정은 zot 이 강제하지 않아 사용 안 함).
+export type ApiKey = { uuid: string; label: string; createdAt: string; expirationDate: string; isExpired: boolean; lastUsed: string };
+export async function listApiKeys(): Promise<ApiKey[]> {
+  const r = await zfetch('/zot/auth/apikey');
+  if (!r.ok) throw new Error(`API 키 목록 ${r.status}`);
+  return (await r.json()).apiKeys || [];
+}
+export async function createApiKey(label: string, expirationDate: string): Promise<ApiKey & { apiKey: string }> {
+  const r = await zfetch('/zot/auth/apikey', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(expirationDate ? { label, expirationDate } : { label })
+  });
+  if (!r.ok) throw new Error(`API 키 발급 ${r.status}`);
+  return r.json();
+}
+export async function deleteApiKey(id: string): Promise<void> {
+  const r = await zfetch(`/zot/auth/apikey?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!r.ok) throw new Error(`API 키 삭제 ${r.status}`);
+}

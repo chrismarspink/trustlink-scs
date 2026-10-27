@@ -4,6 +4,7 @@ import { isAuthed, oidcLogin } from '@/lib/api';
 import { Layout } from '@/components/Layout';
 import Artifacts from '@/pages/Artifacts';
 import ArtifactDetail from '@/pages/ArtifactDetail';
+import ApiKeys from '@/pages/ApiKeys';
 import GettingStarted from '@/pages/docs/GettingStarted';
 import ShareGuide from '@/pages/docs/ShareGuide';
 import Vuln from '@/pages/docs/Vuln';
@@ -43,6 +44,7 @@ function ProductApp() {
         <Route path="/docs/vuln" element={<Vuln />} />
         <Route path="/docs/rbac" element={<Rbac />} />
         <Route path="/artifact/:name/:tag" element={<ArtifactDetail />} />
+        <Route path="/apikeys" element={<ApiKeys />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

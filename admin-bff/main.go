@@ -691,6 +691,7 @@ func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 502, map[string]string{"error": "그룹 배정 실패: " + err.Error()})
 		return
 	}
+	s.refreshAccess()
 	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-create", Subject: in.Username, Detail: map[string]any{"groups": groups}})
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 201, map[string]any{"id": uid, "username": in.Username, "group": in.Role, "groups": groups, "password": in.Password})
@@ -736,6 +737,7 @@ func (s *Server) apiUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		detail["enabled"] = *in.Enabled
 	}
+	s.refreshAccess() // 비활성화·고객사 해제 즉시 zot 판정에서 제외(API 키 포함)
 	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-update", Subject: in.Username, Detail: detail})
 	writeJSON(w, 200, map[string]any{"id": uid, "updated": detail})
 }
@@ -758,6 +760,7 @@ func (s *Server) apiDeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 502, map[string]string{"error": fmt.Sprintf("삭제 실패(%d)", resp.StatusCode)})
 		return
 	}
+	s.refreshAccess()
 	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-delete", Subject: name})
 	writeJSON(w, 200, map[string]string{"id": uid})
 }

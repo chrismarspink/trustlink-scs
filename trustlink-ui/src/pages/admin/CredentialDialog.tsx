@@ -86,20 +86,20 @@ function notice(c: CredentialInfo): string {
       '※ 시스템의 시크릿 변수(TL_USER/TL_PASS)로만 보관하고, 스크립트·문서·메신저에 남기지 마세요.',
     ].join('\n');
   }
-  const canUpload = c.group === 'developers' || c.group === 'admins';
   return [
     '[TrustLink 계정 발급 안내]',
     `웹 주소: ${web}`,
     `계정: ${c.username}`,
     `임시 비밀번호: ${c.password}`,
     '※ 첫 로그인 시 비밀번호를 반드시 변경해야 합니다.',
-    ...(canUpload ? [
+    // oras 는 웹 비밀번호를 받지 않음 → 모든 사람 계정에 API 키 안내(권한은 계정 권한 그대로)
+    ...[
       '',
-      '파일 업로드(oras)용 API 키 발급:',
-      `  1) ${web}/zot 접속 → 위 계정으로 로그인`,
-      '  2) 우측 상단 사용자 메뉴 → API Keys → 키 생성(만료일 지정 권장)',
+      'oras(명령줄) 업로드·다운로드용 API 키 발급:',
+      `  1) ${web} 접속 → 위 계정으로 로그인(비밀번호 변경)`,
+      '  2) 왼쪽 메뉴 "내 API 키" → 용도·만료 선택 → 발급(한 번만 표시)',
       `  3) printf '%s' "<API 키>" | oras login ${reg} -u ${c.username} --password-stdin --plain-http`,
-    ] : []),
+    ],
     '',
     '※ 이 안내는 확인 후 삭제하세요.',
   ].join('\n');

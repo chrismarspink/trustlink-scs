@@ -8,6 +8,9 @@ package main
 //           ci·svc-bff(.env) + 유효한 기계 계정 → ZOT_MANAGED_DIR/htpasswd
 //   - 웹 경로는 BFF 가 svc-bff 로 대리 조회하므로, 같은 설정으로 canRead/canWrite 를 판정해
 //     zot 과 동일한 규칙을 강제한다.
+//   - 그룹은 렌더 시 "현재 활성 구성원 이름"으로 풀어 쓴다. zot 은 API 키·세션에 마지막 로그인 때의
+//     그룹을 들고 있어, 그룹 그대로 두면 비활성화·고객사 해제 후에도 API 키가 계속 통한다(실측).
+//     사용자 변경 시 즉시 + 2분 주기로 다시 렌더한다(Keycloak 콘솔에서 바꾼 경우 대비).
 
 import (
 	"bytes"
@@ -160,6 +163,7 @@ type accessManager struct {
 	baseUsers string // ci·svc-bff htpasswd 줄(기동 시 1회 해시)
 	oidcCreds []byte
 	hasher    func(user, pw string) (string, error)
+	resolve   func(groups []string) (map[string][]string, error) // 그룹 → 활성 구성원(nil 이면 그룹 그대로)
 	now       func() time.Time
 	p         AccessPolicy
 	acl       *aclConfig
@@ -254,6 +258,15 @@ func (m *accessManager) renderLocked() error {
 		repos[pp.Repo] = entry
 		repos[pp.Repo+"/**"] = entry
 	}
+	if m.resolve != nil {
+		if err := m.expandGroups(httpCfg); err != nil {
+			if m.acl != nil {
+				return fmt.Errorf("그룹 구성원 조회 실패(이전 설정 유지): %w", err)
+			}
+			log.Printf("그룹 구성원 조회 실패 — 그룹 기준으로 우선 렌더: %v", err)
+		}
+	}
+	ac, _ = httpCfg["accessControl"].(map[string]any)
 	out, _ := json.MarshalIndent(cfg, "", "  ")
 
 	var acl aclConfig
@@ -295,6 +308,71 @@ func (m *accessManager) renderLocked() error {
 		changed = true
 	}
 	m.acl = &acl
+	return nil
+}
+
+// expandGroups: accessControl 의 모든 정책에서 groups 를 활성 구성원 이름(users)으로 바꾼다.
+func (m *accessManager) expandGroups(httpCfg map[string]any) error {
+	b, _ := json.Marshal(httpCfg["accessControl"])
+	var ac map[string]any
+	if err := json.Unmarshal(b, &ac); err != nil {
+		return err
+	}
+	var pols []map[string]any
+	if repos, ok := ac["repositories"].(map[string]any); ok {
+		for _, r := range repos {
+			rm, _ := r.(map[string]any)
+			ps, _ := rm["policies"].([]any)
+			for _, p := range ps {
+				if pm, ok := p.(map[string]any); ok {
+					pols = append(pols, pm)
+				}
+			}
+		}
+	}
+	if ap, ok := ac["adminPolicy"].(map[string]any); ok {
+		pols = append(pols, ap)
+	}
+	names := map[string]bool{}
+	for _, p := range pols {
+		gs, _ := p["groups"].([]any)
+		for _, g := range gs {
+			names[fmt.Sprint(g)] = true
+		}
+	}
+	list := []string{}
+	for n := range names {
+		list = append(list, n)
+	}
+	sort.Strings(list)
+	members, err := m.resolve(list)
+	if err != nil {
+		return err
+	}
+	for _, p := range pols {
+		users := []string{}
+		seen := map[string]bool{}
+		add := func(u string) {
+			if !seen[u] {
+				seen[u] = true
+				users = append(users, u)
+			}
+		}
+		us, _ := p["users"].([]any)
+		for _, u := range us {
+			add(fmt.Sprint(u))
+		}
+		gs, _ := p["groups"].([]any)
+		for _, g := range gs {
+			for _, u := range members[fmt.Sprint(g)] {
+				add(u)
+			}
+		}
+		sort.Strings(users)
+		p["users"] = users
+		p["groups"] = []string{}
+	}
+	httpCfg["accessControl"] = ac
 	return nil
 }
 
@@ -343,7 +421,7 @@ func (s *Server) initAccess() error {
 	}
 	m := &accessManager{
 		storePath: s.cfg.AccessStore, tmplPath: s.cfg.ZotTemplate, outDir: s.cfg.ZotManagedDir,
-		hasher: htpasswdHash, now: time.Now,
+		hasher: htpasswdHash, now: time.Now, resolve: s.activeGroupMembers,
 	}
 	for _, u := range [][2]string{{s.cfg.MetricsUser, s.cfg.MetricsPass}, {s.cfg.ZotAdminUser, s.cfg.ZotAdminPass}} {
 		if u[0] == "" || u[1] == "" {
@@ -363,14 +441,60 @@ func (s *Server) initAccess() error {
 		return err
 	}
 	s.access = m
-	go func() { // 만료된 기계 계정을 htpasswd 에서 제외
-		for range time.Tick(10 * time.Minute) {
+	go func() { // 만료된 기계 계정 제외 + Keycloak 콘솔에서 바뀐 구성원 반영
+		for range time.Tick(2 * time.Minute) {
 			if err := m.render(); err != nil {
 				log.Printf("zot 설정 렌더 실패: %v", err)
 			}
 		}
 	}()
 	return nil
+}
+
+// activeGroupMembers: Keycloak 그룹 → 활성(enabled) 구성원 username. 없는 그룹은 빈 목록.
+func (s *Server) activeGroupMembers(names []string) (map[string][]string, error) {
+	gs, err := s.listGroups()
+	if err != nil {
+		return nil, err
+	}
+	ids := map[string]string{}
+	for _, g := range gs {
+		ids[g.Name] = g.ID
+	}
+	out := map[string][]string{}
+	for _, n := range names {
+		out[n] = []string{}
+		id := ids[n]
+		if id == "" {
+			continue
+		}
+		resp, err := s.kcAdmin("GET", "/groups/"+id+"/members?max=10000", nil)
+		if err != nil {
+			return nil, err
+		}
+		var us []kcUser
+		err = json.NewDecoder(resp.Body).Decode(&us)
+		resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 {
+			return nil, fmt.Errorf("그룹 %s 구성원 조회 실패(%d)", n, resp.StatusCode)
+		}
+		for _, u := range us {
+			if u.Enabled {
+				out[n] = append(out[n], u.Username)
+			}
+		}
+	}
+	return out, nil
+}
+
+// refreshAccess: 사용자·그룹 변경 직후 다시 렌더(실패는 로그만 — 2분 주기로 재시도).
+func (s *Server) refreshAccess() {
+	if s.access == nil {
+		return
+	}
+	if err := s.access.render(); err != nil {
+		log.Printf("접근 정책 재렌더 실패: %v", err)
+	}
 }
 
 // canAccess: 웹 경로 권한 판정. 관리 모드가 아니면(개발용) 기존 동작 유지.

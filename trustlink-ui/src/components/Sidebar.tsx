@@ -15,6 +15,7 @@ type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; childr
 // 제품(레지스트리) 섹션 — 항상 노출. "문서"는 하위 트리.
 const PRODUCT: Item[] = [
   { to: '/', label: '아티팩트', icon: Package, end: true },
+  { to: '/apikeys', label: '내 API 키', icon: KeyRound },
   {
     to: '/docs', label: '문서', icon: BookOpen, children: [
       { to: '/docs', label: '시작하기', icon: Rocket, end: true },

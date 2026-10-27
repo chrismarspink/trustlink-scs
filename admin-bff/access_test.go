@@ -40,6 +40,8 @@ const testTemplate = `{
  }}
 }`
 
+var activeAcme = []string{"acme1"}
+
 func newTestManager(t *testing.T) *accessManager {
 	dir := t.TempDir()
 	tmpl := filepath.Join(dir, "tmpl.json")
@@ -48,6 +50,14 @@ func newTestManager(t *testing.T) *accessManager {
 		storePath: filepath.Join(dir, "store", "access-policy.json"), tmplPath: tmpl, outDir: filepath.Join(dir, "out"),
 		baseUsers: "ci:$2y$base\n", oidcCreds: []byte(`{"clientid":"zot"}`), now: time.Now,
 		hasher: func(u, p string) (string, error) { return u + ":$2y$" + p, nil },
+	}
+	m.resolve = func(gs []string) (map[string][]string, error) { // 활성 구성원(Keycloak 대용)
+		all := map[string][]string{"developers": {"dev1"}, "admins": {"admin1"}, "org-acme": activeAcme, "org-beta": {"beta1"}}
+		out := map[string][]string{}
+		for _, g := range gs {
+			out[g] = all[g]
+		}
+		return out, nil
 	}
 	if err := m.render(); err != nil {
 		t.Fatal(err)
@@ -129,8 +139,22 @@ func TestAccessPolicyRenderAndEvaluate(t *testing.T) {
 		t.Fatal("htpasswd 만 변경 시 config.json 재기록 안 됨")
 	}
 
+	// 비활성화·고객사 해제: 토큰/API 키에 그룹(org-acme)이 남아 있어도 구성원 목록에서 빠지면 거부
+	activeAcme = []string{}
+	if err := m.render(); err != nil {
+		t.Fatal(err)
+	}
+	if m.allowed("acme1", []string{"users", "org-acme"}, "products/npouch", "read") {
+		t.Fatal("비활성 사용자가 그룹 스냅샷으로 접근 가능")
+	}
+	if !m.allowed("robot-acme", nil, "products/npouch", "read") {
+		t.Fatal("기계 계정 권한은 유지되어야 함")
+	}
+	activeAcme = []string{"acme1"}
+	_ = m.render()
+
 	// 저장 후 재기동해도 정책 유지
-	m2 := &accessManager{storePath: m.storePath, tmplPath: m.tmplPath, outDir: m.outDir, now: time.Now, hasher: m.hasher}
+	m2 := &accessManager{storePath: m.storePath, tmplPath: m.tmplPath, outDir: m.outDir, now: time.Now, hasher: m.hasher, resolve: m.resolve}
 	if err := m2.load(); err != nil || m2.render() != nil {
 		t.Fatal("재로드 실패")
 	}
