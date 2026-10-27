@@ -56,6 +56,9 @@ func (s *Server) apiRepos(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(resp.Body).Decode(&cat)
 	out := []map[string]any{}
 	for _, repo := range cat.Repositories {
+		if !s.canAccess(r, repo, "read") { // 웹 경로도 zot 과 같은 규칙(권한 없는 제품은 목록에서 제외)
+			continue
+		}
 		tags := s.repoTags(repo)
 		out = append(out, map[string]any{"repo": repo, "tags": tags, "tagCount": len(tags)})
 	}

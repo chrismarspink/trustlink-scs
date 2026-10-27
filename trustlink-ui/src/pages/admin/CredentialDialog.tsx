@@ -5,7 +5,11 @@ import { Alert } from './_ui';
 
 // 자격 전달 창: 관리자가 담당자에게 넘길 계정·비밀번호와 안내문을 1회 표시한다.
 //   kind=user → 개인(Keycloak) 계정 임시 비밀번호 / kind=ci → 공용 업로드 계정
-export type CredentialInfo = { kind: 'user' | 'ci'; username: string; password: string; group?: string };
+//   kind=robot → 기계 계정(push=업로드 ci-*, pull=다운로드 robot-*) oras 비밀값
+export type CredentialInfo = {
+  kind: 'user' | 'ci' | 'robot'; username: string; password: string; group?: string;
+  robotKind?: 'push' | 'pull'; products?: string[]; expires?: string;
+};
 
 // navigator.clipboard 는 보안 컨텍스트(HTTPS/localhost) 전용 → 평문 HTTP 배포에선 execCommand 폴백.
 async function copyText(text: string) {
@@ -62,6 +66,26 @@ function notice(c: CredentialInfo): string {
       '※ 빌드 서버의 CI 시크릿 변수(TL_USER/TL_PASS)로만 보관하고, 스크립트·문서·메신저에 남기지 마세요.',
     ].join('\n');
   }
+  if (c.kind === 'robot') {
+    const push = c.robotKind === 'push';
+    const ref = `${reg}/${c.products?.[0] || 'products/<제품>'}`;
+    return [
+      push ? '[TrustLink 업로드용 기계 계정 안내]' : '[TrustLink 자동 다운로드 계정 안내]',
+      `레지스트리: ${reg} (oras 명령에 --plain-http 필요)`,
+      `계정: ${c.username}`,
+      `비밀값: ${c.password}`,
+      `권한: ${push ? '업로드(쓰기)' : '다운로드(읽기)'} — ${(c.products || []).join(', ') || '(관리자가 제품 권한에서 지정)'}`,
+      `만료: ${c.expires ? c.expires.slice(0, 10) : '없음'}`,
+      '',
+      '사용 예:',
+      `  printf '%s' "$TL_PASS" | oras login ${reg} -u ${c.username} --password-stdin --plain-http`,
+      push
+        ? `  oras push --plain-http ${ref}:<버전> <파일>`
+        : `  oras pull --plain-http ${ref}:<버전> -o ./download`,
+      '',
+      '※ 시스템의 시크릿 변수(TL_USER/TL_PASS)로만 보관하고, 스크립트·문서·메신저에 남기지 마세요.',
+    ].join('\n');
+  }
   const canUpload = c.group === 'developers' || c.group === 'admins';
   return [
     '[TrustLink 계정 발급 안내]',
@@ -88,27 +112,31 @@ export default function CredentialDialog({ cred, onClose }: { cred: CredentialIn
       <div className="w-full max-w-xl rounded-lg border bg-card p-5 shadow-lg">
         <div className="mb-4 flex items-center gap-2">
           <KeyRound size={18} className="text-accent" />
-          <h2 className="text-base font-semibold">{cred.kind === 'ci' ? '업로드(CI) 계정 전달' : '임시 비밀번호 전달'}</h2>
+          <h2 className="text-base font-semibold">
+            {cred.kind === 'ci' ? '업로드(CI) 계정 전달' : cred.kind === 'robot' ? '기계 계정 전달' : '임시 비밀번호 전달'}
+          </h2>
           <button className="ml-auto text-muted-foreground hover:text-foreground" onClick={onClose} aria-label="닫기"><X size={18} /></button>
         </div>
 
         <div className="space-y-2">
           <Field label="계정" value={cred.username} />
-          <Field label={cred.kind === 'ci' ? '비밀번호' : '임시 비밀번호'} value={cred.password} />
+          <Field label={cred.kind === 'user' ? '임시 비밀번호' : cred.kind === 'robot' ? '비밀값' : '비밀번호'} value={cred.password} />
         </div>
 
         <div className="mt-4 mb-1 flex items-center justify-between">
           <span className="text-sm font-medium">전달용 안내문</span>
           <CopyBtn text={text} label="안내문 복사" />
         </div>
-        <textarea readOnly value={text} rows={cred.kind === 'ci' ? 13 : 15}
+        <textarea readOnly value={text} rows={cred.kind === 'user' ? 15 : 14}
           className="w-full resize-none rounded-md border bg-secondary p-3 font-mono text-xs" />
 
         <div className="mt-3">
           <Alert tone="warn">
             {cred.kind === 'ci'
               ? '공용 계정입니다. 메일·메신저 대신 CI 시크릿 변수에 직접 등록하도록 전달하세요. 조회 기록은 감사 로그에 남습니다.'
-              : '이 창을 닫으면 비밀번호를 다시 볼 수 없습니다(필요 시 재설정). 본인에게만 전달하세요.'}
+              : cred.kind === 'robot'
+                ? '이 창을 닫으면 비밀값을 다시 볼 수 없습니다(필요 시 재발급 — 기존 값은 즉시 무효). 담당 시스템 관리자에게만 전달하세요.'
+                : '이 창을 닫으면 비밀번호를 다시 볼 수 없습니다(필요 시 재설정). 본인에게만 전달하세요.'}
           </Alert>
         </div>
         <div className="mt-4 flex justify-end">

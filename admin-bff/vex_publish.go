@@ -123,6 +123,9 @@ func (s *Server) apiVexPublish(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "repo, tag 필수"})
 		return
 	}
+	if !s.requireRepo(w, r, in.Repo, "create") {
+		return
+	}
 	if in.Project == "" {
 		in.Project = path.Base(in.Repo)
 	}

@@ -215,13 +215,45 @@ export type AdminUser = { id: string; username: string; email: string; enabled: 
 export const adminUsers = () => aj<AdminUser[]>('/api/users');
 export const adminGroups = () => aj<string[]>('/api/groups');
 export type IssuedCredential = { username: string; password: string };
-export const adminCreateUser = (b: { username: string; email: string; group: string; password: string }) =>
+export const ROLES = ['admins', 'developers', 'users'] as const;
+export const ORG_PREFIX = 'org-';
+export const adminCreateUser = (b: { username: string; email: string; role: string; orgs: string[]; password: string }) =>
   aj<IssuedCredential & { id: string; group: string }>('/api/users', jsonInit('POST', b));
+export const adminUpdateUser = (id: string, b: { username: string; role?: string; orgs?: string[]; enabled?: boolean }) =>
+  aj(`/api/users/${id}`, jsonInit('PUT', b));
+export const adminDeleteUser = (id: string, username: string) =>
+  aj(`/api/users/${id}?username=${encodeURIComponent(username)}`, { method: 'DELETE' });
 export const adminResetPassword = (id: string, username: string) =>
   aj<IssuedCredential>(`/api/users/${id}/reset-password`, jsonInit('POST', { username }));
 export const adminCICredential = () => aj<IssuedCredential>('/api/credentials/ci');
-export const adminSetUserGroup = (id: string, group: string) =>
-  aj(`/api/users/${id}/group`, jsonInit('POST', { group }));
+
+// 고객사(조직) = Keycloak 그룹 org-<name>
+export type Org = { name: string; group: string; members: string[]; products: string[] };
+export const adminOrgs = () => aj<Org[]>('/api/orgs');
+export const adminCreateOrg = (name: string) => aj('/api/orgs', jsonInit('POST', { name }));
+export const adminDeleteOrg = (name: string) => aj(`/api/orgs/${encodeURIComponent(name)}`, { method: 'DELETE' });
+
+// 제품 권한 — zot accessControl 로 렌더되어 zot 이 판정
+export type Principal = { type: 'group' | 'user'; name: string };
+export type ProductAccess = { repo: string; explicit: boolean; writers: Principal[]; readers: Principal[] };
+export const adminProductAccess = () => aj<ProductAccess[]>('/api/access/products');
+export const adminSetProductAccess = (b: { repo: string; writers: Principal[]; readers: Principal[] }) =>
+  aj('/api/access/products', jsonInit('PUT', b));
+export const adminResetProductAccess = (repo: string) =>
+  aj(`/api/access/products?repo=${encodeURIComponent(repo)}`, { method: 'DELETE' });
+export const adminPrincipals = () => aj<{ groups: string[]; users: string[] }>('/api/access/principals');
+
+// 기계 계정(ci-*: 업로드, robot-*: 다운로드) — oras 로그인용 ID + 비밀값
+export type RobotAccount = {
+  name: string; kind: 'push' | 'pull'; note: string; created: string; createdBy: string;
+  expires: string; valid: boolean; products: string[];
+};
+export type IssuedRobot = IssuedCredential & { kind: 'push' | 'pull'; expires: string; products?: string[] };
+export const adminRobots = () => aj<RobotAccount[]>('/api/robots');
+export const adminCreateRobot = (b: { name: string; kind: 'push' | 'pull'; products: string[]; days: number; note: string }) =>
+  aj<IssuedRobot>('/api/robots', jsonInit('POST', b));
+export const adminReissueRobot = (name: string) => aj<IssuedRobot>(`/api/robots/${name}/reissue`, jsonInit('POST', {}));
+export const adminDeleteRobot = (name: string) => aj(`/api/robots/${name}`, { method: 'DELETE' });
 
 export type DiskInfo = { totalBytes: number; freeBytes: number; usedBytes: number; usedPct: number; path: string };
 export type Metrics = {

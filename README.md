@@ -14,11 +14,10 @@ SBOM·취약점·VEX 를 산출물에 OCI referrer 로 묶어 관리·배포한�
 
 | 서비스 | 이미지 | 역할 |
 |---|---|---|
-| `trustlink-admin` | **자체** (이 저장소 `admin-bff/` + `trustlink-ui/`) | 단일 프론트도어(:28080) — UI·관리 콘솔·BFF API, zot·Keycloak 프록시, DT 중개 |
+| `trustlink-admin` | **자체** (이 저장소 `admin-bff/` + `trustlink-ui/`) | 단일 프론트도어(:28080) — UI·관리 콘솔·BFF API, zot·Keycloak 프록시, DT 중개, 제품 권한·기계 계정을 zot 설정으로 렌더 |
 | `zot` | `ghcr.io/project-zot/zot` | OCI 레지스트리(:28081 직접 pull/push), RBAC·API 키 |
 | `keycloak` + `keycloak-db` | `quay.io/keycloak/keycloak` + `postgres` | OIDC 인증, 사용자·그룹 (전용 DB) |
 | `dtrack-apiserver` + `dtrack-db` | `dependencytrack/apiserver` + `postgres` | SBOM 취약점 분석(헤드리스, 내부 전용) |
-| `zot-init` | `httpd` | htpasswd(ci·svc-bff) 생성(1회성) |
 
 TrustLink 가 각 모듈에 대해 아는 것은 **이미지 주소(.env)** 와 `docker-compose.yaml` 에 내장한 표준 설정
 (zot 설정 파일, Keycloak realm import JSON)뿐이다. 모듈 업데이트 = `.env` 태그 변경.

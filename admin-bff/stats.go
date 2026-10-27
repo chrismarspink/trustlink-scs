@@ -332,6 +332,9 @@ type productStat struct {
 func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 	products := []productStat{}
 	for _, repo := range s.svcCatalog() {
+		if !s.canAccess(r, repo, "read") {
+			continue
+		}
 		versions := []versionStat{}
 		for idx, tag := range sortedVersions(s.svcTags(repo)) {
 			comp, byStatus := s.referrerStats(repo, tag)

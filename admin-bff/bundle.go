@@ -166,6 +166,9 @@ func (s *Server) apiArtifactBlob(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "repo, digest 필수"})
 		return
 	}
+	if !s.requireRepo(w, r, repo, "read") {
+		return
+	}
 	m, _, err := s.fetchManifest(r, repo, dg)
 	if err != nil {
 		writeJSON(w, httpStatus(err), map[string]string{"error": "매니페스트 조회 실패(권한 또는 미존재)"})
@@ -197,6 +200,9 @@ func (s *Server) apiArtifactBundle(w http.ResponseWriter, r *http.Request) {
 	tag := r.URL.Query().Get("tag")
 	if repo == "" || tag == "" {
 		writeJSON(w, 400, map[string]string{"error": "repo, tag 필수"})
+		return
+	}
+	if !s.requireRepo(w, r, repo, "read") {
 		return
 	}
 	subj, subjDigest, err := s.fetchManifest(r, repo, tag)

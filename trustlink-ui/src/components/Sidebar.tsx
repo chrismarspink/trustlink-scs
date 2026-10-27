@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Rocket, Download, Bug
+  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot
 } from 'lucide-react';
 import { getSession, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,9 @@ const PRODUCT: Item[] = [
 const ADMIN: Item[] = [
   { to: '/admin', label: '대시보드', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: '사용자', icon: Users },
+  { to: '/admin/orgs', label: '고객사', icon: Building2 },
+  { to: '/admin/access', label: '제품 권한', icon: ShieldCheck },
+  { to: '/admin/robots', label: '기계 계정', icon: Bot },
   { to: '/admin/capacity', label: '용량', icon: HardDrive },
   { to: '/admin/logs', label: '로그', icon: ScrollText },
   { to: '/admin/registry', label: '레지스트리', icon: Boxes },

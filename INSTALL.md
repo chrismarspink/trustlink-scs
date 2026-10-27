@@ -22,7 +22,7 @@
 cp .env.example .env
 vi .env          # 모든 change-me-* 값을 강한 값으로. FRONT_HOST 는 실제 접속 주소.
 docker compose up -d
-docker compose ps   # zot-init 은 Exited (0) 이 정상
+docker compose ps
 ```
 
 자동으로 처리되는 것:
@@ -30,7 +30,7 @@ docker compose ps   # zot-init 은 Exited (0) 이 정상
 |---|---|
 | Keycloak realm·그룹(admins/developers/users)·OIDC 클라이언트 | 공식 `--import-realm` (realm 이 없을 때만) |
 | TrustLink 관리자 1명(`TL_ADMIN_USER`, admins) | 위 realm import 에 포함 — **최초 1회만** |
-| 레지스트리 계정 ci·svc-bff | `zot-init` 이 htpasswd 생성(기동 시마다 .env 값 반영) |
+| 레지스트리 계정 ci·svc-bff | BFF 가 zot htpasswd 로 생성(기동 시마다 .env 값 반영) |
 | Dependency-Track admin 비밀번호·API 키 | BFF 가 최초 기동 시 설정·발급, `tl-sor` 볼륨에 보관 |
 
 설치 후: `http://<FRONT_HOST>:28080` → 관리자로 로그인 → **관리 콘솔 › 사용자**에서 계정 발급(임시 비밀번호 자동 생성).
@@ -69,12 +69,26 @@ docker compose up -d          # 바뀐 서비스만 재생성
 3. `bash scripts/migrate-keycloak-h2.sh` — H2 의 계정을 Postgres 로 이전(비밀번호 유지, 구 볼륨은 보존).
 4. `docker compose up -d`
 
-## 4. 설정 커스터마이즈
+## 4. 계정·권한 운영 (관리 콘솔)
+
+| 메뉴 | 하는 일 |
+|---|---|
+| 사용자 | 사람 계정 생성(임시 비밀번호 1회 표시)·역할(관리자/내부 개발자/외부 사용자)·고객사 지정·비활성·삭제·비밀번호 재설정 |
+| 고객사 | 고객사 추가·삭제 (Keycloak 그룹 `org-<ID>`) |
+| 제품 권한 | 제품마다 업로드(쓰기)·다운로드(읽기) 대상 지정. 개별 설정이 없는 제품은 내부(개발자·ci) 전용 |
+| 기계 계정 | oras 자동화용 계정 발급 — `ci-…`(업로드), `robot-…`(다운로드), 만료일·재발급·폐기 |
+
+- 판정은 zot 기본 기능(accessControl)이 한다. BFF 는 위 설정을 zot 설정 파일·htpasswd(`zot-managed` 볼륨)로 만들고,
+  zot 이 재시작 없이 반영한다(보통 1~2초). 웹 조회·일괄 다운로드도 같은 규칙으로 판정한다.
+- 역할·고객사 변경은 사용자가 다음에 로그인할 때 적용된다.
+- 사람 계정의 oras 사용: 웹 로그인 비밀번호는 받지 않는다 → zot 화면(`/zot`)에서 본인 API 키를 발급해 사용.
+
+## 5. 설정 커스터마이즈
 | 항목 | 위치 |
 |---|---|
-| 그룹↔레포 RBAC, 보존정책 | `docker-compose.yaml` › `configs.zot-config` (`accessControl`, `retention`) |
+| 기본 권한 규칙, 보존정책 | `docker-compose.yaml` › `configs.zot-config` (`accessControl` 기본값, `retention`) — 제품별 권한은 관리 콘솔 |
 | 보존정책 실제 적용 | `.env` `ZOT_RETENTION_DRYRUN=false` |
 | 사용자·그룹 | 관리 콘솔 › 사용자 (또는 Keycloak 관리 콘솔 `/auth/admin`, master realm 으로 로그인 → trustlink realm) |
 
-## 5. 검증 도구
+## 6. 검증 도구
 `tools/verify.sh`(인증·RBAC 점검, 데모 계정 필요), `tools/dt-verify.sh`(DT 연동).

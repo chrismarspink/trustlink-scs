@@ -31,30 +31,34 @@ import (
 // ---------- config ----------
 
 type Config struct {
-	Addr          string
-	KCPublic      string // 브라우저용 (authorize/logout)
-	KCInternal    string // 서버용 (token/admin api)
-	Realm         string
-	ClientID      string
-	ClientSecret  string
-	RedirectURI   string
-	MetricsURL    string
-	MetricsUser   string
-	MetricsPass   string
-	DataDir       string // statfs 대상
-	LogFile       string
-	ZotAPIURL     string // 카탈로그/태그/삭제
-	ZotAdminUser  string // delete 권한 보유 htpasswd 계정(adminPolicy)
-	ZotAdminPass  string
-	ConfigFile    string // accessControl 매트릭스용 zot 설정 경로
-	DTBaseURL     string // Dependency-Track API Server (헤드리스)
-	DTApiKey      string // DT 서비스 API 키 (X-Api-Key). 비면 키 파일 → 부트스트랩(dt_bootstrap.go)
+	Addr            string
+	KCPublic        string // 브라우저용 (authorize/logout)
+	KCInternal      string // 서버용 (token/admin api)
+	Realm           string
+	ClientID        string
+	ClientSecret    string
+	RedirectURI     string
+	MetricsURL      string
+	MetricsUser     string
+	MetricsPass     string
+	DataDir         string // statfs 대상
+	LogFile         string
+	ZotAPIURL       string // 카탈로그/태그/삭제
+	ZotAdminUser    string // delete 권한 보유 htpasswd 계정(adminPolicy)
+	ZotAdminPass    string
+	ConfigFile      string // accessControl 매트릭스용 zot 설정 경로
+	DTBaseURL       string // Dependency-Track API Server (헤드리스)
+	DTApiKey        string // DT 서비스 API 키 (X-Api-Key). 비면 키 파일 → 부트스트랩(dt_bootstrap.go)
 	DTAdminPassword string // DT admin 비밀번호(부트스트랩용)
-	DTKeyFile     string // 발급된 DT API 키 보관 파일(볼륨)
-	UIDir         string // 신규 trustlink-ui dist 경로 (단일 프론트도어 서빙)
-	KCProxyTarget string // /auth/* 리버스 프록시 타깃 (relative-path 미포함 베이스)
-	SoRPath       string // 감사 SoR(JSONL) 경로
-	SessionsPath  string // 로그인 세션 영속 파일 경로 (재시작/재배포 시 세션 유지)
+	DTKeyFile       string // 발급된 DT API 키 보관 파일(볼륨)
+	UIDir           string // 신규 trustlink-ui dist 경로 (단일 프론트도어 서빙)
+	KCProxyTarget   string // /auth/* 리버스 프록시 타깃 (relative-path 미포함 베이스)
+	SoRPath         string // 감사 SoR(JSONL) 경로
+	SessionsPath    string // 로그인 세션 영속 파일 경로 (재시작/재배포 시 세션 유지)
+	ZotTemplate     string // zot 설정 템플릿(설정 시 접근 정책 관리 모드 — access.go)
+	ZotManagedDir   string // 렌더된 zot 설정·htpasswd 를 쓰는 디렉터리(zot 과 공유 볼륨)
+	AccessStore     string // 제품 권한·기계 계정 저장 파일
+	ZotOIDCSecret   string // zot OIDC 클라이언트 시크릿(oidc-credentials.json 렌더용)
 }
 
 func env(k, def string) string {
@@ -66,30 +70,34 @@ func env(k, def string) string {
 
 func loadConfig() Config {
 	return Config{
-		Addr:              env("ADDR", ":9100"),
-		KCPublic:          env("KC_PUBLIC", "http://localhost:8085"),
-		KCInternal:        env("KC_INTERNAL", "http://localhost:8085"),
-		Realm:             env("REALM", "trustlink"),
-		ClientID:          env("CLIENT_ID", "trustlink-admin"),
-		ClientSecret:      env("CLIENT_SECRET", ""),
-		RedirectURI:       env("REDIRECT_URI", "http://localhost:9100/admin/callback"),
-		MetricsURL:        env("ZOT_METRICS_URL", "http://localhost:28080/metrics"),
-		MetricsUser:       env("ZOT_METRICS_USER", "ci"),
-		MetricsPass:       env("ZOT_METRICS_PASS", ""),
-		DataDir:           env("ZOT_DATA", "/tmp/zot"),
-		LogFile:           env("LOG_FILE", "/tmp/trustlink-zot.log"),
-		ZotAPIURL:         env("ZOT_API_URL", "http://localhost:28080"),
-		ZotAdminUser:      env("ZOT_ADMIN_USER", "svc-bff"),
-		ZotAdminPass:      env("ZOT_ADMIN_PASS", ""),
-		ConfigFile:        env("CONFIG_FILE", "/tmp/zot-run.json"),
-		DTBaseURL:         env("DT_BASE_URL", ""),
-		DTApiKey:          env("DT_API_KEY", ""),
-		DTAdminPassword:   env("DT_ADMIN_PASSWORD", ""),
-		DTKeyFile:         env("DT_KEY_FILE", "/var/lib/trustlink/dt-api-key"),
-		UIDir:             env("UI_DIR", ""),
-		KCProxyTarget:     env("KC_PROXY_TARGET", env("KC_INTERNAL", "http://localhost:8085")),
-		SoRPath:           env("SOR_PATH", "/var/lib/trustlink/sor.jsonl"),
-		SessionsPath:      env("SESSIONS_PATH", "/var/lib/trustlink/sessions.json"),
+		Addr:            env("ADDR", ":9100"),
+		KCPublic:        env("KC_PUBLIC", "http://localhost:8085"),
+		KCInternal:      env("KC_INTERNAL", "http://localhost:8085"),
+		Realm:           env("REALM", "trustlink"),
+		ClientID:        env("CLIENT_ID", "trustlink-admin"),
+		ClientSecret:    env("CLIENT_SECRET", ""),
+		RedirectURI:     env("REDIRECT_URI", "http://localhost:9100/admin/callback"),
+		MetricsURL:      env("ZOT_METRICS_URL", "http://localhost:28080/metrics"),
+		MetricsUser:     env("ZOT_METRICS_USER", "ci"),
+		MetricsPass:     env("ZOT_METRICS_PASS", ""),
+		DataDir:         env("ZOT_DATA", "/tmp/zot"),
+		LogFile:         env("LOG_FILE", "/tmp/trustlink-zot.log"),
+		ZotAPIURL:       env("ZOT_API_URL", "http://localhost:28080"),
+		ZotAdminUser:    env("ZOT_ADMIN_USER", "svc-bff"),
+		ZotAdminPass:    env("ZOT_ADMIN_PASS", ""),
+		ConfigFile:      env("CONFIG_FILE", "/tmp/zot-run.json"),
+		DTBaseURL:       env("DT_BASE_URL", ""),
+		DTApiKey:        env("DT_API_KEY", ""),
+		DTAdminPassword: env("DT_ADMIN_PASSWORD", ""),
+		DTKeyFile:       env("DT_KEY_FILE", "/var/lib/trustlink/dt-api-key"),
+		UIDir:           env("UI_DIR", ""),
+		KCProxyTarget:   env("KC_PROXY_TARGET", env("KC_INTERNAL", "http://localhost:8085")),
+		SoRPath:         env("SOR_PATH", "/var/lib/trustlink/sor.jsonl"),
+		SessionsPath:    env("SESSIONS_PATH", "/var/lib/trustlink/sessions.json"),
+		ZotTemplate:     env("ZOT_CONFIG_TEMPLATE", ""),
+		ZotManagedDir:   env("ZOT_MANAGED_DIR", "/etc/zot-managed"),
+		AccessStore:     env("ACCESS_STORE", "/var/lib/trustlink/access-policy.json"),
+		ZotOIDCSecret:   env("ZOT_OIDC_CLIENT_SECRET", ""),
 	}
 }
 
@@ -206,9 +214,10 @@ type Server struct {
 	saExp  time.Time
 	states map[string]stateData // oauth state 임시 저장 (만료 + 로그인 후 복귀 경로)
 	stMu   sync.Mutex
-	sor  *SoR          // 감사 기록(SBOM 생성 등)
-	oidc *oidcVerifier // OIDC 액세스 토큰 서명/클레임 검증기
-	dtKey atomic.Value // DT API 키(string) — initDTKey 가 설정
+	sor    *SoR           // 감사 기록(SBOM 생성 등)
+	oidc   *oidcVerifier  // OIDC 액세스 토큰 서명/클레임 검증기
+	dtKey  atomic.Value   // DT API 키(string) — initDTKey 가 설정
+	access *accessManager // 제품 권한·기계 계정(관리 모드일 때만)
 }
 
 // stateData: OIDC state 에 만료시각과 로그인 후 복귀 경로를 함께 보관.
@@ -233,6 +242,9 @@ func main() {
 	s.sor = newSoR(cfg.SoRPath)
 	s.oidc = newOIDCVerifier(cfg, s.http)
 	s.initDTKey()
+	if err := s.initAccess(); err != nil {
+		log.Fatalf("접근 정책 초기화 실패: %v", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /admin/login", s.handleLogin)
@@ -243,7 +255,19 @@ func main() {
 	mux.HandleFunc("GET /api/users", s.guard(s.apiUsers))
 	mux.HandleFunc("GET /api/groups", s.guard(s.apiGroups))
 	mux.HandleFunc("POST /api/users", s.guard(s.apiCreateUser))
-	mux.HandleFunc("POST /api/users/{id}/group", s.guard(s.apiSetUserGroup))
+	mux.HandleFunc("PUT /api/users/{id}", s.guard(s.apiUpdateUser)) // 역할·고객사·활성 상태
+	mux.HandleFunc("DELETE /api/users/{id}", s.guard(s.apiDeleteUser))
+	mux.HandleFunc("GET /api/orgs", s.guard(s.apiOrgs)) // 고객사 = Keycloak 그룹 org-*
+	mux.HandleFunc("POST /api/orgs", s.guard(s.apiOrgCreate))
+	mux.HandleFunc("DELETE /api/orgs/{name}", s.guard(s.apiOrgDelete))
+	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts)) // 제품별 읽기/쓰기 대상
+	mux.HandleFunc("PUT /api/access/products", s.guard(s.apiAccessProductPut))
+	mux.HandleFunc("DELETE /api/access/products", s.guard(s.apiAccessProductDelete))
+	mux.HandleFunc("GET /api/access/principals", s.guard(s.apiAccessPrincipals))
+	mux.HandleFunc("GET /api/robots", s.guard(s.apiRobots)) // 기계 계정(ci-*, robot-*)
+	mux.HandleFunc("POST /api/robots", s.guard(s.apiRobotCreate))
+	mux.HandleFunc("POST /api/robots/{name}/reissue", s.guard(s.apiRobotReissue))
+	mux.HandleFunc("DELETE /api/robots/{name}", s.guard(s.apiRobotDelete))
 	mux.HandleFunc("POST /api/users/{id}/reset-password", s.guard(s.apiResetPassword)) // 임시 비밀번호 재발급(1회 표시)
 	mux.HandleFunc("GET /api/credentials/ci", s.guard(s.apiCICredential))              // 공용 업로드(ci) 계정 전달
 	mux.HandleFunc("GET /api/metrics", s.guard(s.apiMetrics))
@@ -268,7 +292,7 @@ func main() {
 	mux.HandleFunc("GET /api/vex/findings", vexEdit(s.apiVexFindings))
 	mux.HandleFunc("PUT /api/vex/analysis", vexEdit(s.apiVexAnalysis))
 	mux.HandleFunc("GET /api/vex/export", vexEdit(s.apiVexExport))
-	mux.HandleFunc("POST /api/vex/publish", vexEdit(s.apiVexPublish)) // DT VEX → OCI 새 referrer 발행
+	mux.HandleFunc("POST /api/vex/publish", vexEdit(s.apiVexPublish))     // DT VEX → OCI 새 referrer 발행
 	mux.HandleFunc("POST /api/sbom/generate", s.guard(s.apiSBOMGenerate)) // syft 자체 SBOM 생성·부착
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 
@@ -591,15 +615,41 @@ func (s *Server) userGroupNames(uid string) []string {
 	return names
 }
 
+// userGroupsFor: 역할 1개 + 고객사 여러 개 → Keycloak 그룹 이름 목록.
+func userGroupsFor(role string, orgs []string) ([]string, error) {
+	if !contains(roleGroups, role) {
+		return nil, fmt.Errorf("역할은 %s 중 하나", strings.Join(roleGroups, "/"))
+	}
+	gs := []string{role}
+	for _, o := range orgs {
+		o = strings.TrimPrefix(o, orgPrefix)
+		if !reOrgName.MatchString(o) {
+			return nil, fmt.Errorf("고객사 ID 형식 오류: %s", o)
+		}
+		gs = append(gs, orgPrefix+o)
+	}
+	return gs, nil
+}
+
 func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Username string `json:"username"`
-		Email    string `json:"email"`
-		Group    string `json:"group"`
-		Password string `json:"password"`
+		Username string   `json:"username"`
+		Email    string   `json:"email"`
+		Role     string   `json:"role"`
+		Orgs     []string `json:"orgs"`
+		Password string   `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Username == "" || in.Group == "" {
-		writeJSON(w, 400, map[string]string{"error": "username, group 필수"})
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Username == "" {
+		writeJSON(w, 400, map[string]string{"error": "username 필수"})
+		return
+	}
+	if reservedUserPrefix.MatchString(in.Username) {
+		writeJSON(w, 400, map[string]string{"error": "ci-·robot-·svc- 로 시작하는 이름은 기계 계정 전용입니다"})
+		return
+	}
+	groups, err := userGroupsFor(in.Role, in.Orgs)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
 		return
 	}
 	if in.Password == "" { // 미입력 시 무작위 임시 비밀번호 자동 생성(응답으로 1회 전달)
@@ -637,64 +687,115 @@ func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 502, map[string]string{"error": "임시 비밀번호 설정 실패: " + err.Error()})
 		return
 	}
-	if err := s.setUserGroup(uid, in.Group); err != nil {
+	if err := s.setUserGroups(uid, groups); err != nil {
 		writeJSON(w, 502, map[string]string{"error": "그룹 배정 실패: " + err.Error()})
 		return
 	}
-	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-create", Subject: in.Username, Detail: map[string]any{"group": in.Group}})
+	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-create", Subject: in.Username, Detail: map[string]any{"groups": groups}})
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, 201, map[string]string{"id": uid, "username": in.Username, "group": in.Group, "password": in.Password})
+	writeJSON(w, 201, map[string]any{"id": uid, "username": in.Username, "group": in.Role, "groups": groups, "password": in.Password})
 }
 
-func (s *Server) apiSetUserGroup(w http.ResponseWriter, r *http.Request) {
+// PUT /api/users/{id} {role, orgs[], enabled, username} — 역할·고객사·활성 상태 변경
+func (s *Server) apiUpdateUser(w http.ResponseWriter, r *http.Request) {
 	uid := r.PathValue("id")
 	var in struct {
-		Group string `json:"group"`
+		Username string   `json:"username"` // 감사 기록용
+		Role     string   `json:"role"`
+		Orgs     []string `json:"orgs"`
+		Enabled  *bool    `json:"enabled"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Group == "" {
-		writeJSON(w, 400, map[string]string{"error": "group 필수"})
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "요청 형식 오류"})
 		return
 	}
-	if err := s.setUserGroup(uid, in.Group); err != nil {
+	detail := map[string]any{}
+	if in.Role != "" {
+		groups, err := userGroupsFor(in.Role, in.Orgs)
+		if err != nil {
+			writeJSON(w, 400, map[string]string{"error": err.Error()})
+			return
+		}
+		if err := s.setUserGroups(uid, groups); err != nil {
+			writeJSON(w, 502, map[string]string{"error": err.Error()})
+			return
+		}
+		detail["groups"] = groups
+	}
+	if in.Enabled != nil {
+		body, _ := json.Marshal(map[string]any{"enabled": *in.Enabled})
+		resp, err := s.kcAdmin("PUT", "/users/"+uid, strings.NewReader(string(body)))
+		if err != nil {
+			writeJSON(w, 502, map[string]string{"error": err.Error()})
+			return
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNoContent {
+			writeJSON(w, 502, map[string]string{"error": fmt.Sprintf("활성 상태 변경 실패(%d)", resp.StatusCode)})
+			return
+		}
+		detail["enabled"] = *in.Enabled
+	}
+	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-update", Subject: in.Username, Detail: detail})
+	writeJSON(w, 200, map[string]any{"id": uid, "updated": detail})
+}
+
+// DELETE /api/users/{id}?username= — 사람 계정 삭제(본인 삭제 불가)
+func (s *Server) apiDeleteUser(w http.ResponseWriter, r *http.Request) {
+	uid := r.PathValue("id")
+	name := r.URL.Query().Get("username")
+	if sess, ok := s.sessionOf(r); ok && sess.Username == name {
+		writeJSON(w, 400, map[string]string{"error": "자기 자신은 삭제할 수 없습니다"})
+		return
+	}
+	resp, err := s.kcAdmin("DELETE", "/users/"+uid, nil)
+	if err != nil {
 		writeJSON(w, 502, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, 200, map[string]string{"id": uid, "group": in.Group})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		writeJSON(w, 502, map[string]string{"error": fmt.Sprintf("삭제 실패(%d)", resp.StatusCode)})
+		return
+	}
+	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "user-delete", Subject: name})
+	writeJSON(w, 200, map[string]string{"id": uid})
 }
 
-// setUserGroup: 대상 그룹만 남기고 나머지 RBAC 그룹에서 제거 (단일 역할).
-func (s *Server) setUserGroup(uid, group string) error {
+// setUserGroups: 사용자의 그룹을 정확히 desired 로 맞춘다(추가·제거).
+func (s *Server) setUserGroups(uid string, desired []string) error {
 	groups, err := s.listGroups()
 	if err != nil {
 		return err
 	}
-	var targetID string
 	byName := map[string]string{}
 	for _, g := range groups {
 		byName[g.Name] = g.ID
-		if g.Name == group {
-			targetID = g.ID
+	}
+	for _, d := range desired {
+		if byName[d] == "" {
+			return fmt.Errorf("그룹 %q 없음", d)
 		}
 	}
-	if targetID == "" {
-		return fmt.Errorf("그룹 %q 없음", group)
-	}
-	// 기존 그룹에서 제거
-	for _, cur := range s.userGroupNames(uid) {
-		if cur != group {
-			if id, ok := byName[cur]; ok {
-				resp, _ := s.kcAdmin("DELETE", "/users/"+uid+"/groups/"+id, nil)
-				if resp != nil {
-					resp.Body.Close()
-				}
+	cur := s.userGroupNames(uid)
+	for _, c := range cur {
+		if !contains(desired, c) && byName[c] != "" {
+			resp, err := s.kcAdmin("DELETE", "/users/"+uid+"/groups/"+byName[c], nil)
+			if err != nil {
+				return err
 			}
+			resp.Body.Close()
 		}
 	}
-	resp, err := s.kcAdmin("PUT", "/users/"+uid+"/groups/"+targetID, nil)
-	if err != nil {
-		return err
+	for _, d := range desired {
+		if !contains(cur, d) {
+			resp, err := s.kcAdmin("PUT", "/users/"+uid+"/groups/"+byName[d], nil)
+			if err != nil {
+				return err
+			}
+			resp.Body.Close()
+		}
 	}
-	resp.Body.Close()
 	return nil
 }
 

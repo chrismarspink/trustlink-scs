@@ -7,6 +7,8 @@
 #   - 오픈소스 모듈(zot·Keycloak·Dependency-Track·PostgreSQL·httpd)은 공식 이미지를 무수정으로 쓴다.
 #     TrustLink 가 아는 것은 이미지 주소(.env)와 아래에 내장한 설정뿐이다.
 #   - 자체 이미지는 trustlink-admin(BFF+UI) 하나.
+#   - 제품별 읽기/쓰기 권한·기계 계정은 관리 콘솔에서 관리한다. BFF 가 아래 zot 설정 템플릿에 그 정책을
+#     더해 zot 설정 파일·htpasswd 를 만들고(zot-managed 볼륨), zot 이 재시작 없이 반영·판정한다.
 #   - 데이터는 모두 named volume → 컨테이너·이미지를 바꿔도 계정·아티팩트·분석 결과 유지.
 #     (kc-db: Keycloak 계정/realm, tl-data: 아티팩트, dtrack-*: 취약점 DB, tl-sor: 세션·감사·DT 키)
 #   - 외부 노출: ${FRONT_PORT}(웹·관리·OIDC, BFF 단일 프론트도어), 28081(레지스트리 직접 pull/push).
@@ -76,42 +78,19 @@ services:
     restart: "no"
 
   # ---------- 레지스트리: zot ----------
-  zot-init:                          # htpasswd(ci·svc-bff) + OIDC 자격 파일 생성(.env 값 반영, 매 기동 시 갱신)
-    image: ${HTTPD_IMAGE:-httpd:2.4}
-    environment:
-      CI_PASSWORD: ${CI_PASSWORD:?CI_PASSWORD}
-      SVC_BFF_PASS: ${SVC_BFF_PASS:?SVC_BFF_PASS}
-      ZOT_OIDC_CLIENT_SECRET: ${ZOT_OIDC_CLIENT_SECRET:?ZOT_OIDC_CLIENT_SECRET}
-    command:
-      - sh
-      - -c
-      - |
-        set -e
-        htpasswd -bBn ci "$$CI_PASSWORD" > /auth/htpasswd
-        htpasswd -bBn svc-bff "$$SVC_BFF_PASS" >> /auth/htpasswd
-        printf '{"clientid":"zot","clientsecret":"%s"}\n' "$$ZOT_OIDC_CLIENT_SECRET" > /auth/oidc-credentials.json
-        chmod 644 /auth/htpasswd /auth/oidc-credentials.json
-    volumes: ["zot-auth:/auth"]
-    restart: "no"
-
   zot:
     image: ${ZOT_IMAGE:-ghcr.io/project-zot/zot:v2.1.18}
-    command: ["serve", "/etc/zot/config.json"]
     ports: ["28081:5000"]            # BFF 가 내려가도 pull/push 유지. 인증/RBAC 은 zot 이 직접 강제.
-    configs:
-      - source: zot-config
-        target: /etc/zot/config.json
+    command: ["serve", "/etc/zot/config.json"]
     volumes:
-      - zot-auth:/etc/zot/auth:ro
+      - zot-managed:/etc/zot:ro       # BFF 가 렌더한 config.json·htpasswd·oidc-credentials.json (변경 시 zot 자동 리로드)
       - tl-data:/var/lib/registry
       - tl-logs:/var/log/zot
     depends_on:
-      zot-init:
-        condition: service_completed_successfully
       keycloak:
         condition: service_healthy
       trustlink-admin:
-        condition: service_started   # issuer discovery 는 BFF(/auth 프록시) 경유
+        condition: service_healthy   # 설정 파일 렌더 완료 + issuer discovery 는 BFF(/auth 프록시) 경유
     restart: unless-stopped
 
   # ---------- TrustLink (자체 이미지) ----------
@@ -139,7 +118,11 @@ services:
       ZOT_ADMIN_PASS: ${SVC_BFF_PASS}
       ZOT_DATA: /var/lib/registry
       LOG_FILE: /var/log/zot/zot.log
-      CONFIG_FILE: /etc/zot/config.json
+      CONFIG_FILE: /etc/zot-managed/config.json            # 렌더 결과(권한 매트릭스·스토리지 화면)
+      ZOT_CONFIG_TEMPLATE: /etc/trustlink/zot-config.json  # 아래 configs.zot-config (원본)
+      ZOT_MANAGED_DIR: /etc/zot-managed
+      ACCESS_STORE: /var/lib/trustlink/access-policy.json  # 제품 권한·기계 계정
+      ZOT_OIDC_CLIENT_SECRET: ${ZOT_OIDC_CLIENT_SECRET:?ZOT_OIDC_CLIENT_SECRET}
       DT_BASE_URL: http://dtrack-apiserver:8080
       DT_API_KEY: ${DT_API_KEY:-}                  # 비우면 BFF 가 DT_ADMIN_PASSWORD 로 자동 발급·보관
       DT_ADMIN_PASSWORD: ${DT_ADMIN_PASSWORD:?DT_ADMIN_PASSWORD}
@@ -147,15 +130,21 @@ services:
       SOR_PATH: /var/lib/trustlink/sor.jsonl
       SESSIONS_PATH: /var/lib/trustlink/sessions.json
     configs:
-      - source: zot-config               # 권한 매트릭스·보존정책 화면용(읽기 전용)
-        target: /etc/zot/config.json
+      - source: zot-config               # zot 설정 원본(템플릿) — BFF 가 제품 권한을 더해 렌더
+        target: /etc/trustlink/zot-config.json
     volumes:
+      - zot-managed:/etc/zot-managed
       - tl-data:/var/lib/registry:ro
       - tl-logs:/var/log/zot:ro
       - tl-sor:/var/lib/trustlink
     depends_on:
       keycloak:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${FRONT_PORT}/healthz >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
     restart: unless-stopped
 
   # ---------- 취약점 분석: Dependency-Track (헤드리스, 내부 전용) ----------
@@ -197,7 +186,7 @@ services:
 
 volumes:
   kc-db:
-  zot-auth:
+  zot-managed:
   tl-data:
   tl-logs:
   tl-sor:
@@ -286,7 +275,8 @@ configs:
         fi
       done
 
-  # zot 설정(무수정 공식 zot 이 읽는 표준 설정 파일).
+  # zot 설정 원본(무수정 공식 zot 의 표준 설정 형식). 제품별 권한(products/<제품>)은 관리 콘솔에서 설정하며
+  # BFF 가 accessControl 에 덧붙여 렌더한다. 여기 규칙은 "개별 설정이 없는 레포"의 기본값 = 내부 전용.
   zot-config:
     content: |
       {
@@ -319,14 +309,14 @@ configs:
           "externalUrl": "http://${FRONT_HOST}:${FRONT_PORT}",
           "realm": "zot",
           "auth": {
-            "htpasswd": { "path": "/etc/zot/auth/htpasswd" },
+            "htpasswd": { "path": "/etc/zot/htpasswd" },
             "apikey": true,
             "openid": {
               "providers": {
                 "oidc": {
                   "name": "Keycloak",
                   "issuer": "http://${FRONT_HOST}:${FRONT_PORT}/auth/realms/trustlink",
-                  "credentialsfile": "/etc/zot/auth/oidc-credentials.json",
+                  "credentialsfile": "/etc/zot/oidc-credentials.json",
                   "scopes": ["openid", "email"],
                   "claimMapping": { "username": "preferred_username", "groups": "groups" }
                 }
@@ -339,16 +329,14 @@ configs:
               "products/**": {
                 "policies": [
                   { "users": ["ci"],          "actions": ["read", "create", "update"] },
-                  { "groups": ["developers"], "actions": ["read", "create", "update"] },
-                  { "groups": ["users"],      "actions": ["read"] }
+                  { "groups": ["developers"], "actions": ["read", "create", "update"] }
                 ],
                 "defaultPolicy": []
               },
               "innotium/**": {
                 "policies": [
                   { "users": ["ci"],          "actions": ["read", "create", "update"] },
-                  { "groups": ["developers"], "actions": ["read", "create", "update"] },
-                  { "groups": ["users"],      "actions": ["read"] }
+                  { "groups": ["developers"], "actions": ["read", "create", "update"] }
                 ],
                 "defaultPolicy": []
               }

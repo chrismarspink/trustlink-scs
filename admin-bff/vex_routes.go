@@ -69,6 +69,9 @@ func (s *Server) apiVexFindings(w http.ResponseWriter, r *http.Request) {
 	}
 	repo := r.URL.Query().Get("repo")
 	tag := r.URL.Query().Get("tag")
+	if repo != "" && !s.requireRepo(w, r, repo, "read") {
+		return
+	}
 	var uuid string
 	var err error
 	if repo != "" {
