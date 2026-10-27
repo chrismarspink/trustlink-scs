@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -223,13 +224,20 @@ func (s *Server) writeBundleZip(caller *http.Request, repo, tag string, subj *oc
 	zw := zip.NewWriter(w)
 	defer zw.Close()
 
+	used := map[string]bool{} // zip 안 경로 중복 방지(같은 이름의 referrer 가 여러 개일 때 -2, -3 …)
 	add := func(dir string, layer ociDesc) {
 		br, err := s.zotGet(caller, "/v2/"+repo+"/blobs/"+layer.Digest, "")
 		if err != nil || br.StatusCode != 200 {
 			return
 		}
 		defer br.Body.Close()
-		fw, err := zw.Create(dir + "/" + layerFilename(layer))
+		name := dir + "/" + layerFilename(layer)
+		for i := 2; used[name]; i++ {
+			ext := path.Ext(layerFilename(layer))
+			name = fmt.Sprintf("%s/%s-%d%s", dir, strings.TrimSuffix(layerFilename(layer), ext), i, ext)
+		}
+		used[name] = true
+		fw, err := zw.Create(name)
 		if err != nil {
 			return
 		}
@@ -252,13 +260,24 @@ func (s *Server) writeBundleZip(caller *http.Request, repo, tag string, subj *oc
 			}
 		}
 	}
-	// referrers (SBOM/VEX/서명)
-	for _, ref := range s.fetchReferrers(caller, repo, subjDigest) {
+	// referrers (SBOM/VEX/서명/문서). VEX 는 재발행 시 누적되므로 최신(created) 1건만 — 대시보드와 같은 기준.
+	refs := s.fetchReferrers(caller, repo, subjDigest)
+	sort.SliceStable(refs, func(i, j int) bool {
+		return refs[i].Annotations["org.opencontainers.image.created"] > refs[j].Annotations["org.opencontainers.image.created"]
+	})
+	vexDone := false
+	for _, ref := range refs {
 		rm, _, err := s.fetchManifest(caller, repo, ref.Digest)
 		if err != nil {
 			continue
 		}
 		dir := kindDir(ref.ArtifactType, rm.ArtifactType)
+		if dir == "vex" {
+			if vexDone {
+				continue
+			}
+			vexDone = true
+		}
 		for _, l := range rm.Layers {
 			add(dir, l)
 		}
