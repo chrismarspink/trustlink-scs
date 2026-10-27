@@ -32,6 +32,7 @@ export default function System() {
         <tbody>
           <tr><Td>zot (레지스트리)</Td><Td><StatusDot ok={h.zot} /></Td></tr>
           <tr><Td>Keycloak (인증)</Td><Td><StatusDot ok={h.keycloak} /></Td></tr>
+          {h.dtrack !== undefined && <tr><Td>Dependency-Track (취약점 분석)</Td><Td><StatusDot ok={h.dtrack} /></Td></tr>}
         </tbody>
       </Table>
     </>

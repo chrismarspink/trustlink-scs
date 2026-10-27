@@ -264,7 +264,7 @@ export type Metrics = {
 };
 export const adminMetrics = () => aj<Metrics>('/api/metrics');
 
-export type Health = { zot: boolean; keycloak: boolean };
+export type Health = { zot: boolean; keycloak: boolean; dtrack?: boolean };
 export const adminHealth = () => aj<Health>('/api/health');
 
 export type LogsResult = {

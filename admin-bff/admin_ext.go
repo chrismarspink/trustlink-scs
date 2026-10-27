@@ -17,6 +17,10 @@ func (s *Server) apiHealth(w http.ResponseWriter, r *http.Request) {
 	out["zot"] = s.ping(s.cfg.ZotAPIURL+"/v2/", true)
 	// keycloak realm
 	out["keycloak"] = s.ping(fmt.Sprintf("%s/realms/%s", s.cfg.KCInternal, s.cfg.Realm), false)
+	// Dependency-Track: 설정된 경우만. API 서버 응답 + BFF API 키 확보까지 되어야 정상(취약점 분석·VEX 사용 가능)
+	if s.cfg.DTBaseURL != "" {
+		out["dtrack"] = s.ping(s.cfg.DTBaseURL+"/api/version", false) && s.dtAPIKey() != ""
+	}
 	writeJSON(w, 200, out)
 }
 
