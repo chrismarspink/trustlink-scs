@@ -6,7 +6,7 @@ import {
   ScrollText, Boxes, Activity, KeyRound, Database,
   ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot
 } from 'lucide-react';
-import { getSession, type Session } from '@/lib/api';
+import { bffLogin, getSession, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type Sub = { to: string; label: string; icon: LucideIcon; end?: boolean };
@@ -97,7 +97,22 @@ export function Sidebar() {
   const [sess, setSess] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
-    getSession().then(setSess).catch(() => setSess(null));
+    getSession()
+      .then((s) => {
+        setSess(s);
+        // 제품 화면 로그인만 있고 BFF 세션이 없으면(BFF 재시작 등) Keycloak SSO 로 한 번 조용히 재발급.
+        // 반복 리다이렉트 방지: 탭당 1분에 한 번만 시도.
+        if (s) return;
+        try {
+          const last = Number(sessionStorage.getItem('tl-bff-sso') || 0);
+          if (Date.now() - last < 60_000) return;
+          sessionStorage.setItem('tl-bff-sso', String(Date.now()));
+        } catch {
+          return;
+        }
+        bffLogin(window.location.pathname + window.location.search);
+      })
+      .catch(() => setSess(null));
   }, []);
 
   const showAdmin = !!sess?.groups?.includes('admins');
