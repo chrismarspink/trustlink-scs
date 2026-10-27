@@ -29,7 +29,8 @@ func mustProxy(target string) *httputil.ReverseProxy {
 
 // registerFrontDoor: 프록시 + 정적 UI 라우트 등록. (admin/api/auth 콜백은 main 에서 먼저 등록)
 func (s *Server) registerFrontDoor(mux *http.ServeMux) {
-	zotProxy := mustProxy(s.cfg.ZotAPIURL)    // 예: http://zot:5000
+	zotProxy := mustProxy(s.cfg.ZotAPIURL) // 예: http://zot:5000
+	zotProxy.ModifyResponse = stripSecureCookiesOnHTTP
 	kcProxy := mustProxy(s.cfg.KCProxyTarget) // 예: http://keycloak:8085 (relative-path /auth, 경로 보존)
 
 	// 레지스트리/zot UI 보조 경로 → zot
@@ -41,6 +42,41 @@ func (s *Server) registerFrontDoor(mux *http.ServeMux) {
 
 	// 그 외 모든 경로 → 신규 UI(dist), SPA 폴백.
 	mux.HandleFunc("/", s.serveUI)
+}
+
+// stripSecureCookiesOnHTTP: 공식 zot 은 OIDC state/PKCE 쿠키를 항상 Secure 로 내려준다.
+// 평문 HTTP 접속이면 브라우저가 Secure 쿠키를 버려 콜백에서 "failed to get state" 가 나므로
+// 프론트도어에서 Secure 속성만 제거한다(zot 무수정). HTTPS 접속이면 손대지 않는다.
+func stripSecureCookiesOnHTTP(resp *http.Response) error {
+	req := resp.Request
+	if req == nil || req.TLS != nil || strings.EqualFold(req.Header.Get("X-Forwarded-Proto"), "https") {
+		return nil
+	}
+	cookies := resp.Header.Values("Set-Cookie")
+	if len(cookies) == 0 {
+		return nil
+	}
+	resp.Header.Del("Set-Cookie")
+	for _, c := range cookies {
+		resp.Header.Add("Set-Cookie", stripSecure(c))
+	}
+	return nil
+}
+
+func stripSecure(cookie string) string {
+	parts := strings.Split(cookie, ";")
+	out := parts[:1]
+	for _, p := range parts[1:] {
+		a := strings.TrimSpace(p)
+		switch {
+		case strings.EqualFold(a, "Secure"):
+			continue
+		case strings.EqualFold(a, "SameSite=None"): // None 은 Secure 필수 → Lax 로
+			p = " SameSite=Lax"
+		}
+		out = append(out, p)
+	}
+	return strings.Join(out, ";")
 }
 
 func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {

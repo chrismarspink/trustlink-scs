@@ -13,7 +13,7 @@ import (
 	"path"
 )
 
-func (s *Server) dtEnabled() bool { return s.cfg.DTBaseURL != "" && s.cfg.DTApiKey != "" }
+func (s *Server) dtEnabled() bool { return s.cfg.DTBaseURL != "" && s.dtAPIKey() != "" }
 
 func (s *Server) dtReq(method, path string, body []byte) (*http.Response, error) {
 	var r io.Reader
@@ -24,7 +24,7 @@ func (s *Server) dtReq(method, path string, body []byte) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("X-Api-Key", s.cfg.DTApiKey)
+	req.Header.Set("X-Api-Key", s.dtAPIKey())
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -157,7 +157,7 @@ func (s *Server) dtExportVEX(projectUUID string) ([]byte, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	req.Header.Set("X-Api-Key", s.cfg.DTApiKey)
+	req.Header.Set("X-Api-Key", s.dtAPIKey())
 	req.Header.Set("Accept", "application/vnd.cyclonedx+json")
 	resp, err := s.http.Do(req)
 	if err != nil {

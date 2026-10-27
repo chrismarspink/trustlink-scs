@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -47,7 +48,9 @@ type Config struct {
 	ZotAdminPass  string
 	ConfigFile    string // accessControl 매트릭스용 zot 설정 경로
 	DTBaseURL     string // Dependency-Track API Server (헤드리스)
-	DTApiKey      string // DT 서비스 API 키 (X-Api-Key)
+	DTApiKey      string // DT 서비스 API 키 (X-Api-Key). 비면 키 파일 → 부트스트랩(dt_bootstrap.go)
+	DTAdminPassword string // DT admin 비밀번호(부트스트랩용)
+	DTKeyFile     string // 발급된 DT API 키 보관 파일(볼륨)
 	UIDir         string // 신규 trustlink-ui dist 경로 (단일 프론트도어 서빙)
 	KCProxyTarget string // /auth/* 리버스 프록시 타깃 (relative-path 미포함 베이스)
 	SoRPath       string // 감사 SoR(JSONL) 경로
@@ -81,6 +84,8 @@ func loadConfig() Config {
 		ConfigFile:        env("CONFIG_FILE", "/tmp/zot-run.json"),
 		DTBaseURL:         env("DT_BASE_URL", ""),
 		DTApiKey:          env("DT_API_KEY", ""),
+		DTAdminPassword:   env("DT_ADMIN_PASSWORD", ""),
+		DTKeyFile:         env("DT_KEY_FILE", "/var/lib/trustlink/dt-api-key"),
 		UIDir:             env("UI_DIR", ""),
 		KCProxyTarget:     env("KC_PROXY_TARGET", env("KC_INTERNAL", "http://localhost:8085")),
 		SoRPath:           env("SOR_PATH", "/var/lib/trustlink/sor.jsonl"),
@@ -203,6 +208,7 @@ type Server struct {
 	stMu   sync.Mutex
 	sor  *SoR          // 감사 기록(SBOM 생성 등)
 	oidc *oidcVerifier // OIDC 액세스 토큰 서명/클레임 검증기
+	dtKey atomic.Value // DT API 키(string) — initDTKey 가 설정
 }
 
 // stateData: OIDC state 에 만료시각과 로그인 후 복귀 경로를 함께 보관.
@@ -226,6 +232,7 @@ func main() {
 	}
 	s.sor = newSoR(cfg.SoRPath)
 	s.oidc = newOIDCVerifier(cfg, s.http)
+	s.initDTKey()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /admin/login", s.handleLogin)

@@ -5,11 +5,13 @@
 
 ## 사람 사용자 (Keycloak OIDC) — 공통 비밀번호 `Passw0rd!`
 
+> 데모 계정은 기본으로 만들어지지 않는다. `.env` 에 `COMPOSE_PROFILES=demo` 를 넣고 `docker compose up -d` 하면 생성된다(이미 있는 계정은 유지).
+
 | 사용자 | 그룹 | 역할 / 권한 (products·innotium 레포) |
 |---|---|---|
 | `dev1`, `dev2` | developers | 개발자 — pull/push, README 편집·VEX 첨부/수정·서명 검증 (read+create+update) |
-| `partner1`, `partner2` | partners | 파트너사 — 조회(read)만 |
-| `acme1`, `acme2` | customers | 고객 — 조회(read)만 |
+| `partner1`, `partner2` | users | 파트너사 — 조회(read)·다운로드만 |
+| `acme1`, `acme2` | users | 고객 — 조회(read)·다운로드만 |
 | `admin1`, `admin2` | admins | 관리자 — 전체(+delete) + 관리 콘솔(`http://trustlink:28080/admin`) |
 | `qa-tester` | developers | 관리 콘솔에서 생성한 샘플(그룹 변경 데모용) |
 
@@ -37,7 +39,7 @@
 CLI 예시 (레지스트리 직접 진입점 `:28081`):
 ```bash
 # oras (아티팩트)
-oras login trustlink:28081 -u ci -p '<CI_PASSWORD>' --plain-http
+printf '%s' '<CI_PASSWORD>' | oras login trustlink:28081 -u ci --password-stdin --plain-http
 oras push --plain-http trustlink:28081/products/<name>:<ver> app.tar
 oras pull --plain-http trustlink:28081/products/<name>:<ver>
 

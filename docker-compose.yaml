@@ -1,0 +1,369 @@
+# TrustLink SCS — 설치·운영 compose (단일 산출물)
+#
+#   설치:    cp .env.example .env  →  값 편집  →  docker compose up -d
+#   업데이트: .env 의 *_IMAGE 태그 변경  →  docker compose pull && docker compose up -d
+#   데모 계정: .env 에 COMPOSE_PROFILES=demo (dev1·acme1·admin1 … / Passw0rd!)
+#
+#   - 오픈소스 모듈(zot·Keycloak·Dependency-Track·PostgreSQL·httpd)은 공식 이미지를 무수정으로 쓴다.
+#     TrustLink 가 아는 것은 이미지 주소(.env)와 아래에 내장한 설정뿐이다.
+#   - 자체 이미지는 trustlink-admin(BFF+UI) 하나.
+#   - 데이터는 모두 named volume → 컨테이너·이미지를 바꿔도 계정·아티팩트·분석 결과 유지.
+#     (kc-db: Keycloak 계정/realm, tl-data: 아티팩트, dtrack-*: 취약점 DB, tl-sor: 세션·감사·DT 키)
+#   - 외부 노출: ${FRONT_PORT}(웹·관리·OIDC, BFF 단일 프론트도어), 28081(레지스트리 직접 pull/push).
+#   - 설정 값에 큰따옴표(")·역슬래시(\)는 쓰지 않는다(아래 JSON 에 그대로 들어감).
+
+name: trustlink
+
+services:
+  # ---------- 인증: Keycloak + 전용 DB ----------
+  keycloak-db:
+    image: ${KEYCLOAK_DB_IMAGE:-postgres:16}
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD}
+    volumes: ["kc-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.7.1}
+    # --import-realm: trustlink realm 이 없을 때만 가져온다(있으면 건너뜀 → 업데이트해도 계정 유지)
+    command: ["start", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?KC_ADMIN_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8085"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    configs:
+      - source: trustlink-realm
+        target: /opt/keycloak/data/import/trustlink-realm.json
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8085"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    restart: unless-stopped
+
+  keycloak-demo-users:               # (선택) 데모 계정 — COMPOSE_PROFILES=demo 일 때만. 기존 계정은 건드리지 않음.
+    profiles: ["demo"]
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.7.1}
+    entrypoint: ["bash", "/demo-users.sh"]
+    environment:
+      KC_ADMIN: ${KC_ADMIN:-admin}
+      KC_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+    configs:
+      - source: demo-users
+        target: /demo-users.sh
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: "no"
+
+  # ---------- 레지스트리: zot ----------
+  zot-init:                          # htpasswd(ci·svc-bff) + OIDC 자격 파일 생성(.env 값 반영, 매 기동 시 갱신)
+    image: ${HTTPD_IMAGE:-httpd:2.4}
+    environment:
+      CI_PASSWORD: ${CI_PASSWORD:?CI_PASSWORD}
+      SVC_BFF_PASS: ${SVC_BFF_PASS:?SVC_BFF_PASS}
+      ZOT_OIDC_CLIENT_SECRET: ${ZOT_OIDC_CLIENT_SECRET:?ZOT_OIDC_CLIENT_SECRET}
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        htpasswd -bBn ci "$$CI_PASSWORD" > /auth/htpasswd
+        htpasswd -bBn svc-bff "$$SVC_BFF_PASS" >> /auth/htpasswd
+        printf '{"clientid":"zot","clientsecret":"%s"}\n' "$$ZOT_OIDC_CLIENT_SECRET" > /auth/oidc-credentials.json
+        chmod 644 /auth/htpasswd /auth/oidc-credentials.json
+    volumes: ["zot-auth:/auth"]
+    restart: "no"
+
+  zot:
+    image: ${ZOT_IMAGE:-ghcr.io/project-zot/zot:v2.1.18}
+    command: ["serve", "/etc/zot/config.json"]
+    ports: ["28081:5000"]            # BFF 가 내려가도 pull/push 유지. 인증/RBAC 은 zot 이 직접 강제.
+    configs:
+      - source: zot-config
+        target: /etc/zot/config.json
+    volumes:
+      - zot-auth:/etc/zot/auth:ro
+      - tl-data:/var/lib/registry
+      - tl-logs:/var/log/zot
+    depends_on:
+      zot-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+      trustlink-admin:
+        condition: service_started   # issuer discovery 는 BFF(/auth 프록시) 경유
+    restart: unless-stopped
+
+  # ---------- TrustLink (자체 이미지) ----------
+  trustlink-admin:
+    image: ${TRUSTLINK_ADMIN_IMAGE:-jkkim7202/trustlink-admin:latest}
+    networks:
+      default:
+        aliases: ["${FRONT_HOST}"]   # 컨테이너 내부에서 ${FRONT_HOST} → BFF (issuer 도달)
+    ports: ["${FRONT_PORT}:${FRONT_PORT}"]
+    environment:
+      ADDR: ":${FRONT_PORT}"
+      UI_DIR: /srv/ui
+      KC_PUBLIC: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_INTERNAL: http://keycloak:8085/auth
+      KC_PROXY_TARGET: http://keycloak:8085
+      REALM: trustlink
+      CLIENT_ID: trustlink-admin
+      CLIENT_SECRET: ${TRUSTLINK_ADMIN_SECRET:?TRUSTLINK_ADMIN_SECRET}
+      REDIRECT_URI: http://${FRONT_HOST}:${FRONT_PORT}/admin/callback
+      ZOT_API_URL: http://zot:5000
+      ZOT_METRICS_URL: http://zot:5000/metrics
+      ZOT_METRICS_USER: ci
+      ZOT_METRICS_PASS: ${CI_PASSWORD}
+      ZOT_ADMIN_USER: svc-bff
+      ZOT_ADMIN_PASS: ${SVC_BFF_PASS}
+      ZOT_DATA: /var/lib/registry
+      LOG_FILE: /var/log/zot/zot.log
+      CONFIG_FILE: /etc/zot/config.json
+      DT_BASE_URL: http://dtrack-apiserver:8080
+      DT_API_KEY: ${DT_API_KEY:-}                  # 비우면 BFF 가 DT_ADMIN_PASSWORD 로 자동 발급·보관
+      DT_ADMIN_PASSWORD: ${DT_ADMIN_PASSWORD:?DT_ADMIN_PASSWORD}
+      DT_KEY_FILE: /var/lib/trustlink/dt-api-key
+      SOR_PATH: /var/lib/trustlink/sor.jsonl
+      SESSIONS_PATH: /var/lib/trustlink/sessions.json
+    configs:
+      - source: zot-config               # 권한 매트릭스·보존정책 화면용(읽기 전용)
+        target: /etc/zot/config.json
+    volumes:
+      - tl-data:/var/lib/registry:ro
+      - tl-logs:/var/log/zot:ro
+      - tl-sor:/var/lib/trustlink
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------- 취약점 분석: Dependency-Track (헤드리스, 내부 전용) ----------
+  dtrack-db:
+    image: ${DTRACK_DB_IMAGE:-postgres:16}
+    environment:
+      POSTGRES_DB: dtrack
+      POSTGRES_USER: dtrack
+      POSTGRES_PASSWORD: ${DT_DB_PASSWORD:?DT_DB_PASSWORD}
+    volumes: ["dtrack-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dtrack -d dtrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  dtrack-apiserver:
+    image: ${DTRACK_IMAGE:-dependencytrack/apiserver:4.14.3}
+    environment:
+      ALPINE_DATABASE_MODE: external
+      ALPINE_DATABASE_URL: jdbc:postgresql://dtrack-db:5432/dtrack
+      ALPINE_DATABASE_DRIVER: org.postgresql.Driver
+      ALPINE_DATABASE_USERNAME: dtrack
+      ALPINE_DATABASE_PASSWORD: ${DT_DB_PASSWORD}
+    mem_limit: ${DTRACK_MEM_LIMIT:-4608m}   # apiserver 메모리 요구가 큼(~4.5GB)
+    ports: ["127.0.0.1:8081:8080"]          # 호스트 로컬 전용(진단용). 외부 노출 금지.
+    volumes: ["dtrack-data:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    depends_on:
+      dtrack-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  kc-db:
+  zot-auth:
+  tl-data:
+  tl-logs:
+  tl-sor:
+  dtrack-db:
+  dtrack-data:
+
+configs:
+  # Keycloak realm (최초 1회 import). 그룹 3개 + OIDC 클라이언트 2개 + TrustLink 관리자 1명.
+  trustlink-realm:
+    content: |
+      {
+        "realm": "trustlink",
+        "enabled": true,
+        "groups": [ { "name": "users" }, { "name": "developers" }, { "name": "admins" } ],
+        "clients": [
+          {
+            "clientId": "zot",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${ZOT_OIDC_CLIENT_SECRET}",
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": true,
+            "redirectUris": [ "http://${FRONT_HOST}:${FRONT_PORT}/zot/auth/callback/oidc", "http://${FRONT_HOST}:${FRONT_PORT}/*" ],
+            "webOrigins": [ "+" ],
+            "protocolMappers": [ {
+              "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+              "config": { "claim.name": "groups", "full.path": "false", "id.token.claim": "true",
+                          "access.token.claim": "true", "userinfo.token.claim": "true" } } ]
+          },
+          {
+            "clientId": "trustlink-admin",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${TRUSTLINK_ADMIN_SECRET}",
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": true,
+            "serviceAccountsEnabled": true,
+            "redirectUris": [ "http://${FRONT_HOST}:${FRONT_PORT}/admin/callback" ],
+            "webOrigins": [ "+" ],
+            "attributes": { "post.logout.redirect.uris": "http://${FRONT_HOST}:${FRONT_PORT}/*" },
+            "protocolMappers": [ {
+              "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+              "config": { "claim.name": "groups", "full.path": "false", "id.token.claim": "true",
+                          "access.token.claim": "true", "userinfo.token.claim": "true" } } ]
+          }
+        ],
+        "users": [
+          {
+            "username": "service-account-trustlink-admin",
+            "enabled": true,
+            "serviceAccountClientId": "trustlink-admin",
+            "clientRoles": { "realm-management": [ "view-users", "query-users", "query-groups", "manage-users", "view-realm" ] }
+          },
+          {
+            "username": "${TL_ADMIN_USER:-tladmin}",
+            "enabled": true,
+            "emailVerified": true,
+            "email": "${TL_ADMIN_USER:-tladmin}@trustlink.local",
+            "firstName": "${TL_ADMIN_USER:-tladmin}",
+            "lastName": "admin",
+            "credentials": [ { "type": "password", "value": "${TL_ADMIN_PASSWORD:?TL_ADMIN_PASSWORD}", "temporary": false } ],
+            "groups": [ "/admins" ]
+          }
+        ]
+      }
+
+  # 데모 계정(PoC 전용). 이미 있는 계정은 비밀번호·그룹을 바꾸지 않는다.
+  demo-users:
+    content: |
+      set -u
+      KC=/opt/keycloak/bin/kcadm.sh
+      $$KC config credentials --server http://keycloak:8085/auth --realm master --user "$$KC_ADMIN" --password "$$KC_ADMIN_PASSWORD"
+      for u in dev1:developers dev2:developers partner1:users partner2:users acme1:users acme2:users admin1:admins admin2:admins; do
+        name=$${u%%:*}; group=$${u##*:}
+        if $$KC create users -r trustlink -s username=$$name -s enabled=true -s emailVerified=true \
+             -s email=$$name@trustlink.local -s firstName=$$name -s lastName=demo 2>/dev/null; then
+          $$KC set-password -r trustlink --username $$name --new-password 'Passw0rd!'
+          uid=$$($$KC get users -r trustlink -q username=$$name --fields id --format csv --noquotes | tail -1)
+          gid=$$($$KC get groups -r trustlink -q search=$$group --fields id,name --format csv --noquotes | grep ",$$group$$" | cut -d, -f1)
+          $$KC update users/$$uid/groups/$$gid -r trustlink -s realm=trustlink -s userId=$$uid -s groupId=$$gid -n
+          echo "demo user $$name ($$group) created"
+        else
+          echo "demo user $$name exists — 유지"
+        fi
+      done
+
+  # zot 설정(무수정 공식 zot 이 읽는 표준 설정 파일).
+  zot-config:
+    content: |
+      {
+        "distSpecVersion": "1.1.1",
+        "storage": {
+          "rootDirectory": "/var/lib/registry",
+          "dedupe": true,
+          "gc": true,
+          "gcDelay": "1h",
+          "gcInterval": "24h",
+          "retention": {
+            "dryRun": ${ZOT_RETENTION_DRYRUN:-true},
+            "delay": "168h",
+            "policies": [
+              {
+                "repositories": ["innotium/**", "products/**"],
+                "deleteUntagged": true,
+                "deleteReferrers": false,
+                "keepTags": [
+                  { "patterns": ["^latest$$"] },
+                  { "patterns": [".*"], "mostRecentlyPushedCount": 10 }
+                ]
+              }
+            ]
+          }
+        },
+        "http": {
+          "address": "0.0.0.0",
+          "port": "5000",
+          "externalUrl": "http://${FRONT_HOST}:${FRONT_PORT}",
+          "realm": "zot",
+          "auth": {
+            "htpasswd": { "path": "/etc/zot/auth/htpasswd" },
+            "apikey": true,
+            "openid": {
+              "providers": {
+                "oidc": {
+                  "name": "Keycloak",
+                  "issuer": "http://${FRONT_HOST}:${FRONT_PORT}/auth/realms/trustlink",
+                  "credentialsfile": "/etc/zot/auth/oidc-credentials.json",
+                  "scopes": ["openid", "email"],
+                  "claimMapping": { "username": "preferred_username", "groups": "groups" }
+                }
+              }
+            }
+          },
+          "accessControl": {
+            "repositories": {
+              "**": { "defaultPolicy": [] },
+              "products/**": {
+                "policies": [
+                  { "users": ["ci"],          "actions": ["read", "create", "update"] },
+                  { "groups": ["developers"], "actions": ["read", "create", "update"] },
+                  { "groups": ["users"],      "actions": ["read"] }
+                ],
+                "defaultPolicy": []
+              },
+              "innotium/**": {
+                "policies": [
+                  { "users": ["ci"],          "actions": ["read", "create", "update"] },
+                  { "groups": ["developers"], "actions": ["read", "create", "update"] },
+                  { "groups": ["users"],      "actions": ["read"] }
+                ],
+                "defaultPolicy": []
+              }
+            },
+            "adminPolicy": { "groups": ["admins"], "users": ["svc-bff"], "actions": ["read", "create", "update", "delete"] },
+            "metrics": { "users": ["ci", "svc-bff"] }
+          }
+        },
+        "log": { "level": "info", "output": "/var/log/zot/zot.log" },
+        "extensions": {
+          "search": {
+            "enable": true,
+            "cve": { "updateInterval": "24h", "trivy": { "dbRepository": "ghcr.io/aquasecurity/trivy-db" } }
+          },
+          "ui": { "enable": true },
+          "metrics": { "enable": true, "prometheus": { "path": "/metrics" } }
+        }
+      }

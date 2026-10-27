@@ -6,7 +6,7 @@
 # 설치(수신 측):
 #   oras pull  trustlink:28081/innotium/trustlink-install:<ver> -o ./install   # 설치 패키지
 #   images.txt 의 각 이미지: oras pull ... -o . && docker load -i <comp>.tar.gz
-#   docker compose -f docker-compose.yml up -d
+#   docker compose up -d
 #
 # 도구: oras, docker, curl, python3. ci/admin 자격은 PoC 기본값(공개) — 운영은 env 주입.
 set -u
@@ -20,7 +20,7 @@ WORK="${WORK:-$(mktemp -d)}"; mkdir -p "$WORK/install"
 # 컴포넌트 → 로컬 이미지
 IMAGES="
 trustlink-admin|trustlink-admin:latest
-zot|trustlink:latest
+zot|ghcr.io/project-zot/zot:v2.1.18
 keycloak|quay.io/keycloak/keycloak:latest
 dependency-track|dependencytrack/apiserver:latest
 postgres|postgres:16
@@ -44,20 +44,19 @@ echo "$IMAGES" | while IFS='|' read -r name image; do
 done
 
 # 설치 패키지(경량): compose + 설정 + 이미지 목록 + 설치 안내
-cp "$DIR/docker-compose.yml" "$WORK/install/docker-compose.yml"
-cp "$DIR/trustlink/config.container.json" "$WORK/install/" 2>/dev/null || true
+cp "$DIR/docker-compose.yaml" "$WORK/install/docker-compose.yaml"
 cat > "$WORK/install/INSTALL.md" <<EOF
 # TrustLink 설치 ($VER)
 1) 이미지 적재: images.txt 의 각 줄에 대해
    oras pull --plain-http $REG/<ref> -o . && docker load -i <tar>
-2) 설정 배치 후: docker compose -f docker-compose.yml up -d
+2) .env 작성 후: docker compose up -d
 EOF
 
 echo "──── 설치 패키지 push ────"
-cfgarg=""; [ -f "$WORK/install/config.container.json" ] && cfgarg="config.container.json:application/json"
+cfgarg=""
 ( cd "$WORK/install" && oras push --plain-http -u "$CI_USER" -p "$CI_PASS" "$REG/$NS/trustlink-install:$VER" \
     --artifact-type application/vnd.trustlink.install.v1 \
-    docker-compose.yml:text/yaml images.txt:text/plain INSTALL.md:text/markdown $cfgarg >/dev/null 2>&1 ) \
+    docker-compose.yaml:text/yaml images.txt:text/plain INSTALL.md:text/markdown $cfgarg >/dev/null 2>&1 ) \
   && echo "  push: $NS/trustlink-install:$VER"
 
 echo "완료. 설치 패키지: $NS/trustlink-install:$VER (+ 이미지 $NS/*-image:$VER)"

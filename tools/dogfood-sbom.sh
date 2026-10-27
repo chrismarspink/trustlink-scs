@@ -22,7 +22,7 @@ DIR="$(cd "$(dirname "$0")/.." && pwd)"  # deploy/zot-keycloak
 # 컴포넌트 → 이미지 (자체 + 서브모듈). 설정 번들은 별도 처리.
 COMPONENTS="
 trustlink-admin|trustlink-admin:latest|TrustLink BFF (자체)
-zot|trustlink:latest|아티팩트 레지스트리 zot (자체 빌드)
+zot|ghcr.io/project-zot/zot:v2.1.18|아티팩트 레지스트리 zot (공식)
 keycloak|quay.io/keycloak/keycloak:latest|인증 (Keycloak)
 dependency-track|dependencytrack/apiserver:latest|취약점 분석 (Dependency-Track)
 postgres|postgres:16|DT 데이터베이스 (PostgreSQL)
@@ -84,7 +84,7 @@ PY
 push_config() {
   local repo="$NS/trustlink-config" tar="config.tar.gz"
   echo "──────── [config] 설정 번들 ────────"
-  tar -C "$DIR" -czf "$WORK/$tar" docker-compose.yml trustlink/config.container.json keycloak 2>/dev/null
+  tar -C "$DIR" -czf "$WORK/$tar" docker-compose.yaml 2>/dev/null
   ( cd "$WORK" && oras push --plain-http -u "$CI_USER" -p "$CI_PASS" "$REG/$repo:$VER" \
       --artifact-type application/vnd.trustlink.config.v1+tar \
       "$tar":application/gzip >/dev/null 2>&1 ) && echo "  push: $repo:$VER ($(wc -c < "$WORK/$tar") bytes)"

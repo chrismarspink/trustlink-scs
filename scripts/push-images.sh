@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# 커스텀 이미지(zot 빌드·BFF)를 Docker Hub 에 push → compose-only 설치(docker-compose.deploy.yml) 가능하게 한다.
+# 자체 이미지(trustlink-admin = BFF+UI)를 Docker Hub 에 push → docker-compose.yaml 만으로 설치 가능하게 한다.
+# (zot·keycloak·dependency-track·postgres 는 공식 이미지를 그대로 쓰므로 push 대상 아님)
 #
 # 사전:
-#   1) 이미지 빌드돼 있어야 함: trustlink:latest(zot), trustlink-admin:latest(BFF)  ← admin-bff/build.sh
+#   1) 이미지 빌드돼 있어야 함: trustlink-admin:latest  ← admin-bff/build.sh
 #   2) Docker Hub 로그인: docker login -u <user>   (네임스페이스 push 권한 필요)
 #
 # 사용:
@@ -14,9 +15,8 @@ NS="${NS:-trustlink-scs}"           # Docker Hub 네임스페이스(계정/조�
 TAG="${TAG:-latest}"                # 기본 태그
 VER="${VER:-$(date +%Y%m%d-%H%M%S)}" # 함께 붙일 불변 버전 태그
 
-# 로컬 이미지 → Docker Hub repo (docker-compose.deploy.yml 의 참조와 일치)
+# 로컬 이미지 → Docker Hub repo (.env TRUSTLINK_ADMIN_IMAGE 와 일치)
 MAP="
-trustlink:latest|$NS/trustlink-zot
 trustlink-admin:latest|$NS/trustlink-admin
 "
 
@@ -44,5 +44,5 @@ for line in $MAP; do
   done
 done
 
-echo "완료. 설치측: docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d"
-echo "(deploy.yml 기본 네임스페이스가 $NS 가 아니면 TRUSTLINK_ZOT_IMAGE/TRUSTLINK_ADMIN_IMAGE 로 지정)"
+echo "완료. 설치측: docker compose up -d"
+echo "(기본 네임스페이스가 $NS 가 아니면 .env TRUSTLINK_ADMIN_IMAGE 로 지정)"
