@@ -92,8 +92,8 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, fp)
 		return
 	}
-	// 정적 자산(.js/.css 등)인데 없으면 404
-	if ext := filepath.Ext(clean); ext != "" && !strings.EqualFold(ext, ".html") {
+	// 빌드 자산(/assets/*)인데 없으면 404. 그 외는 SPA 경로 — /artifact/x/10.0 처럼 버전의 점을 확장자로 오인하지 않게.
+	if strings.HasPrefix(clean, "/assets/") {
 		http.NotFound(w, r)
 		return
 	}

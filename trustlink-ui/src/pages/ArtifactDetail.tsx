@@ -296,8 +296,13 @@ export default function ArtifactDetail() {
     });
   }, [repo]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    // 버전 전환 시 이전 요청의 늦은 응답이 화면을 덮어쓰지 않게 무시
+    let stale = false;
     setImg(null); setErr('');
-    getImage(repo, sel).then(setImg).catch((e) => setErr(String(e)));
+    getImage(repo, sel)
+      .then((d) => { if (!stale) setImg(d); })
+      .catch((e) => { if (!stale) setErr(String(e)); });
+    return () => { stale = true; };
   }, [repo, sel]);
 
   const bundleUrl = `/api/artifact/bundle?repo=${encodeURIComponent(repo)}&tag=${encodeURIComponent(sel)}`;

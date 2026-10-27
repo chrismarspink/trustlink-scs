@@ -3,6 +3,9 @@ package main
 import (
 	"crypto/tls"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -47,5 +50,26 @@ func TestStripSecureCookiesOnHTTP(t *testing.T) {
 	_ = stripSecureCookiesOnHTTP(resp)
 	if got := resp.Header.Values("Set-Cookie"); got[0] != "a=1; Secure" {
 		t.Fatalf("X-Forwarded-Proto=https 는 보존해야 함: %q", got)
+	}
+}
+
+func TestServeUISPAFallback(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "index.html"), []byte("INDEX"), 0o644)
+	os.MkdirAll(filepath.Join(dir, "assets"), 0o755)
+	os.WriteFile(filepath.Join(dir, "assets", "app.js"), []byte("JS"), 0o644)
+	s := &Server{cfg: Config{UIDir: dir}}
+	for path, want := range map[string]int{
+		"/":                                   200,
+		"/artifact/products%2Finnopouch/10.0": 200, // 버전의 점 → SPA
+		"/admin/users":                        200,
+		"/assets/app.js":                      200,
+		"/assets/missing.js":                  404,
+	} {
+		rec := httptest.NewRecorder()
+		s.serveUI(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != want {
+			t.Errorf("%s: got %d want %d", path, rec.Code, want)
+		}
 	}
 }
