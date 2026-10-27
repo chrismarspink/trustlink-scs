@@ -3,7 +3,7 @@
 #   1) 원격 작업트리가 깨끗한지 확인 → git pull --ff-only
 #   2) BFF 이미지 원격 빌드(admin-bff/build.sh: UI → go → docker build, .env 의 TRUSTLINK_ADMIN_IMAGE 로 태깅)
 #   3) docker compose up -d (변경된 서비스만 재생성, 데이터 볼륨 유지)
-#   4) BFF 컨테이너 IP 가 바뀌면 hairpin iptables DNAT 갱신(공인 IP 를 FRONT_HOST 로 쓰는 서버 전용)
+#   4) 컨테이너 → OIDC issuer(FRONT_HOST) 도달 확인 (NAT 조작 없음 — 방화벽 규칙 1줄로 충족, INSTALL.md 0절)
 #
 # 최초 1회(구 구성 → 새 구성): 원격 .env 에 새 항목(KC_DB_PASSWORD·TL_ADMIN_* 등, .env.example 참고) 추가 후
 #   ssh 로 들어가 `bash scripts/migrate-keycloak-h2.sh` 를 먼저 실행한다(계정 이전).
@@ -27,20 +27,10 @@ echo "[2/4] BFF 빌드"
 echo "[3/4] docker compose up -d"
 "${SSH[@]}" "cd ~/$RDIR && docker compose up -d --wait --wait-timeout 300 2>&1 | grep -iE 'error|unhealthy' || true; docker compose ps --format '  {{.Service}}\t{{.Status}}'"
 
-echo "[4/4] hairpin 규칙 확인"
-"${SSH[@]}" 'set -e
-  C=$(docker ps --filter label=com.docker.compose.service=trustlink-admin -q | head -1)
-  IP=$(docker inspect "$C" --format "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}")
-  CUR=$(sudo -n iptables -t nat -S PREROUTING | grep -- "--dport 28080" | grep -oE "to-destination [0-9.]+" | cut -d" " -f2 || true)
-  echo "  BFF IP=$IP, DNAT=${CUR:-없음}"
-  if [ -n "$CUR" ] && [ "$CUR" != "$IP" ]; then   # DNAT + MASQUERADE 둘 다 BFF IP 를 가리켜야 함
-    for CH in PREROUTING POSTROUTING; do
-      sudo -n iptables -t nat -S $CH | grep -- "--dport 28080" | sed "s/^-A/-D/" | while read -r r; do sudo -n iptables -t nat $r; done
-    done
-    sudo -n iptables -t nat -I PREROUTING 1 -p tcp -s 172.16.0.0/12 -d '"$HOST"' --dport 28080 -j DNAT --to-destination "$IP:28080"
-    sudo -n iptables -t nat -I POSTROUTING 1 -p tcp -s 172.16.0.0/12 -d "$IP" --dport 28080 -j MASQUERADE
-    docker compose restart zot >/dev/null   # issuer 도달 실패로 재시작 중이던 zot 복구
-    echo "  DNAT·MASQUERADE 갱신 → $IP"
-  fi
-  sleep 3; curl -s -o /dev/null -w "  healthz %{http_code}\n" http://127.0.0.1:28080/healthz'
+echo "[4/4] 컨테이너 → OIDC issuer 도달 확인 (zot 로그인 전제)"
+"${SSH[@]}" "cd ~/$RDIR && set -a && . ./.env && set +a
+  NET=\$(docker inspect \$(docker compose ps -q zot) --format '{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}}{{end}}')
+  code=\$(docker run --rm --network \$NET curlimages/curl:8.10.1 -s -m 8 -o /dev/null -w '%{http_code}' http://\$FRONT_HOST:\$FRONT_PORT/auth/realms/trustlink/.well-known/openid-configuration)
+  echo \"  issuer \$code\"
+  [ \"\$code\" = 200 ] || echo '  ✗ 방화벽 확인: sudo ufw allow from 172.16.0.0/12 to any port '\$FRONT_PORT' proto tcp (INSTALL.md 0절)'"
 echo "완료. http://$HOST:28080"

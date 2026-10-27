@@ -8,6 +8,13 @@
 - 메모리 8GB 이상 권장(Dependency-Track ≈ 4.5GB)
 - 브라우저가 접속할 호스트명(`FRONT_HOST`)이 서버를 가리켜야 한다. 시험용이면 `/etc/hosts` 에 `127.0.0.1 trustlink`
 - 개방 포트: **28080**(웹·관리·로그인), **28081**(레지스트리 pull/push)
+- **호스트 방화벽(ufw 등)이 켜진 서버**: zot 컨테이너가 OIDC issuer(`http://<FRONT_HOST>:28080`)에 접속할 수 있도록
+  컨테이너 대역 → 28080 을 1회 허용한다(재부팅 후에도 유지, BFF IP 가 바뀌어도 무관). 28080 은 원래 공개 포트라 노출 범위는 늘지 않는다.
+  ```bash
+  sudo ufw allow from 172.16.0.0/12 to any port 28080 proto tcp comment "trustlink: containers -> BFF (OIDC issuer)"
+  ```
+  허용이 없으면 zot 이 `failed to initialize new relying party oidc` 로 재시작을 반복한다.
+  (`FRONT_HOST` 가 도메인이면 compose 의 네트워크 별칭으로 내부에서 바로 BFF 로 가므로 이 규칙도 필요 없다.)
 
 ## 1. 설치
 
