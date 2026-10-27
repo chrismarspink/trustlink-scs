@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-// shadcn 스타일 최소 프리미티브 (소유 컴포넌트, Tailwind 기반)
+// shadcn/ui 스타일 프리미티브 (소유 컴포넌트, Tailwind 기반)
 export function Button({
   className,
   variant = 'default',
@@ -9,20 +9,20 @@ export function Button({
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'outline' | 'ghost' | 'accent' | 'destructive';
-  size?: 'default' | 'sm';
+  size?: 'default' | 'sm' | 'icon';
 }) {
   const variants = {
-    default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    outline: 'border border-input bg-transparent hover:bg-secondary',
+    default: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+    outline: 'border border-input bg-background shadow-sm hover:bg-secondary',
     ghost: 'hover:bg-secondary',
-    accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
-    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+    accent: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+    destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90'
   };
-  const sizes = { default: 'h-9 px-4 text-sm', sm: 'h-8 px-3 text-xs' };
+  const sizes = { default: 'h-9 px-4 text-sm', sm: 'h-8 px-3 text-xs', icon: 'h-8 w-8' };
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none',
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
         variants[variant],
         sizes[size],
         className
@@ -36,29 +36,41 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   return <div className={cn('rounded-lg border bg-card text-card-foreground shadow-sm', className)} {...props} />;
 }
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('p-4 pb-2', className)} {...props} />;
+  return <div className={cn('p-5 pb-2', className)} {...props} />;
 }
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('p-4 pt-2', className)} {...props} />;
+  return <div className={cn('p-5 pt-2', className)} {...props} />;
 }
 
 export function Badge({
   className,
   variant = 'default',
   ...props
-}: React.HTMLAttributes<HTMLSpanElement> & { variant?: 'default' | 'success' | 'warn' | 'danger' | 'muted' }) {
+}: React.HTMLAttributes<HTMLSpanElement> & { variant?: 'default' | 'success' | 'warn' | 'danger' | 'muted' | 'outline' }) {
   const variants = {
-    default: 'bg-primary text-primary-foreground',
-    success: 'bg-emerald-100 text-emerald-700',
-    warn: 'bg-amber-100 text-amber-700',
-    danger: 'bg-red-100 text-red-700',
-    muted: 'bg-secondary text-secondary-foreground'
+    default: 'border-transparent bg-primary text-primary-foreground',
+    success: 'border-transparent bg-emerald-50 text-emerald-700',
+    warn: 'border-transparent bg-amber-50 text-amber-700',
+    danger: 'border-transparent bg-red-50 text-red-700',
+    muted: 'border-transparent bg-secondary text-secondary-foreground',
+    outline: 'text-foreground'
   };
   return (
     <span
-      className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', variants[variant], className)}
+      className={cn('inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium', variants[variant], className)}
       {...props}
     />
+  );
+}
+
+// 상태 표시 — 배지 대신 점 + 글자
+export function StatusDot({ tone, children }: { tone: 'ok' | 'off' | 'warn' | 'crit'; children: React.ReactNode }) {
+  const dot = { ok: 'bg-emerald-500', off: 'bg-zinc-300', warn: 'bg-amber-500', crit: 'bg-red-500' }[tone];
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn('h-1.5 w-1.5 rounded-full', dot)} />
+      {children}
+    </span>
   );
 }
 
@@ -66,10 +78,14 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        'flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-ring',
+        'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         className
       )}
       {...props}
     />
   );
+}
+
+export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
+  return <label className={cn('text-sm font-medium leading-none', className)} {...props} />;
 }

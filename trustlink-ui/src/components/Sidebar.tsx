@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot
+  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut
 } from 'lucide-react';
-import { bffLogin, getSession, type Session } from '@/lib/api';
+import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type Sub = { to: string; label: string; icon: LucideIcon; end?: boolean };
@@ -40,14 +40,31 @@ const ADMIN: Item[] = [
   { to: '/admin/storage', label: '설정·스토리지', icon: Database }
 ];
 
+// 현재 경로의 [섹션, 메뉴명] — 상단 경로 표시용
+export function navTrail(pathname: string): [string, string] | null {
+  const hit = (items: Item[]) => {
+    let best: Sub | null = null;
+    for (const it of items.flatMap((i) => [i, ...(i.children || [])])) {
+      const ok = it.end ? pathname === it.to : pathname === it.to || pathname.startsWith(it.to + '/');
+      if (ok && (!best || it.to.length > best.to.length)) best = it;
+    }
+    return best;
+  };
+  const a = hit(ADMIN);
+  if (a) return ['관리', a.label];
+  if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
+  const p = hit(PRODUCT);
+  return p ? ['제품', p.label] : null;
+}
+
 const linkCls = (extra = '') => ({ isActive }: { isActive: boolean }) =>
-  cn('flex items-center gap-2.5 px-5 py-2.5 text-sm text-foreground/80 transition-colors hover:bg-secondary', extra,
-    isActive && 'border-l-[3px] border-accent bg-secondary pl-[17px] font-semibold text-primary');
+  cn('mx-2 flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/75 transition-colors hover:bg-secondary hover:text-foreground', extra,
+    isActive && 'bg-zinc-200/60 font-medium text-foreground');
 
 function NavItem({ item }: { item: Item }) {
   return (
     <NavLink to={item.to} end={item.end} className={linkCls()}>
-      <item.icon size={17} /> {item.label}
+      <item.icon size={16} className="text-muted-foreground" /> {item.label}
     </NavLink>
   );
 }
@@ -62,18 +79,21 @@ function NavGroup({ item }: { item: Item }) {
     <div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className={cn('flex w-full items-center gap-2.5 px-5 py-2.5 text-sm text-foreground/80 transition-colors hover:bg-secondary',
-          within && 'font-semibold text-primary')}
+        className={cn('mx-2 flex w-[calc(100%-1rem)] items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-foreground/75 transition-colors hover:bg-secondary hover:text-foreground',
+          within && 'text-foreground')}
       >
-        <item.icon size={17} /> {item.label}
-        <ChevronRight size={15} className={cn('ml-auto transition-transform', open && 'rotate-90')} />
+        <item.icon size={16} className="text-muted-foreground" /> {item.label}
+        <ChevronRight size={14} className={cn('ml-auto text-muted-foreground transition-transform', open && 'rotate-90')} />
       </button>
-      {open && item.children!.map((c) => (
-        <NavLink key={c.to} to={c.to} end={c.end}
-          className={linkCls('py-2 pl-12 text-[13px] text-foreground/70')}>
-          <c.icon size={14} /> {c.label}
-        </NavLink>
-      ))}
+      {open && (
+        <div className="ml-[22px] border-l pl-1">
+          {item.children!.map((c) => (
+            <NavLink key={c.to} to={c.to} end={c.end} className={linkCls('text-[13px]')}>
+              {c.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -82,9 +102,15 @@ function render(items: Item[]) {
   return items.map((i) => (i.children ? <NavGroup key={i.to} item={i} /> : <NavItem key={i.to} item={i} />));
 }
 
+function roleLabel(groups: string[] = []) {
+  if (groups.includes('admins')) return '관리자';
+  if (groups.includes('developers')) return '내부 개발자';
+  return '외부 사용자';
+}
+
 function SectionLabel({ children }: { children: string }) {
   return (
-    <div className="px-5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="px-4 pb-1 pt-5 text-xs font-medium text-muted-foreground">
       {children}
     </div>
   );
@@ -118,15 +144,40 @@ export function Sidebar() {
   const showAdmin = !!sess?.groups?.includes('admins');
 
   return (
-    <nav className="w-52 shrink-0 border-r bg-card pb-3">
-      <SectionLabel>제품</SectionLabel>
-      {render(PRODUCT)}
-      {showAdmin && (
-        <>
-          <SectionLabel>관리 콘솔</SectionLabel>
-          {render(ADMIN)}
-        </>
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-sidebar">
+      <Link to="/" className="flex h-14 select-none items-center gap-2.5 border-b px-4">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <ShieldCheck size={15} />
+        </span>
+        <span className="leading-tight">
+          <span className="block text-sm font-semibold">TrustLink</span>
+          <span className="block text-[11px] text-muted-foreground">Software Supply Chain</span>
+        </span>
+      </Link>
+      <nav className="flex-1 space-y-0.5 overflow-y-auto pb-3">
+        <SectionLabel>제품</SectionLabel>
+        {render(PRODUCT)}
+        {showAdmin && (
+          <>
+            <SectionLabel>관리</SectionLabel>
+            {render(ADMIN)}
+          </>
+        )}
+      </nav>
+      {sess?.username && (
+        <div className="flex items-center gap-2.5 border-t p-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold uppercase">
+            {sess.username.slice(0, 2)}
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate text-sm font-medium">{sess.username}</div>
+            <div className="truncate text-xs text-muted-foreground">{roleLabel(sess.groups)}</div>
+          </div>
+          <button onClick={() => logout()} title="로그아웃" className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <LogOut size={15} />
+          </button>
+        </div>
       )}
-    </nav>
+    </aside>
   );
 }

@@ -6,23 +6,36 @@ import { cn } from '@/lib/utils';
 // 차트 공용 색(밝은 테마 기준). 축/그리드는 muted, 막대 accent.
 const CHART_AXIS = '#64748b';
 const CHART_GRID = '#e5e7eb';
-const CHART_ACCENT = '#F6A623';
+const CHART_ACCENT = '#2563eb';
 
 // 관리 페이지 공용 프리미티브 (shadcn/Tailwind 스타일, 소유 컴포넌트)
 
 export function PageTitle({ children }: { children: ReactNode }) {
-  return <h1 className="mb-5 text-2xl font-bold">{children}</h1>;
+  return <h1 className="mb-5 text-2xl font-semibold tracking-tight">{children}</h1>;
+}
+
+// 제목 + 한 줄 설명 + 우측 주요 동작
+export function PageHeader({ title, description, actions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </div>
+  );
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="mb-3 mt-6 text-lg font-semibold">{children}</h2>;
+  return <h2 className="mb-3 mt-8 text-base font-semibold">{children}</h2>;
 }
 
 export function StatCard({ label, value }: { label: string; value: ReactNode }) {
   return (
     <Card className="p-4">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1.5 text-2xl font-extrabold tracking-tight">{value}</div>
+      <div className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{value}</div>
     </Card>
   );
 }
@@ -42,24 +55,24 @@ export function Loading() {
 
 export function Table({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">{children}</table>
+    <div className="overflow-x-auto rounded-lg border bg-card">
+      <table className="w-full text-sm [&_tbody_tr:last-child_td]:border-b-0">{children}</table>
     </div>
   );
 }
 export function Th({ children, className }: { children?: ReactNode; className?: string }) {
   return (
-    <th className={cn('border-b bg-secondary/60 px-3 py-2 text-left font-medium text-muted-foreground', className)}>
+    <th className={cn('h-10 border-b px-3 text-left font-medium text-muted-foreground', className)}>
       {children}
     </th>
   );
 }
-export function Td({ children, className }: { children?: ReactNode; className?: string }) {
-  return <td className={cn('border-b px-3 py-2 align-middle', className)}>{children}</td>;
+export function Td({ children, className, colSpan }: { children?: ReactNode; className?: string; colSpan?: number }) {
+  return <td colSpan={colSpan} className={cn('border-b px-3 py-2.5 align-middle', className)}>{children}</td>;
 }
 
 // 페이지 내 raw <select> 공용 클래스 (primitives 에 select 가 없어 여기서 통일)
-export const selectCls = 'h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-2 focus:ring-ring';
+export const selectCls = 'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 // 가로 막대 차트 — Apache ECharts(canvas).
 export function BarChart({
