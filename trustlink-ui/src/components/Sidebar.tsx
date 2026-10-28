@@ -9,6 +9,8 @@ import {
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+declare const __APP_VERSION__: string;
+
 type Sub = { to: string; label: string; icon: LucideIcon; end?: boolean };
 type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; children?: Sub[] };
 
@@ -151,7 +153,7 @@ export function Sidebar() {
         </span>
         <span className="leading-tight">
           <span className="block text-sm font-semibold">TrustLink</span>
-          <span className="block text-[11px] text-muted-foreground">Software Supply Chain</span>
+          <span className="block text-[11px] text-muted-foreground">Software Supply Chain · v{__APP_VERSION__}</span>
         </span>
       </Link>
       <nav className="flex-1 space-y-0.5 overflow-y-auto pb-3">
