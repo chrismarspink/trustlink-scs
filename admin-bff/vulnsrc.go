@@ -147,7 +147,11 @@ func (s *Server) apiVulnSourcesPut(w http.ResponseWriter, r *http.Request) {
 		if k != vsGitHubToken && old == v {
 			continue
 		}
-		body, _ := json.Marshal(map[string]string{"groupName": vsGroup, "propertyName": k, "propertyValue": v})
+		var val any = v
+		if v == "" {
+			val = nil // DT 는 빈 문자열을 거부("control characters") — 비울 때는 null
+		}
+		body, _ := json.Marshal(map[string]any{"groupName": vsGroup, "propertyName": k, "propertyValue": val})
 		code, b, err := call("POST", "/api/v1/configProperty", string(body))
 		if err != nil || code != 200 {
 			writeJSON(w, 502, map[string]string{"error": fmt.Sprintf("DT 설정 저장 실패(%s %d): %v %s", k, code, err, b)})
