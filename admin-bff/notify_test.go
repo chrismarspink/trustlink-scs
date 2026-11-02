@@ -172,3 +172,20 @@ func TestDeliverNoEmailAndContacts(t *testing.T) {
 		t.Errorf("to=%v noEmail=%v", n.To, n.NoEmail)
 	}
 }
+
+func TestNotifyVexCustomerCapped(t *testing.T) {
+	s := testNotifyServer(t)
+	var vs []string
+	for i := 0; i < 40; i++ {
+		vs = append(vs, fmt.Sprintf(`{"id":"CVE-N%02d","analysis":{"state":"in_triage"}}`, i))
+	}
+	vs = append(vs, `{"id":"CVE-HIT","analysis":{"state":"exploitable"}}`)
+	s.notifyVexPublished("products/innopouch", "7.0", []byte(`{"vulnerabilities":[`+strings.Join(vs, ",")+`]}`))
+	b := s.notify.st.Notices[0].Body
+	if strings.Count(b, "\n- CVE-") != 30 || !strings.Contains(b, "외 11건") {
+		t.Errorf("30건 제한 아님:\n%s", b)
+	}
+	if i, j := strings.Index(b, "CVE-HIT"), strings.Index(b, "CVE-N00"); i < 0 || i > j {
+		t.Error("영향 있음이 맨 앞이어야 함")
+	}
+}

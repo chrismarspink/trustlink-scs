@@ -410,7 +410,12 @@ func (s *Server) notifyVexPublished(repo, tag string, vex []byte) {
 		"protected_by_compiler": "컴파일러로 보호", "protected_at_runtime": "실행 시 보호", "protected_at_perimeter": "경계에서 보호",
 		"protected_by_mitigating_control": "완화책 적용"}
 	counts := map[string]int{}
-	var lines []string
+	type vexLine struct {
+		rank int
+		text string
+	}
+	stateRank := map[string]int{"영향 있음": 0, "조사 중": 1, "수정됨": 2, "영향 없음": 3, "오탐(영향 없음)": 4}
+	var lines []vexLine
 	for _, v := range doc.Vulnerabilities {
 		st := stateKo[v.Analysis.State]
 		if st == "" {
@@ -428,7 +433,18 @@ func (s *Server) notifyVexPublished(repo, tag string, vex []byte) {
 		if st == "영향 있음" && len(v.Analysis.Response) > 0 {
 			line += " (조치: " + strings.Join(v.Analysis.Response, ", ") + ")"
 		}
-		lines = append(lines, line)
+		lines = append(lines, vexLine{stateRank[st], line})
+	}
+	// 고객이 먼저 봐야 할 것(영향 있음 → 조사 중 → …)부터, 30건까지. 전체는 VEX 파일에.
+	sort.SliceStable(lines, func(i, j int) bool { return lines[i].rank < lines[j].rank })
+	const maxLines = 30
+	var shown []string
+	for i, l := range lines {
+		if i == maxLines {
+			shown = append(shown, fmt.Sprintf("- 외 %d건 — 전체 목록은 아래 링크의 VEX 파일에 있습니다", len(lines)-maxLines))
+			break
+		}
+		shown = append(shown, l.text)
 	}
 	var sum []string
 	for _, k := range []string{"영향 있음", "조사 중", "수정됨", "영향 없음", "오탐(영향 없음)"} {
@@ -439,7 +455,7 @@ func (s *Server) notifyVexPublished(repo, tag string, vex []byte) {
 	title := fmt.Sprintf("[TrustLink] %s %s 보안 판단(VEX) 갱신 — %s", path.Base(repo), tag, strings.Join(sum, ", "))
 	var body strings.Builder
 	fmt.Fprintf(&body, "%s %s 버전의 취약점 영향 판단(VEX)이 갱신되었습니다.\n\n", path.Base(repo), tag)
-	body.WriteString(strings.Join(lines, "\n"))
+	body.WriteString(strings.Join(shown, "\n"))
 	if counts["영향 있음"] > 0 {
 		body.WriteString("\n\n영향이 있는 항목이 있습니다. 제품 상세 화면의 안내에 따라 업데이트하거나 완화 조치를 적용해 주세요.")
 	}
