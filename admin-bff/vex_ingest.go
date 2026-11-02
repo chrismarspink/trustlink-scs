@@ -24,8 +24,18 @@ func sanitizeBOM(b []byte) []byte {
 	if err := json.Unmarshal(b, &m); err != nil {
 		return b // JSON 아니면(SPDX 등) 그대로
 	}
+	changed := false
 	if sn, ok := m["serialNumber"].(string); ok && !urnUUID.MatchString(sn) {
 		delete(m, "serialNumber")
+		changed = true
+	}
+	// DT 4.x 가 모르는 상위 스펙(1.7 등)은 1.6 으로 낮춘다(구성요소·purl 은 호환).
+	if v, ok := m["specVersion"].(string); ok && v > "1.6" && strings.HasPrefix(v, "1.") {
+		m["specVersion"] = "1.6"
+		delete(m, "$schema")
+		changed = true
+	}
+	if changed {
 		if out, err := json.Marshal(m); err == nil {
 			return out
 		}

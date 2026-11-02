@@ -37,3 +37,17 @@ func TestMergeSBOMs(t *testing.T) {
 		t.Errorf("empty scan should report 0 components, got %d", n)
 	}
 }
+
+func TestSanitizeBOMDowngradesSpec(t *testing.T) {
+	out := sanitizeBOM([]byte(`{"$schema":"http://cyclonedx.org/schema/bom-1.7.schema.json","bomFormat":"CycloneDX","specVersion":"1.7","components":[]}`))
+	var m map[string]any
+	if err := json.Unmarshal(out, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["specVersion"] != "1.6" || m["$schema"] != nil {
+		t.Errorf("got %s", out)
+	}
+	if in := `{"specVersion":"1.5"}`; string(sanitizeBOM([]byte(in))) != in {
+		t.Error("1.5 는 그대로여야 함")
+	}
+}

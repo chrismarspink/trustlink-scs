@@ -36,7 +36,8 @@ func (s *Server) svcCaller() *http.Request {
 func runSyft(target string) ([]byte, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "syft", target, "-o", "cyclonedx-json", "-q")
+	// Dependency-Track 4.x 는 CycloneDX 1.7 을 거부(Unrecognized specVersion) → 1.6 으로 출력.
+	cmd := exec.CommandContext(ctx, "syft", target, "-o", "cyclonedx-json@1.6", "-q")
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errb
