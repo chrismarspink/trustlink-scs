@@ -164,6 +164,16 @@ export async function putAnalysis(body: {
 }
 
 // VEX 발행: DT 추출 → zot 새 referrer 부착(원본 불변).
+// syft 로 이 버전의 바이너리를 스캔해 CycloneDX SBOM 을 만들어 첨부(개발자·관리자, 제품 쓰기 권한).
+export async function generateSbom(repo: string, tag: string): Promise<{ components: number; referrer: string }> {
+  const r = await zfetch('/api/sbom/generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo, tag })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `sbom ${r.status}`);
+  return j;
+}
+
 export async function publishVex(body: { repo: string; tag: string; project: string; version: string }): Promise<{ digest: string; created: string }> {
   const r = await zfetch('/api/vex/publish', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)

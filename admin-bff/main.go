@@ -293,7 +293,7 @@ func main() {
 	mux.HandleFunc("PUT /api/vex/analysis", vexEdit(s.apiVexAnalysis))
 	mux.HandleFunc("GET /api/vex/export", vexEdit(s.apiVexExport))
 	mux.HandleFunc("POST /api/vex/publish", vexEdit(s.apiVexPublish))     // DT VEX → OCI 새 referrer 발행
-	mux.HandleFunc("POST /api/sbom/generate", s.guard(s.apiSBOMGenerate)) // syft 자체 SBOM 생성·부착
+	mux.HandleFunc("POST /api/sbom/generate", vexEdit(s.apiSBOMGenerate)) // syft SBOM 생성·부착(제품 쓰기 권한, self 는 admins)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 
 	// 단일 프론트도어: 신규 UI 서빙 + /v2·/zot·/auth 리버스 프록시 (UI_DIR 설정 시 활성)

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, ShieldAlert, ChevronsUpDown, Search, Check, Download, Copy, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, ShieldAlert, ChevronsUpDown, Search, Check, Download, Copy, ChevronDown, ScanSearch } from 'lucide-react';
 import VexPanel from './VexPanel';
-import { getImage, listTags, getReferrerContent, getPullInfo, type ImageDetail, type Referrer } from '@/lib/api';
+import { getImage, listTags, getReferrerContent, getPullInfo, getSession, generateSbom, type ImageDetail, type Referrer } from '@/lib/api';
 import { Card, CardContent, CardHeader, Badge, Button } from '@/components/ui/primitives';
 import { fmtBytes, cn } from '@/lib/utils';
 
@@ -245,6 +245,9 @@ function ReferrerRow({ name, referrer: rf, isCurrent }: { name: string; referrer
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-medium">{formatLabel(rf.artifactType)}</span>
             {isCurrent && <span className="text-xs text-emerald-700">● 현재 유효</span>}
+            {rf.annotations['com.trustlink.sbom.provenance'] === 'trustlink-analyzed' && (
+              <span className="text-xs text-muted-foreground" title={rf.annotations['com.trustlink.sbom.generator']}>syft 자동 생성</span>
+            )}
             {rf.annotations['com.trustlink.vex.author'] && (
               <span className="text-xs text-muted-foreground">발행 {rf.annotations['com.trustlink.vex.author']}</span>
             )}
@@ -278,6 +281,36 @@ function ReferrerRow({ name, referrer: rf, isCurrent }: { name: string; referrer
   );
 }
 
+// CycloneDX SBOM 이 없는 버전: 개발자·관리자에게 syft 생성 안내(취약점 분석은 CycloneDX SBOM 이 있어야 동작).
+function SbomGenerate({ repo, tag, onDone }: { repo: string; tag: string; onDone: () => void }) {
+  const [can, setCan] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  useEffect(() => { getSession().then((s) => setCan(!!s?.canEditVex)).catch(() => setCan(false)); }, []);
+  if (!can) return null;
+  const run = async () => {
+    setBusy(true); setMsg('');
+    try {
+      const r = await generateSbom(repo, tag);
+      setMsg(`SBOM 생성 완료 — 구성요소 ${r.components}개`);
+      onDone();
+    } catch (e) {
+      setMsg(String(e).replace(/^Error: /, ''));
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-dashed px-4 py-3 text-sm">
+      <ScanSearch size={16} className="text-muted-foreground" />
+      <span className="text-muted-foreground">이 버전에는 CycloneDX SBOM 이 없어 취약점 분석을 할 수 없습니다. 바이너리를 syft 로 스캔해 SBOM 을 만들 수 있습니다.</span>
+      <Button size="sm" variant="outline" className="ml-auto" onClick={run} disabled={busy}>{busy ? '스캔 중…' : 'SBOM 생성 (syft)'}</Button>
+      {msg && <div className="w-full text-xs text-muted-foreground">{msg}</div>}
+    </div>
+  );
+}
+
+const hasCycloneDxSbom = (rs: Referrer[]) => rs.some((r) => /cyclonedx/i.test(r.artifactType) && !isVex(r.artifactType));
+
 export default function ArtifactDetail() {
   const { name = '', tag = 'latest' } = useParams();
   const repo = decodeURIComponent(name);
@@ -285,6 +318,7 @@ export default function ArtifactDetail() {
   const [sel, setSel] = useState(tag);
   const [img, setImg] = useState<ImageDetail | null>(null);
   const [err, setErr] = useState('');
+  const [reload, setReload] = useState(0);
 
   // latest 태그가 없는 제품은 가장 높은 버전을 기본으로
   useEffect(() => {
@@ -303,7 +337,7 @@ export default function ArtifactDetail() {
       .then((d) => { if (!stale) setImg(d); })
       .catch((e) => { if (!stale) setErr(String(e)); });
     return () => { stale = true; };
-  }, [repo, sel]);
+  }, [repo, sel, reload]);
 
   const bundleUrl = `/api/artifact/bundle?repo=${encodeURIComponent(repo)}&tag=${encodeURIComponent(sel)}`;
   return (
@@ -351,6 +385,8 @@ export default function ArtifactDetail() {
               {img.referrers.map((rf) => <ReferrerRow key={rf.digest} name={repo} referrer={rf} isCurrent={rf.digest === currentVexDigest(img.referrers)} />)}
             </div>
           )}
+
+          {!hasCycloneDxSbom(img.referrers) && <SbomGenerate repo={repo} tag={img.tag} onDone={() => setReload((n) => n + 1)} />}
 
           <CliCard repo={repo} tag={img.tag} />
 
