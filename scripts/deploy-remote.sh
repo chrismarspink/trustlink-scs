@@ -8,9 +8,13 @@
 # 최초 1회(구 구성 → 새 구성): 원격 .env 에 새 항목(KC_DB_PASSWORD·TL_ADMIN_* 등, .env.example 참고) 추가 후
 #   ssh 로 들어가 `bash scripts/migrate-keycloak-h2.sh` 를 먼저 실행한다(계정 이전).
 # SSH 비밀번호는 실행 중 프롬프트로 입력(키 등록 시 생략).
+# 서버 접속 정보는 공개 저장소에 두지 않는다 — 환경변수나 scripts/deploy-remote.local(커밋 안 됨)에
+#   HOST=… PORT=… RUSER=… 를 적는다.
 set -euo pipefail
 
-HOST="${HOST:-218.38.12.14}"; PORT="${PORT:-7422}"; RUSER="${RUSER:-innotium}"; RDIR="${RDIR:-trustlink}"
+LOCAL="$(dirname "$0")/deploy-remote.local"
+[ -f "$LOCAL" ] && . "$LOCAL"
+HOST="${HOST:?HOST 필요 (scripts/deploy-remote.local)}"; PORT="${PORT:-22}"; RUSER="${RUSER:?RUSER 필요 (scripts/deploy-remote.local)}"; RDIR="${RDIR:-trustlink}"
 CTRL="/tmp/tl-deploy-$$"   # SSH 연결 재사용(비밀번호 1회 입력)
 SSH=(ssh -p "$PORT" -o ControlMaster=auto -o ControlPath="$CTRL" -o ControlPersist=300 "$RUSER@$HOST")
 trap 'ssh -o ControlPath="$CTRL" -O exit "$RUSER@$HOST" 2>/dev/null || true' EXIT

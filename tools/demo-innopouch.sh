@@ -8,7 +8,7 @@
 #   5) 버전별 SBOM → Dependency-Track 분석 → VEX 발행(대시보드 통계)
 #   6) $OUT/credentials.env · upload.sh · download.sh 생성(바로 실행 가능)
 #
-# 사용: BFF=http://218.38.12.14:28080 REG=218.38.12.14:28081 ADMIN=admin1 ADMIN_PW='…' bash tools/demo-innopouch.sh
+# 사용: BFF=http://<서버>:28080 REG=<서버>:28081 ADMIN=admin1 ADMIN_PW='…' bash tools/demo-innopouch.sh
 # 필요: curl, python3, oras
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"

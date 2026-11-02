@@ -8,8 +8,8 @@ import (
 )
 
 func TestMailAllowlist(t *testing.T) {
-	m := &Mailer{Allow: map[string]bool{"jkkim@innotium.com": true}}
-	ok, dropped := m.filter([]string{"JKKim@innotium.com", "acme1@innotium.local"})
+	m := &Mailer{Allow: map[string]bool{"dev@example.com": true}}
+	ok, dropped := m.filter([]string{"Dev@Example.com", "acme1@innotium.local"})
 	if len(ok) != 1 || len(dropped) != 1 || dropped[0] != "acme1@innotium.local" {
 		t.Fatalf("ok=%v dropped=%v", ok, dropped)
 	}
