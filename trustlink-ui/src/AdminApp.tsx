@@ -11,6 +11,7 @@ import Storage from '@/pages/admin/Storage';
 import Orgs from '@/pages/admin/Orgs';
 import Access from '@/pages/admin/Access';
 import Robots from '@/pages/admin/Robots';
+import Notify from '@/pages/admin/Notify';
 
 // 관리 콘솔 영역: BFF 세션 + admins 그룹 게이트(AdminLayout 내부).
 // 별도 모듈로 분리되어 lazy 로드된다(코드 스플릿) → 비-admin 사용자는 이 번들을 받지 않는다.
@@ -23,6 +24,7 @@ export default function AdminApp() {
         <Route path="orgs" element={<Orgs />} />
         <Route path="access" element={<Access />} />
         <Route path="robots" element={<Robots />} />
+        <Route path="notify" element={<Notify />} />
         <Route path="capacity" element={<Capacity />} />
         <Route path="logs" element={<Logs />} />
         <Route path="registry" element={<Registry />} />

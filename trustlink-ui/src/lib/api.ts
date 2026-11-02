@@ -276,6 +276,20 @@ export const adminMetrics = () => aj<Metrics>('/api/metrics');
 
 export type Health = { zot: boolean; keycloak: boolean; dtrack?: boolean };
 export const adminHealth = () => aj<Health>('/api/health');
+export type NoticeItem = { id: string; time: string; kind: string; repo: string; tag: string; title: string; body: string; read: boolean };
+// 내 통보(로그인 필요). BFF 세션이 없으면 null.
+export async function getNotifications(): Promise<{ items: NoticeItem[]; unread: number } | null> {
+  const r = await zfetch('/api/notifications');
+  if (!r.ok) return null;
+  return r.json();
+}
+export const markNotificationsRead = (id = '') => zfetch('/api/notifications/read', jsonInit('POST', { id }));
+export type NoticeLog = {
+  items: { id: string; time: string; kind: string; audience: string; repo: string; tag: string; title: string; to: string[]; mailed?: string[]; dropped?: string[]; mailError?: string }[];
+  lastSync: string; lastSyncMsg: string; tracked: number; pending: number; initialized: boolean;
+};
+export const adminNotifyLog = () => aj<NoticeLog>('/api/notify/log');
+export const adminNotifySync = () => aj<{ message: string }>('/api/notify/sync', jsonInit('POST', {}));
 export type MailStatus = { configured: boolean; host: string; port: string; from: string; allowlist: string[] };
 export const adminMailStatus = () => aj<MailStatus>('/api/mail');
 export const adminMailTest = (to: string) =>

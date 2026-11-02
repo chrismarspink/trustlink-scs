@@ -136,6 +136,10 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}                    # 보내는 주소(비우면 SMTP_USER)
       MAIL_ALLOWLIST: ${MAIL_ALLOWLIST:-}          # 쉼표 구분. 설정 시 이 주소로만 발송(시험 기간용)
+      # 보안 이슈 통보(docs/NOTIFY-DESIGN.md). DT 웹훅은 내부 전용 포트 8089(외부 미공개)로 받는다
+      NOTIFY_STORE: /var/lib/trustlink/notify.json
+      NOTIFY_SYNC_INTERVAL: ${NOTIFY_SYNC_INTERVAL:-10m}   # SBOM → DT 감시 대상 동기화 주기
+      NOTIFY_CC: ${NOTIFY_CC:-}                    # 모든 통보 사본을 받을 운영 주소(쉼표 구분, 선택)
     configs:
       - source: zot-config               # zot 설정 원본(템플릿) — BFF 가 제품 권한을 더해 렌더
         target: /etc/trustlink/zot-config.json

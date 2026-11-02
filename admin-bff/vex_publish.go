@@ -222,6 +222,7 @@ func (s *Server) apiVexPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.sor.append(SoREvent{Actor: author, Action: "vex-publish", Repo: in.Repo, Tag: in.Tag, Detail: map[string]any{"digest": mDigest}})
+	go s.notifyVexPublished(in.Repo, in.Tag, vex) // 고객 통보(판단 결과)
 	writeJSON(w, 200, map[string]any{
 		"status":   "published",
 		"digest":   mDigest,

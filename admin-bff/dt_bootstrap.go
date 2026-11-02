@@ -70,16 +70,9 @@ func writeSecretFile(path, v string) error {
 	return os.WriteFile(path, []byte(v+"\n"), 0o600)
 }
 
-func (s *Server) dtBootstrap() (string, error) {
+// dtAdminCaller: DT admin 으로 로그인해 관리 API 호출 함수를 돌려준다(최초 1회 초기 비밀번호 변경 포함).
+func (s *Server) dtAdminCaller() (func(method, p, body string) (int, []byte, error), error) {
 	base := s.cfg.DTBaseURL
-	if resp, err := s.http.Get(base + "/api/version"); err != nil {
-		return "", err
-	} else {
-		resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return "", fmt.Errorf("DT 미기동(version %d)", resp.StatusCode)
-		}
-	}
 	pw := s.cfg.DTAdminPassword
 	// 최초 1회: admin/admin → 설정값 (이미 바뀌었으면 실패해도 무시)
 	if resp, err := s.http.PostForm(base+"/api/v1/user/forceChangePassword", url.Values{
@@ -88,15 +81,15 @@ func (s *Server) dtBootstrap() (string, error) {
 	}
 	resp, err := s.http.PostForm(base+"/api/v1/user/login", url.Values{"username": {"admin"}, "password": {pw}})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	jwt, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if resp.StatusCode != 200 || !strings.HasPrefix(string(jwt), "eyJ") {
-		return "", fmt.Errorf("DT admin 로그인 실패(%d) — DT_ADMIN_PASSWORD 확인", resp.StatusCode)
+		return nil, fmt.Errorf("DT admin 로그인 실패(%d) — DT_ADMIN_PASSWORD 확인", resp.StatusCode)
 	}
 	auth := "Bearer " + string(jwt)
-	call := func(method, p, body string) (int, []byte, error) {
+	return func(method, p, body string) (int, []byte, error) {
 		req, _ := http.NewRequest(method, base+p, strings.NewReader(body))
 		req.Header.Set("Authorization", auth)
 		if body != "" {
@@ -109,6 +102,22 @@ func (s *Server) dtBootstrap() (string, error) {
 		defer r.Body.Close()
 		b, _ := io.ReadAll(r.Body)
 		return r.StatusCode, b, nil
+	}, nil
+}
+
+func (s *Server) dtBootstrap() (string, error) {
+	base := s.cfg.DTBaseURL
+	if resp, err := s.http.Get(base + "/api/version"); err != nil {
+		return "", err
+	} else {
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return "", fmt.Errorf("DT 미기동(version %d)", resp.StatusCode)
+		}
+	}
+	call, err := s.dtAdminCaller()
+	if err != nil {
+		return "", err
 	}
 
 	uuid := ""
