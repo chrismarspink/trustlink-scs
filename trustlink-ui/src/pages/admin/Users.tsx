@@ -101,6 +101,7 @@ export default function Users() {
   async function submit() {
     if (!form) return;
     if (form.mode === 'create' && !fu.trim()) { alert('아이디를 입력하세요'); return; }
+    if (fr === 'users' && !fe.trim()) { alert('외부 사용자는 보안 통보를 받을 이메일이 필요합니다'); return; }
     if (fr === 'users' && fo.length === 0 && !confirm('고객사를 지정하지 않으면 이 외부 사용자는 아무 제품도 볼 수 없습니다. 계속할까요?')) return;
     setBusy(true);
     try {
@@ -108,7 +109,7 @@ export default function Users() {
         const r = await adminCreateUser({ username: fu.trim(), email: fe.trim(), role: fr, orgs: fo, password: fp });
         setCred({ kind: 'user', username: r.username, password: r.password, group: fr });
       } else {
-        await adminUpdateUser(form.user.id, { username: form.user.username, role: fr, orgs: fo });
+        await adminUpdateUser(form.user.id, { username: form.user.username, role: fr, orgs: fo, ...(fe.trim() !== (form.user.email || '') ? { email: fe.trim() } : {}) });
       }
       setForm(null);
       await load();
@@ -205,7 +206,9 @@ export default function Users() {
                     </span>
                     <div>
                       <div className="font-medium">{u.username}</div>
-                      <div className="text-xs text-muted-foreground">{u.email || ''}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {u.email || (role === 'users' && <span className="text-amber-700">이메일 없음 — 보안 통보 메일을 받지 못함</span>)}
+                      </div>
                     </div>
                   </div>
                 </Td>
@@ -268,12 +271,10 @@ export default function Users() {
               <Label htmlFor="fu">아이디</Label>
               <Input id="fu" value={fu} onChange={(e) => setFu(e.target.value)} disabled={form?.mode === 'edit'} placeholder="예: kim.minsu" />
             </div>
-            {form?.mode === 'create' && (
-              <div className="space-y-2">
-                <Label htmlFor="fe">이메일 <span className="font-normal text-muted-foreground">(선택)</span></Label>
-                <Input id="fe" type="email" value={fe} onChange={(e) => setFe(e.target.value)} />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="fe">이메일 <span className="font-normal text-muted-foreground">{fr === 'users' ? '(필수 — 보안 통보를 받는 주소)' : '(선택)'}</span></Label>
+              <Input id="fe" type="email" value={fe} onChange={(e) => setFe(e.target.value)} placeholder={fr === 'users' ? 'name@customer.com' : ''} />
+            </div>
             <div className="space-y-2">
               <Label>역할</Label>
               <div className="grid gap-2">

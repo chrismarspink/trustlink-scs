@@ -51,6 +51,7 @@ export default function Notify() {
                     {n.mailError ? <span className="text-red-600">실패: {n.mailError}</span>
                       : n.mailed?.length ? `보냄 ${n.mailed.length}` : '—'}
                     {!!n.dropped?.length && <div className="text-muted-foreground">허용 목록 밖 {n.dropped.length}</div>}
+                    {!!n.noEmail?.length && <div className="text-amber-700" title={n.noEmail.join(', ')}>이메일 없음 {n.noEmail.length}</div>}
                   </Td>
                 </tr>
               ))}

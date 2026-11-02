@@ -229,7 +229,7 @@ export const ROLES = ['admins', 'developers', 'users'] as const;
 export const ORG_PREFIX = 'org-';
 export const adminCreateUser = (b: { username: string; email: string; role: string; orgs: string[]; password: string }) =>
   aj<IssuedCredential & { id: string; group: string }>('/api/users', jsonInit('POST', b));
-export const adminUpdateUser = (id: string, b: { username: string; role?: string; orgs?: string[]; enabled?: boolean }) =>
+export const adminUpdateUser = (id: string, b: { username: string; role?: string; orgs?: string[]; enabled?: boolean; email?: string }) =>
   aj(`/api/users/${id}`, jsonInit('PUT', b));
 export const adminDeleteUser = (id: string, username: string) =>
   aj(`/api/users/${id}?username=${encodeURIComponent(username)}`, { method: 'DELETE' });
@@ -238,7 +238,9 @@ export const adminResetPassword = (id: string, username: string) =>
 export const adminCICredential = () => aj<IssuedCredential>('/api/credentials/ci');
 
 // 고객사(조직) = Keycloak 그룹 org-<name>
-export type Org = { name: string; group: string; members: string[]; products: string[] };
+export type Org = { name: string; group: string; members: string[]; emails: Record<string, string>; contacts: string[]; products: string[] };
+export const adminSetOrgContacts = (name: string, emails: string[]) =>
+  aj<{ contacts: string[] }>(`/api/orgs/${encodeURIComponent(name)}/contacts`, jsonInit('PUT', { emails }));
 export const adminOrgs = () => aj<Org[]>('/api/orgs');
 export const adminCreateOrg = (name: string) => aj('/api/orgs', jsonInit('POST', { name }));
 export const adminDeleteOrg = (name: string) => aj(`/api/orgs/${encodeURIComponent(name)}`, { method: 'DELETE' });
@@ -285,7 +287,7 @@ export async function getNotifications(): Promise<{ items: NoticeItem[]; unread:
 }
 export const markNotificationsRead = (id = '') => zfetch('/api/notifications/read', jsonInit('POST', { id }));
 export type NoticeLog = {
-  items: { id: string; time: string; kind: string; audience: string; repo: string; tag: string; title: string; to: string[]; mailed?: string[]; dropped?: string[]; mailError?: string }[];
+  items: { id: string; time: string; kind: string; audience: string; repo: string; tag: string; title: string; to: string[]; mailed?: string[]; dropped?: string[]; noEmail?: string[]; mailError?: string }[];
   lastSync: string; lastSyncMsg: string; quietUntil?: string; tracked: number; pending: number; initialized: boolean;
 };
 export const adminNotifyLog = () => aj<NoticeLog>('/api/notify/log');

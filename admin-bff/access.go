@@ -878,10 +878,12 @@ func (s *Server) apiOrgs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type orgView struct {
-		Name     string   `json:"name"`
-		Group    string   `json:"group"`
-		Members  []string `json:"members"`
-		Products []string `json:"products"`
+		Name     string            `json:"name"`
+		Group    string            `json:"group"`
+		Members  []string          `json:"members"`
+		Emails   map[string]string `json:"emails"`   // 소속 사용자 → 이메일(없으면 빈 값)
+		Contacts []string          `json:"contacts"` // 고객사 보안 담당 통보 주소
+		Products []string          `json:"products"`
 	}
 	var pol AccessPolicy
 	if s.access != nil {
@@ -892,7 +894,12 @@ func (s *Server) apiOrgs(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(g.Name, orgPrefix) {
 			continue
 		}
-		v := orgView{Name: strings.TrimPrefix(g.Name, orgPrefix), Group: g.Name, Members: s.groupMembers(g.ID), Products: []string{}}
+		v := orgView{Name: strings.TrimPrefix(g.Name, orgPrefix), Group: g.Name, Members: []string{}, Emails: map[string]string{},
+			Contacts: orgContacts(g), Products: []string{}}
+		for _, u := range s.groupUsers(g.ID) {
+			v.Members = append(v.Members, u.Username)
+			v.Emails[u.Username] = u.Email
+		}
 		for _, pp := range pol.Products {
 			for _, x := range pp.Readers {
 				if x.Type == "group" && x.Name == g.Name {
@@ -903,6 +910,86 @@ func (s *Server) apiOrgs(w http.ResponseWriter, r *http.Request) {
 		out = append(out, v)
 	}
 	writeJSON(w, 200, out)
+}
+
+const orgContactAttr = "notifyEmails" // 고객사 그룹 속성: 보안 통보를 받을 주소들
+
+func orgContacts(g kcGroup) []string {
+	if c := g.Attributes[orgContactAttr]; c != nil {
+		return c
+	}
+	return []string{}
+}
+
+func (s *Server) groupUsers(gid string) []kcUser {
+	resp, err := s.kcAdmin("GET", "/groups/"+gid+"/members?max=500&briefRepresentation=true", nil)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	var us []kcUser
+	_ = json.NewDecoder(resp.Body).Decode(&us)
+	return us
+}
+
+// PUT /api/orgs/{name}/contacts {emails:[...]} — 고객사 보안 담당 통보 주소(Keycloak 그룹 속성).
+func (s *Server) apiOrgContacts(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Emails []string `json:"emails"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "요청 형식 오류"})
+		return
+	}
+	emails := []string{}
+	for _, e := range in.Emails {
+		e = strings.TrimSpace(e)
+		if e == "" || contains(emails, e) {
+			continue
+		}
+		if msg := checkUserEmail("", e); msg != "" {
+			writeJSON(w, 400, map[string]string{"error": msg})
+			return
+		}
+		emails = append(emails, e)
+	}
+	if len(emails) > 20 {
+		writeJSON(w, 400, map[string]string{"error": "통보 주소는 20개까지"})
+		return
+	}
+	group := orgPrefix + r.PathValue("name")
+	gs, err := s.listGroups()
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": err.Error()})
+		return
+	}
+	var g *kcGroup
+	for i := range gs {
+		if gs[i].Name == group {
+			g = &gs[i]
+		}
+	}
+	if g == nil {
+		writeJSON(w, 404, map[string]string{"error": "고객사 없음"})
+		return
+	}
+	if g.Attributes == nil {
+		g.Attributes = map[string][]string{}
+	}
+	g.Attributes[orgContactAttr] = emails
+	body, _ := json.Marshal(g)
+	resp, err := s.kcAdmin("PUT", "/groups/"+g.ID, bytes.NewReader(body))
+	if err != nil {
+		writeJSON(w, 502, map[string]string{"error": err.Error()})
+		return
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		writeJSON(w, 502, map[string]string{"error": fmt.Sprintf("저장 실패(%d)", resp.StatusCode)})
+		return
+	}
+	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "org-contacts", Subject: group, Detail: map[string]any{"emails": emails}})
+	writeJSON(w, 200, map[string]any{"contacts": emails})
 }
 
 func (s *Server) groupMembers(gid string) []string {

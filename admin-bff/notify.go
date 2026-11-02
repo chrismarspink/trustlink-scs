@@ -41,6 +41,7 @@ type Notice struct {
 	Body     string          `json:"body"`
 	To       []string        `json:"to"`
 	Mailed   []string        `json:"mailed,omitempty"`
+	NoEmail  []string        `json:"noEmail,omitempty"` // 이메일이 없어 메일을 받지 못한 사용자
 	Dropped  []string        `json:"dropped,omitempty"` // 메일 허용 목록 밖이라 보내지 않은 주소
 	MailErr  string          `json:"mailError,omitempty"`
 	Read     map[string]bool `json:"read,omitempty"`
@@ -379,7 +380,7 @@ func (s *Server) sendVulnNotice(b *notifyBatch) {
 	}
 	fmt.Fprintf(&body, "\n판단 화면: %s\n", s.artifactURL(b.repo, b.tag))
 	s.deliver(Notice{Kind: "vuln-new", Audience: "internal", Repo: b.repo, Tag: b.tag, Title: title, Body: body.String()},
-		s.recipients(b.repo, false))
+		s.recipients(b.repo, false), nil)
 }
 
 // ---------- ③ VEX 발행 → 고객 통보 ----------
@@ -444,7 +445,7 @@ func (s *Server) notifyVexPublished(repo, tag string, vex []byte) {
 	}
 	fmt.Fprintf(&body, "\n\n상세·VEX 파일: %s\n", s.artifactURL(repo, tag))
 	s.deliver(Notice{Kind: "vex-published", Audience: "customer", Repo: repo, Tag: tag, Title: title, Body: body.String()},
-		s.recipients(repo, true))
+		s.recipients(repo, true), s.orgContactsFor(repo))
 }
 
 // ---------- 받는 사람 · 발송 ----------
@@ -495,8 +496,40 @@ func (s *Server) recipients(repo string, customer bool) []kcUser {
 	return out
 }
 
-// deliver: 화면 통보 저장 + 메일 발송(허용 목록 적용) + 감사 기록.
-func (s *Server) deliver(nt Notice, to []kcUser) {
+// orgContactsFor: 그 제품을 받을 수 있는 고객사(제품 권한의 읽기 대상 그룹)의 보안 담당 통보 주소.
+func (s *Server) orgContactsFor(repo string) []string {
+	if s.access == nil {
+		return nil
+	}
+	readers := map[string]bool{}
+	for _, pp := range s.access.snapshot().Products {
+		if pp.Repo != repo {
+			continue
+		}
+		for _, x := range pp.Readers {
+			if x.Type == "group" && strings.HasPrefix(x.Name, orgPrefix) {
+				readers[x.Name] = true
+			}
+		}
+	}
+	if len(readers) == 0 {
+		return nil
+	}
+	gs, err := s.listGroups()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, g := range gs {
+		if readers[g.Name] {
+			out = append(out, orgContacts(g)...)
+		}
+	}
+	return out
+}
+
+// deliver: 화면 통보 저장 + 메일 발송(허용 목록 적용) + 감사 기록. extra 는 계정 없는 통보 주소(고객사 보안 담당).
+func (s *Server) deliver(nt Notice, to []kcUser, extra []string) {
 	now := time.Now().UTC()
 	nt.ID = fmt.Sprintf("%d", now.UnixNano())
 	nt.Time = now.Format(time.RFC3339)
@@ -505,6 +538,13 @@ func (s *Server) deliver(nt Notice, to []kcUser) {
 		nt.To = append(nt.To, u.Username)
 		if u.Email != "" {
 			emails = append(emails, u.Email)
+		} else {
+			nt.NoEmail = append(nt.NoEmail, u.Username)
+		}
+	}
+	for _, a := range extra {
+		if !contains(emails, a) {
+			emails = append(emails, a)
 		}
 	}
 	for _, a := range strings.Split(env("NOTIFY_CC", ""), ",") { // 운영 참조 주소(모든 통보 사본)
@@ -529,7 +569,7 @@ func (s *Server) deliver(nt Notice, to []kcUser) {
 	n.mu.Unlock()
 	_ = s.sor.append(SoREvent{Actor: "trustlink", Action: "notify-" + nt.Kind, Repo: nt.Repo, Tag: nt.Tag,
 		Status: map[bool]string{true: "mail-failed", false: "ok"}[nt.MailErr != ""],
-		Detail: map[string]any{"to": nt.To, "mailed": nt.Mailed, "dropped": nt.Dropped, "error": nt.MailErr}})
+		Detail: map[string]any{"to": nt.To, "mailed": nt.Mailed, "dropped": nt.Dropped, "noEmail": nt.NoEmail, "error": nt.MailErr}})
 }
 
 func (s *Server) artifactURL(repo, tag string) string {

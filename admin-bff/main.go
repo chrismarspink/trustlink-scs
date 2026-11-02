@@ -17,6 +17,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -264,7 +265,8 @@ func main() {
 	mux.HandleFunc("GET /api/orgs", s.guard(s.apiOrgs)) // 고객사 = Keycloak 그룹 org-*
 	mux.HandleFunc("POST /api/orgs", s.guard(s.apiOrgCreate))
 	mux.HandleFunc("DELETE /api/orgs/{name}", s.guard(s.apiOrgDelete))
-	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts)) // 제품별 읽기/쓰기 대상
+	mux.HandleFunc("PUT /api/orgs/{name}/contacts", s.guard(s.apiOrgContacts)) // 고객사 보안 담당 통보 주소
+	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts))   // 제품별 읽기/쓰기 대상
 	mux.HandleFunc("PUT /api/access/products", s.guard(s.apiAccessProductPut))
 	mux.HandleFunc("DELETE /api/access/products", s.guard(s.apiAccessProductDelete))
 	mux.HandleFunc("GET /api/access/principals", s.guard(s.apiAccessPrincipals))
@@ -549,8 +551,9 @@ func (s *Server) kcAdmin(method, path string, body io.Reader) (*http.Response, e
 }
 
 type kcGroup struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID         string              `json:"id"`
+	Name       string              `json:"name"`
+	Attributes map[string][]string `json:"attributes,omitempty"`
 }
 type kcUser struct {
 	ID       string `json:"id"`
@@ -560,7 +563,7 @@ type kcUser struct {
 }
 
 func (s *Server) listGroups() ([]kcGroup, error) {
-	resp, err := s.kcAdmin("GET", "/groups?max=200", nil)
+	resp, err := s.kcAdmin("GET", "/groups?max=200&briefRepresentation=false", nil) // 속성(고객사 통보 주소) 포함
 	if err != nil {
 		return nil, err
 	}
@@ -665,6 +668,10 @@ func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": err.Error()})
 		return
 	}
+	if msg := checkUserEmail(in.Role, in.Email); msg != "" {
+		writeJSON(w, 400, map[string]string{"error": msg})
+		return
+	}
 	if in.Password == "" { // 미입력 시 무작위 임시 비밀번호 자동 생성(응답으로 1회 전달)
 		pw, err := genTempPassword()
 		if err != nil {
@@ -710,7 +717,22 @@ func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, map[string]any{"id": uid, "username": in.Username, "group": in.Role, "groups": groups, "password": in.Password})
 }
 
-// PUT /api/users/{id} {role, orgs[], enabled, username} — 역할·고객사·활성 상태 변경
+// checkUserEmail: 외부 사용자는 보안 통보를 받아야 하므로 이메일 필수. 형식도 확인. 문제 없으면 "".
+func checkUserEmail(role, email string) string {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		if role == "users" {
+			return "외부 사용자는 보안 통보를 받을 이메일이 필요합니다"
+		}
+		return ""
+	}
+	if a, err := mail.ParseAddress(email); err != nil || a.Address != email {
+		return "이메일 형식 오류: " + email
+	}
+	return ""
+}
+
+// PUT /api/users/{id} {role, orgs[], enabled, email, username} — 역할·고객사·활성 상태·이메일 변경
 func (s *Server) apiUpdateUser(w http.ResponseWriter, r *http.Request) {
 	uid := r.PathValue("id")
 	var in struct {
@@ -718,12 +740,36 @@ func (s *Server) apiUpdateUser(w http.ResponseWriter, r *http.Request) {
 		Role     string   `json:"role"`
 		Orgs     []string `json:"orgs"`
 		Enabled  *bool    `json:"enabled"`
+		Email    *string  `json:"email"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "요청 형식 오류"})
 		return
 	}
 	detail := map[string]any{}
+	if in.Email != nil {
+		email := strings.TrimSpace(*in.Email)
+		if msg := checkUserEmail(in.Role, email); msg != "" {
+			writeJSON(w, 400, map[string]string{"error": msg})
+			return
+		}
+		body, _ := json.Marshal(map[string]any{"email": email})
+		resp, err := s.kcAdmin("PUT", "/users/"+uid, strings.NewReader(string(body)))
+		if err != nil {
+			writeJSON(w, 502, map[string]string{"error": err.Error()})
+			return
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusConflict {
+			writeJSON(w, 409, map[string]string{"error": "다른 사용자가 이미 쓰는 이메일입니다"})
+			return
+		}
+		if resp.StatusCode != http.StatusNoContent {
+			writeJSON(w, 502, map[string]string{"error": fmt.Sprintf("이메일 변경 실패(%d)", resp.StatusCode)})
+			return
+		}
+		detail["email"] = email
+	}
 	if in.Role != "" {
 		groups, err := userGroupsFor(in.Role, in.Orgs)
 		if err != nil {

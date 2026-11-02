@@ -149,3 +149,26 @@ func TestNotifyBodyCapped(t *testing.T) {
 		t.Errorf("title=%q body=\n%s", n.Title, n.Body)
 	}
 }
+
+func TestCheckUserEmail(t *testing.T) {
+	cases := []struct{ role, email, want string }{
+		{"users", "", "필요"}, {"developers", "", ""}, {"users", "a@acme.com", ""},
+		{"users", "not-an-email", "형식"}, {"admins", "Kim <k@x.com>", "형식"},
+	}
+	for _, c := range cases {
+		got := checkUserEmail(c.role, c.email)
+		if (c.want == "") != (got == "") || !strings.Contains(got, c.want) {
+			t.Errorf("%s %q → %q", c.role, c.email, got)
+		}
+	}
+}
+
+func TestDeliverNoEmailAndContacts(t *testing.T) {
+	s := testNotifyServer(t)
+	s.deliver(Notice{Kind: "vex-published", Audience: "customer", Repo: "products/innopouch", Tag: "7.0", Title: "t", Body: "b"},
+		[]kcUser{{Username: "acme1", Email: "acme1@acme.com"}, {Username: "acme2"}}, []string{"security@acme.com", "acme1@acme.com"})
+	n := s.notify.st.Notices[0]
+	if strings.Join(n.To, ",") != "acme1,acme2" || strings.Join(n.NoEmail, ",") != "acme2" {
+		t.Errorf("to=%v noEmail=%v", n.To, n.NoEmail)
+	}
+}
