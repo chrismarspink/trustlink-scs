@@ -129,6 +129,13 @@ services:
       DT_KEY_FILE: /var/lib/trustlink/dt-api-key
       SOR_PATH: /var/lib/trustlink/sor.jsonl
       SESSIONS_PATH: /var/lib/trustlink/sessions.json
+      # 통보 메일(SMTP). SMTP_HOST 를 비우면 메일 기능 비활성. 465=TLS, 587=STARTTLS
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}                    # 보내는 주소(비우면 SMTP_USER)
+      MAIL_ALLOWLIST: ${MAIL_ALLOWLIST:-}          # 쉼표 구분. 설정 시 이 주소로만 발송(시험 기간용)
     configs:
       - source: zot-config               # zot 설정 원본(템플릿) — BFF 가 제품 권한을 더해 렌더
         target: /etc/trustlink/zot-config.json

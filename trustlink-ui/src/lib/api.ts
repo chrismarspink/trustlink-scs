@@ -276,6 +276,10 @@ export const adminMetrics = () => aj<Metrics>('/api/metrics');
 
 export type Health = { zot: boolean; keycloak: boolean; dtrack?: boolean };
 export const adminHealth = () => aj<Health>('/api/health');
+export type MailStatus = { configured: boolean; host: string; port: string; from: string; allowlist: string[] };
+export const adminMailStatus = () => aj<MailStatus>('/api/mail');
+export const adminMailTest = (to: string) =>
+  aj<{ status: string; to: string[] }>('/api/mail/test', jsonInit('POST', { to }));
 
 export type LogsResult = {
   file: string;

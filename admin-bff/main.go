@@ -215,6 +215,7 @@ type Server struct {
 	states map[string]stateData // oauth state 임시 저장 (만료 + 로그인 후 복귀 경로)
 	stMu   sync.Mutex
 	sor    *SoR           // 감사 기록(SBOM 생성 등)
+	mail   *Mailer        // 통보 메일(SMTP)
 	oidc   *oidcVerifier  // OIDC 액세스 토큰 서명/클레임 검증기
 	dtKey  atomic.Value   // DT API 키(string) — initDTKey 가 설정
 	access *accessManager // 제품 권한·기계 계정(관리 모드일 때만)
@@ -240,6 +241,7 @@ func main() {
 		states: map[string]stateData{},
 	}
 	s.sor = newSoR(cfg.SoRPath)
+	s.mail = newMailer()
 	s.oidc = newOIDCVerifier(cfg, s.http)
 	s.initDTKey()
 	if err := s.initAccess(); err != nil {
@@ -273,7 +275,9 @@ func main() {
 	mux.HandleFunc("GET /api/metrics", s.guard(s.apiMetrics))
 	mux.HandleFunc("GET /api/logs", s.guard(s.apiLogs))
 	mux.HandleFunc("GET /api/health", s.guard(s.apiHealth))
-	mux.HandleFunc("GET /api/repos", s.guardSession(s.apiRepos)) // 제품 열람: 로그인 사용자(그룹 read 는 zot RBAC 이 최종 판정)
+	mux.HandleFunc("GET /api/mail", s.guard(s.apiMailStatus))     // 통보 메일 설정 상태
+	mux.HandleFunc("POST /api/mail/test", s.guard(s.apiMailTest)) // 시험 메일 발송
+	mux.HandleFunc("GET /api/repos", s.guardSession(s.apiRepos))  // 제품 열람: 로그인 사용자(그룹 read 는 zot RBAC 이 최종 판정)
 	mux.HandleFunc("POST /api/registry/delete-tag", s.guard(s.apiDeleteTag))
 	mux.HandleFunc("GET /api/retention", s.guard(s.apiRetention))
 	mux.HandleFunc("GET /api/acl", s.guard(s.apiACL))
