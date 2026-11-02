@@ -107,19 +107,25 @@ func TestLatestSBOM(t *testing.T) {
 	}
 }
 
-func TestNotifyQuietUntil(t *testing.T) {
+func TestNotifyQuietOnlyOldVersions(t *testing.T) {
 	s := testNotifyServer(t)
-	s.notifyQuiet(time.Hour)
+	s.notify.st.Projects["innopouch@8.0"] = "products/innopouch"
+	now := time.Now().UTC()
+	s.notify.st.QuietSince = now.Format(time.RFC3339)
+	s.notify.st.QuietUntil = now.Add(time.Hour).Format(time.RFC3339)
+	s.notify.st.SyncedAt["products/innopouch|7.0"] = now.Add(-24 * time.Hour).Format(time.RFC3339) // 변경 전부터 감시
+	s.notify.st.SyncedAt["products/innopouch|8.0"] = now.Add(time.Minute).Format(time.RFC3339)     // 변경 뒤 새로 올림
 	s.queueVulnNotice(dtVuln("CVE-Q1", "high", "innopouch", "7.0"))
+	s.queueVulnNotice(dtVuln("CVE-Q2", "high", "innopouch", "8.0"))
 	s.flushBatches(true)
-	if len(s.notify.st.Notices) != 0 {
-		t.Fatal("통보 보류 기간에는 통보하지 않아야 함")
+	if len(s.notify.st.Notices) != 1 || s.notify.st.Notices[0].Tag != "8.0" {
+		t.Fatalf("보류는 변경 전 버전에만: %+v", s.notify.st.Notices)
 	}
-	s.notify.st.QuietUntil = time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
-	s.queueVulnNotice(dtVuln("CVE-Q2", "high", "innopouch", "7.0"))
+	s.notify.st.QuietUntil = now.Add(-time.Minute).Format(time.RFC3339)
+	s.queueVulnNotice(dtVuln("CVE-Q3", "high", "innopouch", "7.0"))
 	s.flushBatches(true)
-	if len(s.notify.st.Notices) != 1 {
-		t.Fatal("보류 기간이 지나면 통보해야 함")
+	if len(s.notify.st.Notices) != 2 {
+		t.Fatal("보류 기한이 지나면 통보해야 함")
 	}
 }
 

@@ -74,21 +74,33 @@ func writeSecretFile(path, v string) error {
 func (s *Server) dtAdminCaller() (func(method, p, body string) (int, []byte, error), error) {
 	base := s.cfg.DTBaseURL
 	pw := s.cfg.DTAdminPassword
-	// 최초 1회: admin/admin → 설정값 (이미 바뀌었으면 실패해도 무시)
-	if resp, err := s.http.PostForm(base+"/api/v1/user/forceChangePassword", url.Values{
-		"username": {"admin"}, "password": {"admin"}, "newPassword": {pw}, "confirmPassword": {pw}}); err == nil {
+	login := func() (string, int, error) {
+		resp, err := s.http.PostForm(base+"/api/v1/user/login", url.Values{"username": {"admin"}, "password": {pw}})
+		if err != nil {
+			return "", 0, err
+		}
+		b, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		return string(b), resp.StatusCode, nil
 	}
-	resp, err := s.http.PostForm(base+"/api/v1/user/login", url.Values{"username": {"admin"}, "password": {pw}})
+	jwt, code, err := login()
 	if err != nil {
 		return nil, err
 	}
-	jwt, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if resp.StatusCode != 200 || !strings.HasPrefix(string(jwt), "eyJ") {
-		return nil, fmt.Errorf("DT admin 로그인 실패(%d) — DT_ADMIN_PASSWORD 확인", resp.StatusCode)
+	if code != 200 || !strings.HasPrefix(jwt, "eyJ") {
+		// 최초 1회: admin/admin → 설정값. 이미 바뀐 뒤에는 시도하지 않아 DT 로그에 실패 기록을 남기지 않는다.
+		if resp, err := s.http.PostForm(base+"/api/v1/user/forceChangePassword", url.Values{
+			"username": {"admin"}, "password": {"admin"}, "newPassword": {pw}, "confirmPassword": {pw}}); err == nil {
+			resp.Body.Close()
+		}
+		if jwt, code, err = login(); err != nil {
+			return nil, err
+		}
 	}
-	auth := "Bearer " + string(jwt)
+	if code != 200 || !strings.HasPrefix(jwt, "eyJ") {
+		return nil, fmt.Errorf("DT admin 로그인 실패(%d) — DT_ADMIN_PASSWORD 확인", code)
+	}
+	auth := "Bearer " + jwt
 	return func(method, p, body string) (int, []byte, error) {
 		req, _ := http.NewRequest(method, base+p, strings.NewReader(body))
 		req.Header.Set("Authorization", auth)

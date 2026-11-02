@@ -56,6 +56,16 @@ type notifyState struct {
 	LastSync    string            `json:"lastSync"`
 	LastSyncMsg string            `json:"lastSyncMsg"`
 	QuietUntil  string            `json:"quietUntil,omitempty"` // 취약점 DB 변경 직후 통보 보류 기한(RFC3339)
+	QuietSince  string            `json:"quietSince,omitempty"` // 보류는 이 시각 전부터 감시하던 버전에만 적용
+	SyncedAt    map[string]string `json:"syncedAt"`             // repo|tag → 처음 감시 대상이 된 시각
+	Rebase      *rebaseState      `json:"rebase,omitempty"`     // 취약점 DB 변경 후 재분석 대기
+}
+
+// rebaseState: 새로 켠 출처(OSV·GITHUB)의 취약점이 DT 에 다 들어오면(개수 안정) 재분석하고 보류를 푼다.
+type rebaseState struct {
+	Since string         `json:"since"`
+	Start map[string]int `json:"start"` // 출처 → 변경 시점 취약점 수
+	Last  map[string]int `json:"last"`  // 출처 → 직전 확인 때 수
 }
 
 type vulnInfo struct {
@@ -95,6 +105,9 @@ func newNotifier(p string) *notifier {
 	}
 	if n.st.Baseline == nil {
 		n.st.Baseline = map[string]string{}
+	}
+	if n.st.SyncedAt == nil {
+		n.st.SyncedAt = map[string]string{}
 	}
 	return n
 }
@@ -140,6 +153,7 @@ func (s *Server) initNotify() {
 		}
 	}()
 	go s.ensureDTNotificationRule()
+	go s.watchRebase() // 재배포 전에 시작한 재분석 대기를 이어서
 }
 
 // ---------- ① 동기화 ----------
@@ -186,8 +200,12 @@ func (s *Server) notifySync() string {
 			n.mu.Lock()
 			n.st.SBOM[key] = ref
 			n.st.Projects[name+"@"+tag] = repo
+			now := time.Now().UTC().Format(time.RFC3339)
 			if initial {
-				n.st.Baseline[key] = time.Now().UTC().Format(time.RFC3339)
+				n.st.Baseline[key] = now
+			}
+			if n.st.SyncedAt[key] == "" {
+				n.st.SyncedAt[key] = now
 			}
 			n.mu.Unlock()
 		}
@@ -282,8 +300,8 @@ func (s *Server) queueVulnNotice(in dtNotification) {
 		if t, err := time.Parse(time.RFC3339, n.st.Baseline[key]); err == nil && time.Since(t) < notifyBaselineQuiet {
 			continue // 기준선 적재 직후의 기존 취약점
 		}
-		if t, err := time.Parse(time.RFC3339, n.st.QuietUntil); err == nil && time.Now().Before(t) {
-			continue // 취약점 DB 를 바꾼 직후 — 기존 취약점이 새로 잡힌 것
+		if n.quietFor(key) {
+			continue // 취약점 DB 를 바꾼 직후 — 기존 버전에서 기존 취약점이 새로 잡힌 것
 		}
 		b := n.pending[key]
 		if b == nil {
@@ -293,6 +311,16 @@ func (s *Server) queueVulnNotice(in dtNotification) {
 		b.vulns = append(b.vulns, v)
 	}
 	n.saveLocked()
+}
+
+// quietFor: 취약점 DB 변경에 따른 통보 보류 대상인지(보류 기간 안 + 변경 전부터 감시하던 버전). n.mu 잠근 상태.
+func (n *notifier) quietFor(key string) bool {
+	t, err := time.Parse(time.RFC3339, n.st.QuietUntil)
+	if err != nil || !time.Now().Before(t) {
+		return false
+	}
+	synced := n.st.SyncedAt[key]
+	return synced == "" || synced <= n.st.QuietSince // 시각 문자열(RFC3339 UTC)은 사전순 = 시간순
 }
 
 // flushBatches: 모으는 시간이 지난 묶음을 통보로 보낸다(force 면 전부).

@@ -290,7 +290,7 @@ export type NoticeLog = {
 };
 export const adminNotifyLog = () => aj<NoticeLog>('/api/notify/log');
 export const adminNotifySync = () => aj<{ message: string }>('/api/notify/sync', jsonInit('POST', {}));
-export type VulnSources = { osv: string[]; ecosystems: string[]; github: boolean; githubTokenSet: boolean; quietUntil: string };
+export type VulnSources = { osv: string[]; ecosystems: string[]; github: boolean; githubTokenSet: boolean; quietUntil: string; waiting: string[] };
 export const adminVulnSources = () => aj<VulnSources>('/api/vulnsources');
 export const adminVulnSourcesSave = (b: { osv: string[]; github: boolean; githubToken?: string }) =>
   aj<{ status: string; changed: number; quietUntil: string }>('/api/vulnsources', jsonInit('PUT', b));

@@ -2,8 +2,8 @@ package main
 
 // vulnsrc.go: Dependency-Track 취약점 DB 설정(관리 › 설정·스토리지 › 취약점 DB).
 //   NVD 는 기본 사용. OSV(생태계 선택, 키 불필요)와 GitHub Advisories(토큰 필요)를 켜고 끈다.
-//   출처를 바꾸면 기존 버전에서 새로 잡히는 취약점이 한꺼번에 나오므로 24시간 통보를 보류(기준선)하고,
-//   DT 가 새 DB 를 내려받을 시간을 둔 뒤 감시 중인 모든 버전을 자동 재분석한다.
+//   출처를 늘리면 기존 버전에서 기존 취약점이 한꺼번에 새로 잡히므로, DT 가 새 출처를 다 내려받을 때까지
+//   변경 전부터 감시하던 버전의 통보를 보류하고, 내려받기가 끝나면 모두 재분석한 뒤 보류를 푼다.
 
 import (
 	"encoding/json"
@@ -22,12 +22,14 @@ const (
 	vsOSV          = "google.osv.enabled" // 켠 생태계 목록, ';' 구분
 	vsGitHub       = "github.advisories.enabled"
 	vsGitHubToken  = "github.advisories.access.token"
-	vsQuietAfter   = 24 * time.Hour
+	vsQuietMax     = 72 * time.Hour                       // 출처 데이터가 끝내 안 들어와도 이 시간이 지나면 보류 해제
+	vsQuietTail    = time.Hour                            // 재분석 요청 뒤 늦게 오는 알림까지 보류
 	dtHiddenSecret = "HiddenDecryptedPropertyPlaceholder" // DT 가 비밀값 대신 돌려주는 표시
 )
 
-// 재분석 시점: DT 가 OSV 생태계를 내려받는 데 수 분~수십 분 걸린다.
-var vsReanalyzeAfter = []time.Duration{20 * time.Minute, 2 * time.Hour}
+// DT 는 설정을 바꿔도 바로 내려받지 않고 정기 작업(OSV·GitHub 미러, 기본 24시간 주기)에서 받는다.
+// 그래서 시간이 아니라 출처별 취약점 수가 늘고 안정되면(= 내려받기 완료) 재분석한다.
+var vsWatchEvery = 10 * time.Minute
 
 type vulnSources struct {
 	OSV            []string `json:"osv"`
@@ -35,6 +37,7 @@ type vulnSources struct {
 	GitHub         bool     `json:"github"`
 	GitHubTokenSet bool     `json:"githubTokenSet"`
 	QuietUntil     string   `json:"quietUntil"`
+	Waiting        []string `json:"waiting"` // 내려받기를 기다리는 출처
 }
 
 func (s *Server) dtConfig(call func(string, string, string) (int, []byte, error)) (map[string]string, error) {
@@ -91,9 +94,15 @@ func (s *Server) apiVulnSources(w http.ResponseWriter, r *http.Request) {
 	tok := cfg[vsGitHubToken]
 	s.notify.mu.Lock()
 	quiet := s.notify.st.QuietUntil
+	waiting := []string{}
+	if rb := s.notify.st.Rebase; rb != nil {
+		for src := range rb.Start {
+			waiting = append(waiting, src)
+		}
+	}
 	s.notify.mu.Unlock()
 	writeJSON(w, 200, vulnSources{OSV: splitEco(cfg[vsOSV]), Ecosystems: clean, GitHub: cfg[vsGitHub] == "true",
-		GitHubTokenSet: tok != "" && tok != "null", QuietUntil: quiet})
+		GitHubTokenSet: tok != "" && tok != "null", QuietUntil: quiet, Waiting: waiting})
 }
 
 // PUT /api/vulnsources {osv:[...], github:bool, githubToken?:string}
@@ -155,8 +164,14 @@ func (s *Server) apiVulnSourcesPut(w http.ResponseWriter, r *http.Request) {
 	}
 	quiet := ""
 	if added {
-		quiet = s.notifyQuiet(vsQuietAfter)
-		go s.scheduleReanalyze()
+		srcs := []string{}
+		if in.GitHub && cfg[vsGitHub] != "true" {
+			srcs = append(srcs, "GITHUB")
+		}
+		if len(in.OSV) > len(cur) || !sameSet(in.OSV, cur) {
+			srcs = append(srcs, "OSV")
+		}
+		quiet = s.startRebase(srcs)
 	}
 	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "vuln-sources", Status: "updated",
 		Detail: map[string]any{"osv": in.OSV, "github": in.GitHub, "changed": changed, "quietUntil": quiet}})
@@ -169,23 +184,102 @@ func (s *Server) apiVulnReanalyze(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"status": "ok", "requested": n, "failed": failed})
 }
 
-// notifyQuiet: 지금부터 d 동안 DT 새 취약점 알림을 통보하지 않고 기준선으로만 기록.
-func (s *Server) notifyQuiet(d time.Duration) string {
-	until := time.Now().Add(d).UTC().Format(time.RFC3339)
-	s.notify.mu.Lock()
-	s.notify.st.QuietUntil = until
-	s.notify.saveLocked()
-	s.notify.mu.Unlock()
+func sameSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, x := range a {
+		if !contains(b, x) {
+			return false
+		}
+	}
+	return true
+}
+
+// startRebase: 통보 보류를 걸고(최대 vsQuietMax, 이 시각 전부터 감시하던 버전만) 출처별 취약점 수를 기록한 뒤 감시 시작.
+func (s *Server) startRebase(srcs []string) string {
+	now := time.Now().UTC()
+	rb := &rebaseState{Since: now.Format(time.RFC3339), Start: map[string]int{}, Last: map[string]int{}}
+	for _, src := range srcs {
+		c, _ := s.dtSourceCount(src)
+		rb.Start[src], rb.Last[src] = c, c
+	}
+	until := now.Add(vsQuietMax).Format(time.RFC3339)
+	n := s.notify
+	n.mu.Lock()
+	running := n.st.Rebase != nil
+	n.st.Rebase = rb
+	n.st.QuietSince = rb.Since
+	n.st.QuietUntil = until
+	n.saveLocked()
+	n.mu.Unlock()
+	if !running {
+		go s.watchRebase()
+	}
 	return until
 }
 
-func (s *Server) scheduleReanalyze() {
-	start := time.Now()
-	for _, d := range vsReanalyzeAfter {
-		time.Sleep(time.Until(start.Add(d)))
-		n, failed := s.reanalyzeTracked()
-		log.Printf("취약점 DB 변경 후 재분석: 요청 %d건, 실패 %d건", n, failed)
+// watchRebase: 새 출처의 취약점 수가 늘고 두 번 연속 같으면(내려받기 완료) 재분석 → 1시간 뒤 보류 해제.
+func (s *Server) watchRebase() {
+	n := s.notify
+	for {
+		n.mu.Lock()
+		rb := n.st.Rebase
+		until, _ := time.Parse(time.RFC3339, n.st.QuietUntil)
+		n.mu.Unlock()
+		if rb == nil {
+			return
+		}
+		if time.Now().After(until) {
+			log.Printf("취약점 DB 변경: 내려받기 완료를 확인하지 못한 채 보류 기한 경과 — 보류 해제")
+			n.mu.Lock()
+			n.st.Rebase = nil
+			n.saveLocked()
+			n.mu.Unlock()
+			return
+		}
+		ready := true
+		cur := map[string]int{}
+		for src, start := range rb.Start {
+			c, err := s.dtSourceCount(src)
+			cur[src] = c
+			if err != nil || c <= start || c != rb.Last[src] {
+				ready = false
+			}
+		}
+		n.mu.Lock()
+		if n.st.Rebase != nil {
+			n.st.Rebase.Last = cur
+		}
+		n.saveLocked()
+		n.mu.Unlock()
+		if ready {
+			req, failed := s.reanalyzeTracked()
+			log.Printf("취약점 DB 변경: 새 출처 내려받기 완료(%v) → 재분석 요청 %d건, 실패 %d건, %s 뒤 보류 해제", cur, req, failed, vsQuietTail)
+			n.mu.Lock()
+			n.st.Rebase = nil
+			n.st.QuietUntil = time.Now().Add(vsQuietTail).UTC().Format(time.RFC3339)
+			n.saveLocked()
+			n.mu.Unlock()
+			return
+		}
+		time.Sleep(vsWatchEvery)
 	}
+}
+
+// dtSourceCount: DT 에 들어 있는 출처별 취약점 수(OSV, GITHUB, NVD …).
+func (s *Server) dtSourceCount(src string) (int, error) {
+	resp, err := s.dtReq("GET", "/api/v1/vulnerability/source/"+url.PathEscape(src)+"?pageSize=1&pageNumber=1", nil)
+	if err != nil {
+		return 0, err
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return 0, fmt.Errorf("DT 취약점 수 조회 실패(%d)", resp.StatusCode)
+	}
+	var c int
+	_, err = fmt.Sscan(resp.Header.Get("X-Total-Count"), &c)
+	return c, err
 }
 
 // reanalyzeTracked: 통보 동기화가 DT 에 올린 모든 버전을 DT 에서 다시 분석시킨다.

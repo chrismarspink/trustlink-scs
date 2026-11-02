@@ -30,7 +30,7 @@ export default function VulnSources() {
       const r = await adminVulnSourcesSave({ osv, github: gh, githubToken: token || undefined });
       setToken('');
       setRes(r.quietUntil
-        ? { tone: 'warn', text: `저장했습니다. 새 DB 를 내려받은 뒤 감시 중인 모든 버전을 자동으로 다시 분석합니다(20분·2시간 뒤). 기존 버전에서 새로 잡히는 취약점은 ${fmt(r.quietUntil)}까지 통보하지 않고 기준선으로만 기록합니다.` }
+        ? { tone: 'warn', text: '저장했습니다. Dependency-Track 이 다음 정기 작업(하루 1회)에서 새 DB 를 내려받으면, 감시 중인 모든 버전을 자동으로 다시 분석합니다. 그때까지 기존 버전에서 새로 잡히는 취약점은 통보하지 않고 기준선으로만 기록합니다(새로 올리는 버전은 정상 통보).' }
         : { tone: 'ok', text: '저장했습니다.' });
       load();
     } catch (e) {
@@ -83,8 +83,12 @@ export default function VulnSources() {
             <Input type="password" className="max-w-sm" placeholder={vs.githubTokenSet ? '토큰 등록됨 — 바꿀 때만 입력' : 'GitHub 토큰(공개 저장소 읽기 권한)'}
               value={token} onChange={(e) => setToken(e.target.value)} />
           </div>
-          {vs.quietUntil && new Date(vs.quietUntil) > new Date() && (
-            <p className="text-xs text-amber-700">통보 보류 중: {fmt(vs.quietUntil)}까지 기존 버전의 새 취약점은 기준선으로만 기록합니다.</p>
+          {vs.waiting.length > 0 ? (
+            <p className="text-xs text-amber-700">
+              {vs.waiting.join('·')} 내려받기 대기 중 — 완료되면 자동 재분석 후 통보 보류를 풉니다(늦어도 {fmt(vs.quietUntil)}).
+            </p>
+          ) : vs.quietUntil && new Date(vs.quietUntil) > new Date() && (
+            <p className="text-xs text-amber-700">재분석 중 — {fmt(vs.quietUntil)}까지 기존 버전의 새 취약점은 기준선으로만 기록합니다.</p>
           )}
           <div className="flex gap-2 border-t pt-4">
             <Button onClick={save} disabled={busy || !dirty}>{busy ? '처리 중…' : '저장'}</Button>
