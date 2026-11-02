@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -103,5 +104,42 @@ func TestLatestSBOM(t *testing.T) {
 	}
 	if got := latestSBOM(refs); got != "new" {
 		t.Errorf("got %s", got)
+	}
+}
+
+func TestNotifyQuietUntil(t *testing.T) {
+	s := testNotifyServer(t)
+	s.notifyQuiet(time.Hour)
+	s.queueVulnNotice(dtVuln("CVE-Q1", "high", "innopouch", "7.0"))
+	s.flushBatches(true)
+	if len(s.notify.st.Notices) != 0 {
+		t.Fatal("통보 보류 기간에는 통보하지 않아야 함")
+	}
+	s.notify.st.QuietUntil = time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
+	s.queueVulnNotice(dtVuln("CVE-Q2", "high", "innopouch", "7.0"))
+	s.flushBatches(true)
+	if len(s.notify.st.Notices) != 1 {
+		t.Fatal("보류 기간이 지나면 통보해야 함")
+	}
+}
+
+func TestSplitEco(t *testing.T) {
+	if got := splitEco(" npm; Maven;;PyPI "); strings.Join(got, ",") != "npm,Maven,PyPI" {
+		t.Errorf("got %v", got)
+	}
+	if got := splitEco(""); len(got) != 0 {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestNotifyBodyCapped(t *testing.T) {
+	s := testNotifyServer(t)
+	for i := 0; i < 45; i++ {
+		s.queueVulnNotice(dtVuln(fmt.Sprintf("CVE-C%02d", i), "low", "innopouch", "7.0"))
+	}
+	s.flushBatches(true)
+	n := s.notify.st.Notices[0]
+	if !strings.Contains(n.Title, "45건") || !strings.Contains(n.Body, "- 외 15건") || strings.Count(n.Body, "\n- CVE-") != 30 {
+		t.Errorf("title=%q body=\n%s", n.Title, n.Body)
 	}
 }

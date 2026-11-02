@@ -55,6 +55,7 @@ type notifyState struct {
 	Initialized bool              `json:"initialized"`
 	LastSync    string            `json:"lastSync"`
 	LastSyncMsg string            `json:"lastSyncMsg"`
+	QuietUntil  string            `json:"quietUntil,omitempty"` // 취약점 DB 변경 직후 통보 보류 기한(RFC3339)
 }
 
 type vulnInfo struct {
@@ -281,6 +282,9 @@ func (s *Server) queueVulnNotice(in dtNotification) {
 		if t, err := time.Parse(time.RFC3339, n.st.Baseline[key]); err == nil && time.Since(t) < notifyBaselineQuiet {
 			continue // 기준선 적재 직후의 기존 취약점
 		}
+		if t, err := time.Parse(time.RFC3339, n.st.QuietUntil); err == nil && time.Now().Before(t) {
+			continue // 취약점 DB 를 바꾼 직후 — 기존 취약점이 새로 잡힌 것
+		}
 		b := n.pending[key]
 		if b == nil {
 			b = &notifyBatch{repo: repo, tag: p.Version, first: time.Now()}
@@ -333,7 +337,12 @@ func (s *Server) sendVulnNotice(b *notifyBatch) {
 	var body strings.Builder
 	fmt.Fprintf(&body, "%s:%s 의 SBOM 에서 새 취약점 %d건이 발견되었습니다(%s).\n", b.repo, b.tag, len(b.vulns), strings.Join(sum, ", "))
 	body.WriteString("영향 여부를 판단해 VEX 를 발행해 주세요. 고객에게는 VEX 발행 시점에 판단 결과가 통보됩니다.\n\n")
-	for _, v := range b.vulns {
+	const maxLines = 30 // 메일·화면 본문에 싣는 최대 항목(심각도순). 나머지는 판단 화면에서
+	for i, v := range b.vulns {
+		if i == maxLines {
+			fmt.Fprintf(&body, "- 외 %d건\n", len(b.vulns)-maxLines)
+			break
+		}
 		cvss := ""
 		if v.CVSS > 0 {
 			cvss = fmt.Sprintf(" · CVSS %.1f", v.CVSS)
@@ -559,7 +568,7 @@ func (s *Server) apiNotifyLog(w http.ResponseWriter, r *http.Request) {
 		nt.Read = nil
 		items = append(items, nt)
 	}
-	writeJSON(w, 200, map[string]any{"items": items, "lastSync": n.st.LastSync, "lastSyncMsg": n.st.LastSyncMsg,
+	writeJSON(w, 200, map[string]any{"items": items, "lastSync": n.st.LastSync, "lastSyncMsg": n.st.LastSyncMsg, "quietUntil": n.st.QuietUntil,
 		"tracked": len(n.st.SBOM), "pending": len(n.pending), "initialized": n.st.Initialized})
 }
 

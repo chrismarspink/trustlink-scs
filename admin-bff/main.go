@@ -283,7 +283,10 @@ func main() {
 	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead)) // 읽음 표시
 	mux.HandleFunc("GET /api/notify/log", s.guard(s.apiNotifyLog))                         // 전체 통보 기록
 	mux.HandleFunc("POST /api/notify/sync", s.guard(s.apiNotifySync))                      // 지금 동기화
-	mux.HandleFunc("GET /api/repos", s.guardSession(s.apiRepos))                           // 제품 열람: 로그인 사용자(그룹 read 는 zot RBAC 이 최종 판정)
+	mux.HandleFunc("GET /api/vulnsources", s.guard(s.apiVulnSources))                      // 취약점 DB(OSV·GitHub) 설정
+	mux.HandleFunc("PUT /api/vulnsources", s.guard(s.apiVulnSourcesPut))
+	mux.HandleFunc("POST /api/vulnsources/reanalyze", s.guard(s.apiVulnReanalyze))
+	mux.HandleFunc("GET /api/repos", s.guardSession(s.apiRepos)) // 제품 열람: 로그인 사용자(그룹 read 는 zot RBAC 이 최종 판정)
 	mux.HandleFunc("POST /api/registry/delete-tag", s.guard(s.apiDeleteTag))
 	mux.HandleFunc("GET /api/retention", s.guard(s.apiRetention))
 	mux.HandleFunc("GET /api/acl", s.guard(s.apiACL))

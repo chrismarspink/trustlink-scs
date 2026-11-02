@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { adminStorage, adminStoragePreview, type StorageInfo, type StoragePreview } from '@/lib/api';
 import { Button, Input } from '@/components/ui/primitives';
 import { PageTitle, SectionTitle, StatCard, Loading, Alert } from './_ui';
+import VulnSources from './VulnSources';
 
 export default function Storage() {
   const [info, setInfo] = useState<StorageInfo | null>(null);
@@ -34,7 +35,9 @@ export default function Storage() {
 
   return (
     <>
-      <PageTitle>설정 · 오브젝트 스토리지 (확장용)</PageTitle>
+      <PageTitle>설정</PageTitle>
+      <VulnSources />
+      <SectionTitle>오브젝트 스토리지 (확장용)</SectionTitle>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="현재 드라이버" value={<span className="text-base">{info.driver || '-'}</span>} />
         <StatCard label="루트" value={<span className="break-all text-sm font-mono">{info.rootDirectory || '-'}</span>} />
