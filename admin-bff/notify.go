@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	notifyBaselineQuiet = time.Hour        // 기준선 적재 후 이 시간 안의 DT 알림은 통보하지 않음
-	notifyBatchWait     = 90 * time.Second // 같은 제품·버전 알림을 모으는 시간
-	notifyKeep          = 2000             // 보관할 통보 수
+	notifyBaselineQuiet = time.Hour       // 기준선 적재 후 이 시간 안의 DT 알림은 통보하지 않음
+	notifyBatchWait     = 5 * time.Minute // 같은 제품·버전 알림을 모으는 시간(DT 는 한 버전의 CVE 를 수 분에 걸쳐 알림)
+	notifyKeep          = 2000            // 보관할 통보 수
 )
 
 type Notice struct {
