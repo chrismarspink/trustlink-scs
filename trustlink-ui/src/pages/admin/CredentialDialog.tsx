@@ -6,7 +6,7 @@ import { Alert } from './_ui';
 
 // 자격 전달 창: 관리자가 담당자에게 넘길 계정·비밀번호와 안내문을 1회 표시한다.
 //   kind=user → 개인(Keycloak) 계정 임시 비밀번호 / kind=ci → 공용 업로드 계정
-//   kind=robot → 기계 계정(push=업로드 ci-*, pull=다운로드 robot-*) oras 비밀값
+//   kind=robot → 자동화 계정(push=업로드 ci-*, pull=다운로드 robot-*) oras 비밀값
 export type CredentialInfo = {
   kind: 'user' | 'ci' | 'robot'; username: string; password: string; group?: string;
   robotKind?: 'push' | 'pull'; products?: string[]; expires?: string;
@@ -71,7 +71,7 @@ function notice(c: CredentialInfo): string {
     const push = c.robotKind === 'push';
     const ref = `${reg}/${c.products?.[0] || 'products/<제품>'}`;
     return [
-      push ? '[TrustLink 업로드용 기계 계정 안내]' : '[TrustLink 자동 다운로드 계정 안내]',
+      push ? '[TrustLink 업로드용 자동화 계정 안내]' : '[TrustLink 다운로드용 자동화 계정 안내]',
       `레지스트리: ${reg}${plainHttp && ' (oras 명령에 --plain-http 필요)'}`,
       `계정: ${c.username}`,
       `토큰: ${c.password}`,
@@ -114,7 +114,7 @@ export default function CredentialDialog({ cred, onClose }: { cred: CredentialIn
         <div className="mb-4 flex items-center gap-2">
           <KeyRound size={18} className="text-accent" />
           <h2 className="text-base font-semibold">
-            {cred.kind === 'ci' ? '업로드(CI) 계정 전달' : cred.kind === 'robot' ? '기계 계정 전달' : '임시 비밀번호 전달'}
+            {cred.kind === 'ci' ? '업로드(CI) 계정 전달' : cred.kind === 'robot' ? '자동화 계정 전달' : '임시 비밀번호 전달'}
           </h2>
           <button className="ml-auto text-muted-foreground hover:text-foreground" onClick={onClose} aria-label="닫기"><X size={18} /></button>
         </div>

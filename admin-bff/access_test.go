@@ -112,7 +112,7 @@ func TestAccessPolicyRenderAndEvaluate(t *testing.T) {
 		}
 	}
 
-	// 렌더 결과: zot 설정에 제품 정책, htpasswd 에 유효한 기계 계정만
+	// 렌더 결과: zot 설정에 제품 정책, htpasswd 에 유효한 자동화 계정만
 	cfgB, _ := os.ReadFile(filepath.Join(m.outDir, "config.json"))
 	var cfg map[string]any
 	if err := json.Unmarshal(cfgB, &cfg); err != nil {
@@ -148,7 +148,7 @@ func TestAccessPolicyRenderAndEvaluate(t *testing.T) {
 		t.Fatal("비활성 사용자가 그룹 스냅샷으로 접근 가능")
 	}
 	if !m.allowed("robot-acme", nil, "products/npouch", "read") {
-		t.Fatal("기계 계정 권한은 유지되어야 함")
+		t.Fatal("자동화 계정 권한은 유지되어야 함")
 	}
 	activeAcme = []string{"acme1"}
 	_ = m.render()

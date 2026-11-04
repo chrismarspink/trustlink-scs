@@ -3,7 +3,7 @@
 소프트웨어 공급망 보안(SCS) 플랫폼. 제품 산출물(바이너리·문서·이미지)을 버전별로 보관하고,
 SBOM·취약점·VEX 를 산출물에 OCI referrer 로 묶어 관리·배포한다.
 
-- **사람**(브라우저) → Keycloak 단일 로그인 / **기계·CLI**(oras·docker) → ci 계정 또는 개인 API 키
+- **사람**(브라우저) → Keycloak 단일 로그인 / **자동화·CLI**(oras·docker) → ci 계정 또는 개인 API 키
 - **그룹 기반 RBAC**(admins / developers / users), 지정되지 않은 경로는 모두 거부(fail-closed)
 - **SBOM·취약점·VEX**: SBOM 첨부 → Dependency-Track 분석 → VEX 발행
 
@@ -14,7 +14,7 @@ SBOM·취약점·VEX 를 산출물에 OCI referrer 로 묶어 관리·배포한�
 
 | 서비스 | 이미지 | 역할 |
 |---|---|---|
-| `trustlink-admin` | **자체** (이 저장소 `admin-bff/` + `trustlink-ui/`) | 단일 프론트도어(:28080) — UI·관리 콘솔·BFF API, zot·Keycloak 프록시, DT 중개, 제품 권한·기계 계정을 zot 설정으로 렌더 |
+| `trustlink-admin` | **자체** (이 저장소 `admin-bff/` + `trustlink-ui/`) | 단일 프론트도어(:28080) — UI·관리 콘솔·BFF API, zot·Keycloak 프록시, DT 중개, 제품 권한·자동화 계정을 zot 설정으로 렌더 |
 | `zot` | `ghcr.io/project-zot/zot` | OCI 레지스트리(:28081 직접 pull/push), RBAC·API 키 |
 | `keycloak` + `keycloak-db` | `quay.io/keycloak/keycloak` + `postgres` | OIDC 인증, 사용자·그룹 (전용 DB) |
 | `dtrack-apiserver` + `dtrack-db` | `dependencytrack/apiserver` + `postgres` | SBOM 취약점 분석(헤드리스, 내부 전용) |

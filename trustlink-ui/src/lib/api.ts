@@ -255,7 +255,7 @@ export const adminResetProductAccess = (repo: string) =>
   aj(`/api/access/products?repo=${encodeURIComponent(repo)}`, { method: 'DELETE' });
 export const adminPrincipals = () => aj<{ groups: string[]; users: string[] }>('/api/access/principals');
 
-// 기계 계정(ci-*: 업로드, robot-*: 다운로드) — oras 로그인용 ID + 비밀값
+// 자동화 계정(ci-*: 업로드, robot-*: 다운로드) — oras 로그인용 ID + 비밀값
 export type RobotAccount = {
   name: string; kind: 'push' | 'pull'; note: string; created: string; createdBy: string;
   expires: string; valid: boolean; products: string[];

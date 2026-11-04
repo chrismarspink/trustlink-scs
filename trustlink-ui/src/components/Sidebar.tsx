@@ -33,7 +33,7 @@ const ADMIN: Item[] = [
   { to: '/admin/users', label: '사용자', icon: Users },
   { to: '/admin/orgs', label: '고객사', icon: Building2 },
   { to: '/admin/access', label: '제품 권한', icon: ShieldCheck },
-  { to: '/admin/robots', label: '기계 계정', icon: Bot },
+  { to: '/admin/robots', label: '자동화 계정', icon: Bot },
   { to: '/admin/notify', label: '통보', icon: Bell },
   { to: '/admin/capacity', label: '용량', icon: HardDrive },
   { to: '/admin/logs', label: '로그', icon: ScrollText },

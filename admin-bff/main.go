@@ -58,7 +58,7 @@ type Config struct {
 	SessionsPath    string // 로그인 세션 영속 파일 경로 (재시작/재배포 시 세션 유지)
 	ZotTemplate     string // zot 설정 템플릿(설정 시 접근 정책 관리 모드 — access.go)
 	ZotManagedDir   string // 렌더된 zot 설정·htpasswd 를 쓰는 디렉터리(zot 과 공유 볼륨)
-	AccessStore     string // 제품 권한·기계 계정 저장 파일
+	AccessStore     string // 제품 권한·자동화 계정 저장 파일
 	ZotOIDCSecret   string // zot OIDC 클라이언트 시크릿(oidc-credentials.json 렌더용)
 }
 
@@ -220,7 +220,7 @@ type Server struct {
 	notify *notifier      // 보안 이슈 통보(notify.go)
 	oidc   *oidcVerifier  // OIDC 액세스 토큰 서명/클레임 검증기
 	dtKey  atomic.Value   // DT API 키(string) — initDTKey 가 설정
-	access *accessManager // 제품 권한·기계 계정(관리 모드일 때만)
+	access *accessManager // 제품 권한·자동화 계정(관리 모드일 때만)
 }
 
 // stateData: OIDC state 에 만료시각과 로그인 후 복귀 경로를 함께 보관.
@@ -270,7 +270,7 @@ func main() {
 	mux.HandleFunc("PUT /api/access/products", s.guard(s.apiAccessProductPut))
 	mux.HandleFunc("DELETE /api/access/products", s.guard(s.apiAccessProductDelete))
 	mux.HandleFunc("GET /api/access/principals", s.guard(s.apiAccessPrincipals))
-	mux.HandleFunc("GET /api/robots", s.guard(s.apiRobots)) // 기계 계정(ci-*, robot-*)
+	mux.HandleFunc("GET /api/robots", s.guard(s.apiRobots)) // 자동화 계정(ci-*, robot-*)
 	mux.HandleFunc("POST /api/robots", s.guard(s.apiRobotCreate))
 	mux.HandleFunc("POST /api/robots/{name}/reissue", s.guard(s.apiRobotReissue))
 	mux.HandleFunc("DELETE /api/robots/{name}", s.guard(s.apiRobotDelete))
@@ -660,7 +660,7 @@ func (s *Server) apiCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if reservedUserPrefix.MatchString(in.Username) {
-		writeJSON(w, 400, map[string]string{"error": "ci-·robot-·svc- 로 시작하는 이름은 기계 계정 전용입니다"})
+		writeJSON(w, 400, map[string]string{"error": "ci-·robot-·svc- 로 시작하는 이름은 자동화 계정 전용입니다"})
 		return
 	}
 	groups, err := userGroupsFor(in.Role, in.Orgs)

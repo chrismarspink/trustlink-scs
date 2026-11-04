@@ -30,6 +30,11 @@ echo "[2/4] BFF 빌드"
 
 echo "[3/4] docker compose up -d"
 "${SSH[@]}" "cd ~/$RDIR && docker compose up -d --wait --wait-timeout 300 2>&1 | grep -iE 'error|unhealthy' || true; docker compose ps --format '  {{.Service}}\t{{.Status}}'"
+# zot 은 설정 파일을 hot reload 하지만 OIDC(issuer·리다이렉트 주소)는 재시작해야 바뀐다 → 공개 주소가 바뀐 배포에서만 재시작(~10초)
+"${SSH[@]}" "cd ~/$RDIR && set -a && . ./.env && set +a
+  U=\${PUBLIC_URL:-http://\$FRONT_HOST:\$FRONT_PORT}
+  if [ \"\$(cat .deploy-public-url 2>/dev/null)\" != \"\$U\" ]; then
+    echo \"  공개 주소 \$U → zot 재시작\"; docker compose restart zot >/dev/null && echo \"\$U\" > .deploy-public-url; fi"
 
 echo "[4/4] 컨테이너 → OIDC issuer 도달 확인 (zot 로그인 전제)"
 "${SSH[@]}" "cd ~/$RDIR && set -a && . ./.env && set +a

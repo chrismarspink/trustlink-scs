@@ -7,7 +7,7 @@
 #   - 오픈소스 모듈(zot·Keycloak·Dependency-Track·PostgreSQL·httpd)은 공식 이미지를 무수정으로 쓴다.
 #     TrustLink 가 아는 것은 이미지 주소(.env)와 아래에 내장한 설정뿐이다.
 #   - 자체 이미지는 trustlink-admin(BFF+UI) 하나.
-#   - 제품별 읽기/쓰기 권한·기계 계정은 관리 콘솔에서 관리한다. BFF 가 아래 zot 설정 템플릿에 그 정책을
+#   - 제품별 읽기/쓰기 권한·자동화 계정은 관리 콘솔에서 관리한다. BFF 가 아래 zot 설정 템플릿에 그 정책을
 #     더해 zot 설정 파일·htpasswd 를 만들고(zot-managed 볼륨), zot 이 재시작 없이 반영·판정한다.
 #   - 데이터는 모두 named volume → 컨테이너·이미지를 바꿔도 계정·아티팩트·분석 결과 유지.
 #     (kc-db: Keycloak 계정/realm, tl-data: 아티팩트, dtrack-*: 취약점 DB, tl-sor: 세션·감사·DT 키)
@@ -120,7 +120,7 @@ services:
       CONFIG_FILE: /etc/zot-managed/config.json            # 렌더 결과(권한 매트릭스·스토리지 화면)
       ZOT_CONFIG_TEMPLATE: /etc/trustlink/zot-config.json  # 아래 configs.zot-config (원본)
       ZOT_MANAGED_DIR: /etc/zot-managed
-      ACCESS_STORE: /var/lib/trustlink/access-policy.json  # 제품 권한·기계 계정
+      ACCESS_STORE: /var/lib/trustlink/access-policy.json  # 제품 권한·자동화 계정
       ZOT_OIDC_CLIENT_SECRET: ${ZOT_OIDC_CLIENT_SECRET:?ZOT_OIDC_CLIENT_SECRET}
       DT_BASE_URL: http://dtrack-apiserver:8080
       DT_API_KEY: ${DT_API_KEY:-}                  # 비우면 BFF 가 DT_ADMIN_PASSWORD 로 자동 발급·보관

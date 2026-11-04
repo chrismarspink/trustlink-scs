@@ -4,6 +4,7 @@ zot/htpasswd
 zot/oidc-credentials.json
 stepca/ca-password
 scripts/deploy-remote.local
+.deploy-public-url
 # CA 인스턴스 material (배포 시 step-ca 가 생성 — 호스트로 추출되는 사본)
 stepca/*.crt
 stepca/*.key

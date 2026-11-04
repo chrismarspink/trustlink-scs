@@ -19,7 +19,7 @@ function principalLabel(p: Principal): string {
     if (p.name.startsWith(ORG_PREFIX)) return `고객사 ${p.name.slice(ORG_PREFIX.length)}`;
     return p.name;
   }
-  return p.name === 'ci' ? 'ci (공용)' : `기계 ${p.name}`;
+  return p.name === 'ci' ? 'ci (공용)' : `자동화 ${p.name}`;
 }
 
 function Chips({ list, onRemove, tone }: { list: Principal[]; onRemove: (p: Principal) => void; tone: 'muted' | 'success' }) {

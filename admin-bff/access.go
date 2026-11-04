@@ -1,11 +1,11 @@
 package main
 
-// 접근 정책: 제품별 읽기/쓰기 권한 + 기계 계정(ci-*, robot-*).
+// 접근 정책: 제품별 읽기/쓰기 권한 + 자동화 계정(ci-*, robot-*).
 //   - 판정은 zot 기본 기능(accessControl)이 한다. TrustLink 는 관리 화면에서 받은 정책을
 //     zot 설정 파일과 htpasswd 로 "렌더링"만 한다(zot 은 두 파일 변경을 재시작 없이 반영).
 //   - 저장: tl-sor 볼륨의 access-policy.json
 //   - 렌더: compose 템플릿(zot 설정 원본) + 제품 정책 → ZOT_MANAGED_DIR/config.json
-//           ci·svc-bff(.env) + 유효한 기계 계정 → ZOT_MANAGED_DIR/htpasswd
+//           ci·svc-bff(.env) + 유효한 자동화 계정 → ZOT_MANAGED_DIR/htpasswd
 //   - 웹 경로는 BFF 가 svc-bff 로 대리 조회하므로, 같은 설정으로 canRead/canWrite 를 판정해
 //     zot 과 동일한 규칙을 강제한다.
 //   - 그룹은 렌더 시 "현재 활성 구성원 이름"으로 풀어 쓴다. zot 은 API 키·세션에 마지막 로그인 때의
@@ -61,7 +61,7 @@ var (
 	reRobotName = regexp.MustCompile(`^(ci|robot)-[a-z0-9][a-z0-9-]{1,38}$`)
 	reOrgName   = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,30}$`)
 	reRepo      = regexp.MustCompile(`^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*$`)
-	// 기계 계정과 이름이 겹치는 사람 계정 금지(zot 에서는 같은 사용자로 취급되므로)
+	// 자동화 계정과 이름이 겹치는 사람 계정 금지(zot 에서는 같은 사용자로 취급되므로)
 	reservedUserPrefix = regexp.MustCompile(`^(ci|robot|svc)(-|$)`)
 )
 
@@ -441,7 +441,7 @@ func (s *Server) initAccess() error {
 		return err
 	}
 	s.access = m
-	go func() { // 만료된 기계 계정 제외 + Keycloak 콘솔에서 바뀐 구성원 반영
+	go func() { // 만료된 자동화 계정 제외 + Keycloak 콘솔에서 바뀐 구성원 반영
 		for range time.Tick(2 * time.Minute) {
 			if err := m.render(); err != nil {
 				log.Printf("zot 설정 렌더 실패: %v", err)
@@ -590,7 +590,7 @@ func validPrincipals(ps []Principal) error {
 			}
 		case "user":
 			if x.Name != "ci" && !reRobotName.MatchString(x.Name) {
-				return fmt.Errorf("기계 계정만 지정 가능: %s", x.Name)
+				return fmt.Errorf("자동화 계정만 지정 가능: %s", x.Name)
 			}
 		default:
 			return fmt.Errorf("principal type 은 group|user")
@@ -656,7 +656,7 @@ func (s *Server) apiAccessProductDelete(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, 200, map[string]string{"repo": repo})
 }
 
-// GET /api/access/principals — 권한 대상 후보(역할·조직 그룹, 기계 계정)
+// GET /api/access/principals — 권한 대상 후보(역할·조직 그룹, 자동화 계정)
 func (s *Server) apiAccessPrincipals(w http.ResponseWriter, r *http.Request) {
 	groups := []string{}
 	if gs, err := s.listGroups(); err == nil {
@@ -676,7 +676,7 @@ func (s *Server) apiAccessPrincipals(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"groups": groups, "users": users})
 }
 
-// ---------- API: 기계 계정 ----------
+// ---------- API: 자동화 계정 ----------
 
 type robotView struct {
 	Name      string   `json:"name"`
@@ -760,7 +760,7 @@ func (s *Server) apiRobotCreate(w http.ResponseWriter, r *http.Request) {
 	err = s.access.update(func(p *AccessPolicy) error {
 		for _, x := range p.Robots {
 			if x.Name == in.Name {
-				return fmt.Errorf("이미 있는 기계 계정: %s", in.Name)
+				return fmt.Errorf("이미 있는 자동화 계정: %s", in.Name)
 			}
 		}
 		p.Robots = append(p.Robots, rb)
@@ -820,7 +820,7 @@ func (s *Server) apiRobotReissue(w http.ResponseWriter, r *http.Request) {
 				return nil
 			}
 		}
-		return fmt.Errorf("기계 계정 없음: %s", name)
+		return fmt.Errorf("자동화 계정 없음: %s", name)
 	})
 	if err != nil {
 		writeJSON(w, 404, map[string]string{"error": err.Error()})

@@ -3,7 +3,7 @@
 #
 #   1) 고객사 acme + 고객 계정(acme1·acme2) 소속 지정
 #   2) 제품 권한 products/innopouch: 쓰기=개발자·ci-innopouch, 읽기=고객사 acme·robot-acme
-#   3) 기계 계정 ci-innopouch(업로드)·robot-acme(다운로드) 발급(있으면 재발급), 개발자 dev1 의 개인 API 키 발급
+#   3) 자동화 계정 ci-innopouch(업로드)·robot-acme(다운로드) 발급(있으면 재발급), 개발자 dev1 의 개인 API 키 발급
 #   4) ci-innopouch 로 버전별 업로드 + SBOM·매뉴얼 referrer 첨부
 #   5) 버전별 SBOM → Dependency-Track 분석 → VEX 발행(대시보드 통계)
 #   6) $OUT/credentials.env · upload.sh · download.sh 생성(바로 실행 가능)
@@ -43,7 +43,7 @@ for u in $CUSTOMERS; do
   echo "  - $u → 외부 사용자, 고객사 $ORG"
 done
 
-echo "[2] 기계 계정 (있으면 재발급)"
+echo "[2] 자동화 계정 (있으면 재발급)"
 ROBOTS=$(api "$BFF/api/robots")
 issue() { # $1 name $2 kind
   if printf '%s' "$ROBOTS" | jget "any(r['name']=='$1' for r in d)" | grep -q True; then
@@ -108,10 +108,10 @@ cat > "$OUT/credentials.env" <<EOF
 # innoPouch 시연 자격 — 외부 공유 금지
 TL_REG=$REG
 TL_REPO=$REPO
-# 업로드(빌드 서버용 기계 계정)
+# 업로드(빌드 서버용 자동화 계정)
 TL_PUSH_USER=ci-innopouch
 TL_PUSH_PASS=$CI_PASS
-# 다운로드(고객 $ORG 자동 다운로드용 기계 계정)
+# 다운로드(고객 $ORG 자동 다운로드용 자동화 계정)
 TL_PULL_USER=$PULL_USER
 TL_PULL_PASS=$PULL_PASS
 # 개발자 개인 API 키(${DEV}) — 업로드·다운로드

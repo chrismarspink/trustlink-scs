@@ -79,7 +79,7 @@ export default function ApiKeys() {
       <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold"><KeyRound size={22} /> 내 API 키</h1>
       <p className="mb-5 text-sm text-muted-foreground">
         oras(명령줄)로 업로드·다운로드할 때 비밀번호 대신 쓰는 개인 토큰입니다. 웹 로그인 비밀번호로는 oras 에 로그인할 수 없습니다.
-        권한은 내 계정 권한과 같고, 계정이 비활성화되면 키도 즉시 막힙니다. 서버·CI 자동화에는 관리자에게 기계 계정을 요청하세요.
+        권한은 내 계정 권한과 같고, 계정이 비활성화되면 키도 즉시 막힙니다. 서버·CI 자동화에는 관리자에게 자동화 계정을 요청하세요.
       </p>
 
       <Card className="mb-5 p-4">

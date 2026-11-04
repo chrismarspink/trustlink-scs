@@ -7,7 +7,7 @@ import { Button, Input, Badge } from '@/components/ui/primitives';
 import { PageTitle, SectionTitle, Loading, Alert, Table, Th, Td, selectCls } from './_ui';
 import CredentialDialog, { type CredentialInfo } from './CredentialDialog';
 
-// 기계 계정: 사람이 아닌 시스템이 oras 로 접속할 때 쓰는 ID + 비밀값.
+// 자동화 계정: 사람이 아닌 시스템이 oras 로 접속할 때 쓰는 ID + 비밀값.
 //   업로드용(ci-…)  = 빌드 서버 → 지정 제품에 쓰기
 //   다운로드용(robot-…) = 고객사 시스템 → 지정 제품 읽기
 const KIND = {
@@ -76,12 +76,12 @@ export default function Robots() {
     }
   }
 
-  if (err) return (<><PageTitle>기계 계정</PageTitle><Alert tone="crit">오류: {err}</Alert></>);
-  if (!list) return (<><PageTitle>기계 계정</PageTitle><Loading /></>);
+  if (err) return (<><PageTitle>자동화 계정</PageTitle><Alert tone="crit">오류: {err}</Alert></>);
+  if (!list) return (<><PageTitle>자동화 계정</PageTitle><Loading /></>);
 
   return (
     <>
-      <PageTitle>기계 계정</PageTitle>
+      <PageTitle>자동화 계정</PageTitle>
       {cred && <CredentialDialog cred={cred} onClose={() => setCred(null)} />}
       <p className="mb-4 text-sm text-muted-foreground">
         사람이 아닌 시스템이 oras 로 접속할 때 쓰는 계정입니다. 인증 토큰은 발급·재발급 때 한 번만 표시되며, 만료일이 지나면 자동으로 로그인이 차단됩니다.
@@ -150,7 +150,7 @@ export default function Robots() {
               </Td>
             </tr>
           ))}
-          {list.length === 0 && <tr><Td className="text-muted-foreground">발급된 기계 계정 없음</Td><Td> </Td><Td> </Td><Td> </Td><Td> </Td><Td> </Td></tr>}
+          {list.length === 0 && <tr><Td className="text-muted-foreground">발급된 자동화 계정 없음</Td><Td> </Td><Td> </Td><Td> </Td><Td> </Td><Td> </Td></tr>}
         </tbody>
       </Table>
     </>
