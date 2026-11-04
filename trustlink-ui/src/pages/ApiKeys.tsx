@@ -1,3 +1,4 @@
+import { registry, plainHttp } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { KeyRound, Plus, Trash2, Copy, Check } from 'lucide-react';
 import { listApiKeys, createApiKey, deleteApiKey, getSession, type ApiKey } from '@/lib/api';
@@ -70,8 +71,8 @@ export default function ApiKeys() {
     }
   }
 
-  const reg = `${window.location.hostname}:28081`;
-  const loginCmd = `printf '%s' '<API 키>' | oras login ${reg} -u ${user} --password-stdin --plain-http`;
+  const reg = registry;
+  const loginCmd = `printf '%s' '<API 키>' | oras login ${reg} -u ${user} --password-stdin${plainHttp}`;
 
   return (
     <div className="mx-auto max-w-4xl">

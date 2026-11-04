@@ -1,3 +1,4 @@
+import { registry, plainHttp } from '@/lib/utils';
 import { useState } from 'react';
 import { Copy, Check, KeyRound, X } from 'lucide-react';
 import { Button } from '@/components/ui/primitives';
@@ -51,17 +52,17 @@ function Field({ label, value }: { label: string; value: string }) {
 
 function notice(c: CredentialInfo): string {
   const web = window.location.origin;
-  const reg = `${window.location.hostname}:28081`;
+  const reg = registry;
   if (c.kind === 'ci') {
     return [
       '[TrustLink 업로드(CI) 계정 안내]',
-      `레지스트리: ${reg} (oras 명령에 --plain-http 필요)`,
+      `레지스트리: ${reg}${plainHttp && ' (oras 명령에 --plain-http 필요)'}`,
       `계정: ${c.username}`,
       `비밀번호: ${c.password}`,
       '업로드 가능 레포: products/**, innotium/** (삭제 불가)',
       '',
       '사용 예:',
-      `  printf '%s' "$TL_PASS" | oras login ${reg} -u ${c.username} --password-stdin --plain-http`,
+      `  printf '%s' "$TL_PASS" | oras login ${reg} -u ${c.username} --password-stdin${plainHttp}`,
       '',
       '※ 빌드 서버의 CI 시크릿 변수(TL_USER/TL_PASS)로만 보관하고, 스크립트·문서·메신저에 남기지 마세요.',
     ].join('\n');
@@ -71,17 +72,17 @@ function notice(c: CredentialInfo): string {
     const ref = `${reg}/${c.products?.[0] || 'products/<제품>'}`;
     return [
       push ? '[TrustLink 업로드용 기계 계정 안내]' : '[TrustLink 자동 다운로드 계정 안내]',
-      `레지스트리: ${reg} (oras 명령에 --plain-http 필요)`,
+      `레지스트리: ${reg}${plainHttp && ' (oras 명령에 --plain-http 필요)'}`,
       `계정: ${c.username}`,
       `토큰: ${c.password}`,
       `권한: ${push ? '업로드(쓰기)' : '다운로드(읽기)'} — ${(c.products || []).join(', ') || '(관리자가 제품 권한에서 지정)'}`,
       `만료: ${c.expires ? c.expires.slice(0, 10) : '없음'}`,
       '',
       '사용 예:',
-      `  printf '%s' "$TL_PASS" | oras login ${reg} -u ${c.username} --password-stdin --plain-http`,
+      `  printf '%s' "$TL_PASS" | oras login ${reg} -u ${c.username} --password-stdin${plainHttp}`,
       push
-        ? `  oras push --plain-http ${ref}:<버전> <파일>`
-        : `  oras pull --plain-http ${ref}:<버전> -o ./download`,
+        ? `  oras push${plainHttp} ${ref}:<버전> <파일>`
+        : `  oras pull${plainHttp} ${ref}:<버전> -o ./download`,
       '',
       '※ 시스템의 시크릿 변수(TL_USER/TL_PASS)로만 보관하고, 스크립트·문서·메신저에 남기지 마세요.',
     ].join('\n');
@@ -98,7 +99,7 @@ function notice(c: CredentialInfo): string {
       'oras(명령줄) 업로드·다운로드용 API 키 발급:',
       `  1) ${web} 접속 → 위 계정으로 로그인(비밀번호 변경)`,
       '  2) 왼쪽 메뉴 "내 API 키" → 용도·만료 선택 → 발급(한 번만 표시)',
-      `  3) printf '%s' "<API 키>" | oras login ${reg} -u ${c.username} --password-stdin --plain-http`,
+      `  3) printf '%s' "<API 키>" | oras login ${reg} -u ${c.username} --password-stdin${plainHttp}`,
     ],
     '',
     '※ 이 안내는 확인 후 삭제하세요.',

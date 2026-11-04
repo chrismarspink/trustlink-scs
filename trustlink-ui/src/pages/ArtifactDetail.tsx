@@ -4,7 +4,7 @@ import { ArrowLeft, ShieldCheck, ShieldAlert, ChevronsUpDown, Search, Check, Dow
 import VexPanel from './VexPanel';
 import { getImage, listTags, getReferrerContent, getPullInfo, getSession, generateSbom, type ImageDetail, type Referrer } from '@/lib/api';
 import { Card, CardContent, CardHeader, Badge, Button } from '@/components/ui/primitives';
-import { fmtBytes, cn } from '@/lib/utils';
+import { fmtBytes, cn, registry, plainHttp } from '@/lib/utils';
 
 // 검색형 태그 선택기 (버전이 많아도 필터로 빠르게 선택)
 function TagPicker({ tags, value, onChange }: { tags: string[]; value: string; onChange: (t: string) => void }) {
@@ -186,8 +186,8 @@ function CmdBox({ cmd }: { cmd: string }) {
 
 // 명령줄 다운로드 안내(oras 항상, 컨테이너 이미지면 docker 도). 웹 전체 다운로드는 상단 버튼.
 function CliCard({ repo, tag }: { repo: string; tag: string }) {
-  // 레지스트리는 웹(28080)이 아니라 zot 직접 진입점(28081). 사람 계정은 웹 비밀번호 대신 '내 API 키'로 로그인.
-  const host = `${window.location.hostname}:28081`;
+  // 레지스트리 주소는 접속 방식(https 도메인 / http :28081)에 따름. 사람 계정은 웹 비밀번호 대신 '내 API 키'로 로그인.
+  const host = registry;
   const ref = `${host}/${repo}:${tag}`;
   const [isImage, setIsImage] = useState(false);
   useEffect(() => {
@@ -202,8 +202,8 @@ function CliCard({ repo, tag }: { repo: string; tag: string }) {
         </p>
       </CardHeader>
       <CardContent className="space-y-1.5">
-        <CmdBox cmd={`printf '%s' '<API 키>' | oras login ${host} -u <내 ID> --password-stdin --plain-http`} />
-        <CmdBox cmd={`oras pull --plain-http ${ref} -o ./download`} />
+        <CmdBox cmd={`printf '%s' '<API 키>' | oras login ${host} -u <내 ID> --password-stdin${plainHttp}`} />
+        <CmdBox cmd={`oras pull${plainHttp} ${ref} -o ./download`} />
         {isImage && (
           <>
             <p className="pt-2 text-sm text-muted-foreground">

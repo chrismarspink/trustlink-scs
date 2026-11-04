@@ -12,6 +12,8 @@
 #   - 데이터는 모두 named volume → 컨테이너·이미지를 바꿔도 계정·아티팩트·분석 결과 유지.
 #     (kc-db: Keycloak 계정/realm, tl-data: 아티팩트, dtrack-*: 취약점 DB, tl-sor: 세션·감사·DT 키)
 #   - 외부 노출: ${FRONT_PORT}(웹·관리·OIDC, BFF 단일 프론트도어), 28081(레지스트리 직접 pull/push).
+#     HTTPS: 앞단 리버스 프록시(443 → ${FRONT_PORT}, /v2/ → 28081)를 두고 .env 에 PUBLIC_URL=https://<도메인>
+#     (비우면 http://${FRONT_HOST}:${FRONT_PORT}). 프록시는 X-Forwarded-Proto: https 를 넘겨야 한다.
 #   - 설정 값에 큰따옴표(")·역슬래시(\)는 쓰지 않는다(아래 JSON 에 그대로 들어감).
 
 name: trustlink
@@ -46,7 +48,7 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: "8085"
       KC_HTTP_RELATIVE_PATH: /auth
-      KC_HOSTNAME: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_HOSTNAME: ${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/auth
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     configs:
@@ -96,20 +98,17 @@ services:
   # ---------- TrustLink (자체 이미지) ----------
   trustlink-admin:
     image: ${TRUSTLINK_ADMIN_IMAGE:-jkkim7202/trustlink-admin:latest}
-    networks:
-      default:
-        aliases: ["${FRONT_HOST}"]   # 컨테이너 내부에서 ${FRONT_HOST} → BFF (issuer 도달)
     ports: ["${FRONT_PORT}:${FRONT_PORT}"]
     environment:
       ADDR: ":${FRONT_PORT}"
       UI_DIR: /srv/ui
-      KC_PUBLIC: http://${FRONT_HOST}:${FRONT_PORT}/auth
+      KC_PUBLIC: ${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/auth
       KC_INTERNAL: http://keycloak:8085/auth
       KC_PROXY_TARGET: http://keycloak:8085
       REALM: trustlink
       CLIENT_ID: trustlink-admin
       CLIENT_SECRET: ${TRUSTLINK_ADMIN_SECRET:?TRUSTLINK_ADMIN_SECRET}
-      REDIRECT_URI: http://${FRONT_HOST}:${FRONT_PORT}/admin/callback
+      REDIRECT_URI: ${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/admin/callback
       ZOT_API_URL: http://zot:5000
       ZOT_METRICS_URL: http://zot:5000/metrics
       ZOT_METRICS_USER: ci
@@ -221,7 +220,7 @@ configs:
             "secret": "${ZOT_OIDC_CLIENT_SECRET}",
             "standardFlowEnabled": true,
             "directAccessGrantsEnabled": true,
-            "redirectUris": [ "http://${FRONT_HOST}:${FRONT_PORT}/zot/auth/callback/oidc", "http://${FRONT_HOST}:${FRONT_PORT}/*" ],
+            "redirectUris": [ "${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/zot/auth/callback/oidc", "${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/*" ],
             "webOrigins": [ "+" ],
             "protocolMappers": [ {
               "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
@@ -237,9 +236,9 @@ configs:
             "standardFlowEnabled": true,
             "directAccessGrantsEnabled": true,
             "serviceAccountsEnabled": true,
-            "redirectUris": [ "http://${FRONT_HOST}:${FRONT_PORT}/admin/callback" ],
+            "redirectUris": [ "${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/admin/callback" ],
             "webOrigins": [ "+" ],
-            "attributes": { "post.logout.redirect.uris": "http://${FRONT_HOST}:${FRONT_PORT}/*" },
+            "attributes": { "post.logout.redirect.uris": "${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/*" },
             "protocolMappers": [ {
               "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
               "config": { "claim.name": "groups", "full.path": "false", "id.token.claim": "true",
@@ -319,7 +318,7 @@ configs:
         "http": {
           "address": "0.0.0.0",
           "port": "5000",
-          "externalUrl": "http://${FRONT_HOST}:${FRONT_PORT}",
+          "externalUrl": "${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}",
           "realm": "zot",
           "auth": {
             "htpasswd": { "path": "/etc/zot/htpasswd" },
@@ -328,7 +327,7 @@ configs:
               "providers": {
                 "oidc": {
                   "name": "Keycloak",
-                  "issuer": "http://${FRONT_HOST}:${FRONT_PORT}/auth/realms/trustlink",
+                  "issuer": "${PUBLIC_URL:-http://${FRONT_HOST}:${FRONT_PORT}}/auth/realms/trustlink",
                   "credentialsfile": "/etc/zot/oidc-credentials.json",
                   "scopes": ["openid", "email"],
                   "claimMapping": { "username": "preferred_username", "groups": "groups" }

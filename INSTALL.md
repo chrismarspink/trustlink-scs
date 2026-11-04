@@ -14,7 +14,28 @@
   sudo ufw allow from 172.16.0.0/12 to any port 28080 proto tcp comment "trustlink: containers -> BFF (OIDC issuer)"
   ```
   허용이 없으면 zot 이 `failed to initialize new relying party oidc` 로 재시작을 반복한다.
-  (`FRONT_HOST` 가 도메인이면 compose 의 네트워크 별칭으로 내부에서 바로 BFF 로 가므로 이 규칙도 필요 없다.)
+
+### HTTPS (도메인 + Let's Encrypt)
+서버의 웹서버(Apache·nginx 등)를 앞단 프록시로 두고 인증서는 certbot 으로 받는다. 예: Apache
+```apache
+<VirtualHost *:443>
+    ServerName trustlink.example.com
+    SSLEngine on
+    SSLCertificateFile    /etc/letsencrypt/live/trustlink.example.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/trustlink.example.com/privkey.pem
+    ProxyPreserveHost On
+    ProxyTimeout 600
+    RequestHeader set X-Forwarded-Proto "https"
+    ProxyPass        /v2/ http://127.0.0.1:28081/v2/
+    ProxyPassReverse /v2/ http://127.0.0.1:28081/v2/
+    ProxyPass        /    http://127.0.0.1:28080/
+    ProxyPassReverse /    http://127.0.0.1:28080/
+</VirtualHost>
+```
+`.env` 에 `PUBLIC_URL=https://trustlink.example.com` 을 넣고 `docker compose up -d`. 컨테이너는 이 주소(443)로
+OIDC issuer 에 접속하므로 방화벽이 443 을 허용해야 한다. 웹 화면의 oras 안내는 https 접속이면 `--plain-http` 없이
+`trustlink.example.com` 을 레지스트리 주소로 보여 준다. 이미 설치된 서버는 Keycloak 의 리다이렉트 주소를 추가해야 한다 — `bash scripts/kc-add-public-url.sh`
+(realm import 는 realm 이 있으면 건너뛰므로).
 
 ## 1. 설치
 

@@ -1,8 +1,9 @@
+import { registry } from '@/lib/utils';
 import { DocTitle, Section, Glossary, ArchDiagram, FlowDiagram } from './_shared';
 
 export default function GettingStarted() {
-  const host = window.location.host;
-  const reg = `${window.location.hostname}:28081`;
+  const web = window.location.origin;
+  const reg = `${window.location.protocol}//${registry}`;
   return (
     <>
       <DocTitle title="시작하기" lead="TrustLink SCS — 공급망 보안 아티팩트 레지스트리. 컨테이너/바이너리와 그 SBOM·VEX를 한곳에서 관리·검증·배포합니다." />
@@ -29,13 +30,13 @@ export default function GettingStarted() {
 
       <Section title="접속 엔드포인트">
         <ul className="list-disc pl-5">
-          <li><b>웹 콘솔·관리·로그인</b> — <code>http://{host}</code> (TrustLink/BFF)</li>
-          <li><b>레지스트리 pull/push</b> — <code>http://{reg}</code> (zot 직접)</li>
+          <li><b>웹 콘솔·관리·로그인</b> — <code>{web}</code> (TrustLink/BFF)</li>
+          <li><b>레지스트리 pull/push</b> — <code>{reg}</code> (zot)</li>
         </ul>
       </Section>
 
       <Section title="빠른 시작">
-        <p>1) 브라우저로 <code>http://{host}</code> 접속 → Keycloak 로그인 → 제품 목록.</p>
+        <p>1) 브라우저로 <code>{web}</code> 접속 → Keycloak 로그인 → 제품 목록.</p>
         <p>2) 제품 카드 → 버전 선택 → 개요·SBOM/VEX·다운로드·취약점 분석 확인.</p>
         <p>3) CLI 업로드/다운로드는 <b>업로드·다운로드</b> 문서를 참고하세요.</p>
       </Section>

@@ -34,7 +34,8 @@ echo "[3/4] docker compose up -d"
 echo "[4/4] 컨테이너 → OIDC issuer 도달 확인 (zot 로그인 전제)"
 "${SSH[@]}" "cd ~/$RDIR && set -a && . ./.env && set +a
   NET=\$(docker inspect \$(docker compose ps -q zot) --format '{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}}{{end}}')
-  code=\$(docker run --rm --network \$NET curlimages/curl:8.10.1 -s -m 8 -o /dev/null -w '%{http_code}' http://\$FRONT_HOST:\$FRONT_PORT/auth/realms/trustlink/.well-known/openid-configuration)
-  echo \"  issuer \$code\"
-  [ \"\$code\" = 200 ] || echo '  ✗ 방화벽 확인: sudo ufw allow from 172.16.0.0/12 to any port '\$FRONT_PORT' proto tcp (INSTALL.md 0절)'"
-echo "완료. http://$HOST:28080"
+  URL=\${PUBLIC_URL:-http://\$FRONT_HOST:\$FRONT_PORT}
+  code=\$(docker run --rm --network \$NET curlimages/curl:8.10.1 -s -m 8 -o /dev/null -w '%{http_code}' \$URL/auth/realms/trustlink/.well-known/openid-configuration)
+  echo \"  issuer \$URL \$code\"
+  [ \"\$code\" = 200 ] || echo '  ✗ 방화벽 확인: 컨테이너 대역 → 웹 포트 허용 (INSTALL.md 0절)'"
+echo "완료."
