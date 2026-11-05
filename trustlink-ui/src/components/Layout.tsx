@@ -13,7 +13,8 @@ export function Layout({ children }: { children: ReactNode }) {
         <header className="flex h-14 items-center border-b px-8 text-sm text-muted-foreground">
           {trail && (
             <>
-              {trail[0]}<span className="mx-2 text-zinc-300">/</span><span className="text-foreground">{trail[1]}</span>
+              {trail.slice(0, -1).map((t) => <span key={t}>{t}<span className="mx-2 text-zinc-300">/</span></span>)}
+              <span className="text-foreground">{trail[trail.length - 1]}</span>
             </>
           )}
           <NotificationBell />

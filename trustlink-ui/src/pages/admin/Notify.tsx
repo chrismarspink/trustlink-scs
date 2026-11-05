@@ -5,7 +5,7 @@ import { PageHeader, StatCard, Alert, Loading, Table, Th, Td } from './_ui';
 
 const fmt = (t: string) => (t ? new Date(t).toLocaleString('ko-KR') : '—');
 
-// 관리 › 통보: 감시 대상 동기화 상태와 보낸 통보 기록(받는 사람·메일 결과).
+// 관리 › 취약점 통보: 감시 대상 동기화 상태와 보낸 통보 기록(받는 사람·메일 결과).
 export default function Notify() {
   const [log, setLog] = useState<NoticeLog | null>(null);
   const [err, setErr] = useState('');
@@ -22,7 +22,7 @@ export default function Notify() {
 
   return (
     <>
-      <PageHeader title="통보" description="새 취약점은 그 제품 업로드 권한자와 관리자에게, VEX 판단 결과는 그 제품을 받는 고객에게 통보합니다."
+      <PageHeader title="취약점 통보" description="새 취약점은 그 제품 업로드 권한자와 관리자에게, VEX 판단 결과는 그 제품을 받는 고객에게 통보합니다."
         actions={<Button variant="outline" onClick={sync} disabled={busy}>{busy ? '동기화 중…' : '지금 동기화'}</Button>} />
       {err && <Alert tone="crit">오류: {err}</Alert>}
       {msg && <div className="mb-4"><Alert tone="ok">동기화: {msg}</Alert></div>}

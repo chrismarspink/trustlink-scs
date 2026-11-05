@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell
+  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog
 } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils';
 declare const __APP_VERSION__: string;
 
 type Sub = { to: string; label: string; icon: LucideIcon; end?: boolean };
-type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; children?: Sub[] };
+// open: 하위 트리를 처음부터 펼쳐 둔다(자주 쓰는 묶음). 아니면 그 안의 화면에 있을 때만 펼침.
+type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; open?: boolean; children?: Sub[] };
 
 // 제품(레지스트리) 섹션 — 항상 노출. "문서"는 하위 트리.
 const PRODUCT: Item[] = [
@@ -30,34 +31,41 @@ const PRODUCT: Item[] = [
 // 관리 콘솔 섹션 — admins 일 때 노출.
 const ADMIN: Item[] = [
   { to: '/admin', label: '대시보드', icon: LayoutDashboard, end: true },
-  { to: '/admin/users', label: '사용자', icon: Users },
-  { to: '/admin/orgs', label: '고객사', icon: Building2 },
-  { to: '/admin/access', label: '제품 권한', icon: ShieldCheck },
-  { to: '/admin/robots', label: '자동화 계정', icon: Bot },
-  { to: '/admin/notify', label: '통보', icon: Bell },
+  {
+    to: '/admin/accounts', label: '계정 및 권한', icon: UserCog, open: true, children: [
+      { to: '/admin/users', label: '사용자', icon: Users },
+      { to: '/admin/orgs', label: '고객사', icon: Building2 },
+      { to: '/admin/access', label: '제품 권한', icon: ShieldCheck },
+      { to: '/admin/robots', label: '자동화 계정', icon: Bot },
+      { to: '/admin/acl', label: '권한 매트릭스', icon: KeyRound }
+    ]
+  },
+  { to: '/admin/notify', label: '취약점 통보', icon: Bell },
   { to: '/admin/capacity', label: '용량', icon: HardDrive },
   { to: '/admin/logs', label: '로그', icon: ScrollText },
   { to: '/admin/registry', label: '레지스트리', icon: Boxes },
   { to: '/admin/system', label: '시스템 상태', icon: Activity },
-  { to: '/admin/acl', label: '권한 매트릭스', icon: KeyRound },
   { to: '/admin/storage', label: '설정·스토리지', icon: Database }
 ];
 
-// 현재 경로의 [섹션, 메뉴명] — 상단 경로 표시용
-export function navTrail(pathname: string): [string, string] | null {
+const matches = (pathname: string, it: Sub) => (it.end ? pathname === it.to : pathname === it.to || pathname.startsWith(it.to + '/'));
+
+// 현재 경로의 [섹션, (묶음,) 메뉴명] — 상단 경로 표시용
+export function navTrail(pathname: string): string[] | null {
   const hit = (items: Item[]) => {
-    let best: Sub | null = null;
-    for (const it of items.flatMap((i) => [i, ...(i.children || [])])) {
-      const ok = it.end ? pathname === it.to : pathname === it.to || pathname.startsWith(it.to + '/');
-      if (ok && (!best || it.to.length > best.to.length)) best = it;
+    let best: string[] | null = null, len = 0;
+    for (const i of items) {
+      for (const [it, trail] of [[i, [i.label]] as const, ...(i.children || []).map((c) => [c, [i.label, c.label]] as const)]) {
+        if (matches(pathname, it) && it.to.length > len) { best = [...trail]; len = it.to.length; }
+      }
     }
     return best;
   };
   const a = hit(ADMIN);
-  if (a) return ['관리', a.label];
+  if (a) return ['관리', ...a];
   if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
   const p = hit(PRODUCT);
-  return p ? ['제품', p.label] : null;
+  return p ? ['제품', ...p] : null;
 }
 
 const linkCls = (extra = '') => ({ isActive }: { isActive: boolean }) =>
@@ -75,8 +83,8 @@ function NavItem({ item }: { item: Item }) {
 // 하위 트리 그룹 — 부모는 토글, 활성 경로면 자동 펼침.
 function NavGroup({ item }: { item: Item }) {
   const loc = useLocation();
-  const within = loc.pathname === item.to || loc.pathname.startsWith(item.to + '/');
-  const [open, setOpen] = useState(within);
+  const within = matches(loc.pathname, item) || item.children!.some((c) => matches(loc.pathname, c));
+  const [open, setOpen] = useState(within || !!item.open);
   useEffect(() => { if (within) setOpen(true); }, [within]);
   return (
     <div>
