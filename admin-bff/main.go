@@ -296,7 +296,8 @@ func main() {
 	mux.HandleFunc("GET /api/artifact/bundle", s.guardSession(s.apiArtifactBundle)) // 웹 다운로드: 로그인 사용자(본인 자격으로 zot RBAC)
 	mux.HandleFunc("GET /api/storage", s.guard(s.apiStorageGet))
 	mux.HandleFunc("POST /api/storage/preview", s.guard(s.apiStoragePreview))
-	mux.HandleFunc("GET /api/stats", s.guardSession(s.apiStats)) // 대시보드 통계: 로그인 사용자
+	mux.HandleFunc("GET /api/stats", s.guardSession(s.apiStats))  // 대시보드 통계: 로그인 사용자
+	mux.HandleFunc("GET /api/dashboard", s.guard(s.apiDashboard)) // 관리 대시보드 집계(할 일·보안·품질·고객·운영)
 	// 제품 페이지용 경량 세션(그룹 무관, 로그인만)
 	mux.HandleFunc("GET /api/session", s.guardSession(s.apiSession))
 	// Dependency-Track 헤드리스 연동 (취약점 분석 → VEX). security/developers/admins 편집 가능.

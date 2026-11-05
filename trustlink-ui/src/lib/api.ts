@@ -363,6 +363,30 @@ export type ProductStat = { repo: string; versions: VersionStat[] };
 export type Stats = { products: ProductStat[] };
 export const adminStats = () => aj<Stats>('/api/stats');
 
+// 관리 대시보드 집계(GET /api/dashboard, 5분 캐시 — refresh 로 즉시 재집계)
+export type DashCount = { label: string; value: number };
+export type DashTodo = { kind: string; tone: 'crit' | 'warn'; text: string; count: number; link?: string };
+export type DashDay = { date: string; critical?: number; high?: number; medium?: number; low?: number; unaudited?: number; uploads?: number; downloads?: number };
+export type DashDownload = { time: string; user: string; org?: string; repo: string; tag: string; latest?: string };
+export type Dashboard = {
+  generated: string;
+  dt: boolean;
+  todo: DashTodo[];
+  security: {
+    pending: Record<string, number>; total: number; analyzed: number; aging: DashCount[]; trend: DashDay[] | null;
+    products: { repo: string; tag: string; critical: number; high: number; total: number; pending: number }[] | null;
+    mttrHours: number; mttrSamples: number; recent: { time: string; repo: string; tag: string; title: string }[] | null;
+  };
+  quality: {
+    versions: number; withSbom: number; sbomSupplier: number; sbomSyft: number; withVex: number;
+    components: number; noVersion: number; noPurl: number; noLicense: number; copyleft: number;
+    licenses: DashCount[] | null; top: { name: string; products: number; versions: number; vulns: number }[] | null;
+  };
+  customers: { orgs: DashCount[] | null; recent: DashDownload[] | null; outdated: DashDownload[] | null; notices: number };
+  ops: { daily: DashDay[] | null; actors: DashCount[] | null; mailed: number; mailFailed: number; lastSync: string; lastSyncMsg: string; certDays: number };
+};
+export const adminDashboard = (refresh = false) => aj<Dashboard>('/api/dashboard' + (refresh ? '?refresh=1' : ''));
+
 // 이미지 여부 감지 — config.mediaType 가 컨테이너 이미지 config 면 docker pull 가능.
 // (oras artifact 는 empty/커스텀 config → oras 전용). index 면 첫 child 로 판별.
 const IMAGE_CONFIG_TYPES = [
