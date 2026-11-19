@@ -8,7 +8,7 @@ set -e
 cd "$(dirname "$0")"
 
 ARCH="${ARCH:-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')}"
-IMAGE="$(cd .. && docker compose config --images 2>/dev/null | grep trustlink-admin || echo trustlink-admin:latest)"
+IMAGE="$(cd .. && docker compose config --images 2>/dev/null | grep trustlink-admin | head -1 | grep . || echo trustlink-admin:latest)"
 
 echo "[1/4] UI 빌드 + ui-dist 동기화"
 # package-lock.json 이 설치본보다 새로우면(의존성 변경) npm ci 로 맞춘다
