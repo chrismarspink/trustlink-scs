@@ -8,7 +8,7 @@ import { Button, Badge, Card } from '@/components/ui/primitives';
 import { PageHeader, SectionTitle, StatCard, Alert, Loading, Table, Th, Td, selectCls } from './_ui';
 import { cn } from '@/lib/utils';
 
-// 관리 › 규제 대응 검증: 체크리스트(엑셀)를 기준으로 릴리스가 어떤 규제 대상인지, 무엇이 부족하고 무엇을 보완할지 리포트.
+// 규제·보고 › 규제 대응 검증: 체크리스트(엑셀)를 기준으로 릴리스가 어떤 규제 대상인지, 무엇이 부족하고 무엇을 보완할지 리포트.
 // 판정은 규칙(산출물 증거 점검), AI 는 미충족 항목의 문제·보완 설명과 요약만 쓴다.
 
 const fmt = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—');

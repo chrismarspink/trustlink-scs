@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Archive, FilePlus2, FileText, ClipboardCheck, BookMarked, Landmark, Scale, Globe2, Sparkles, ChevronDown, ChevronRight, RefreshCw, Search, Download
+  Archive, FilePlus2, FileText, ClipboardCheck, BookMarked, Landmark, Scale, Globe2, Sparkles, ChevronDown, ChevronRight, RefreshCw, Search, Download, GitBranch
 } from 'lucide-react';
 import {
-  adminRegs, adminRegReportRun, adminRegReports, adminRepos, adminCompliance, aiStatus, regReportPdfUrl,
-  type RegsInfo, type RegReportItem, type RepoEntry, type CompInfo
+  adminRegs, adminRegReportRun, adminRegReports, adminRepos, adminCompliance, aiStatus, regReportPdfUrl, adminUpstreamReports,
+  type RegsInfo, type RegReportItem, type RepoEntry, type CompInfo, type UpReportItem
 } from '@/lib/api';
 import { Button, Input, Label } from '@/components/ui/primitives';
 import { PageHeader, Alert, Loading, selectCls } from './_ui';
 import { cn } from '@/lib/utils';
 
-// 관리 › 보고서함 — 발행한 문서(PDF 로 내보내는 보고서)를 한곳에 모은다.
+// 규제·보고 › 보고서함 — 발행한 문서(PDF 로 내보내는 보고서)를 한곳에 모은다.
 //   발행 문서함: 규제 대응 보고서(한글·영문, 판 번호별)와 체크리스트 점검 보고서.
 //   새 보고서: 역할·지역·제품·언어를 골라 규제 대응 보고서를 만든다.
 // 대시보드는 실시간 현황만, 규제 카탈로그·규제 대응 검증 화면은 관리·점검 작업만 맡는다.
@@ -100,21 +100,24 @@ function SeriesRow({ s }: { s: Series }) {
 function Library({ reload }: { reload: number }) {
   const [regs, setRegs] = useState<RegReportItem[] | null>(null);
   const [comp, setComp] = useState<CompInfo['reports']>([]);
-  const [kind, setKind] = useState<'all' | 'reg' | 'check'>('all');
+  const [ups, setUps] = useState<UpReportItem[]>([]);
+  const [kind, setKind] = useState<'all' | 'reg' | 'check' | 'up'>('all');
   const [q, setQ] = useState('');
   const [err, setErr] = useState('');
   useEffect(() => {
     adminRegReports().then(setRegs).catch((e) => setErr(String(e)));
     adminCompliance().then((c) => setComp(c.reports || [])).catch(() => {});
+    adminUpstreamReports().then(setUps).catch(() => {});
   }, [reload]);
   const series = useMemo(() => toSeries(regs || []).filter((s) => !q || `${s.title} ${s.audienceKo} ${s.repo || ''} ${s.latest.docNo || ''}`.toLowerCase().includes(q.toLowerCase())), [regs, q]);
+  const upList = ups.filter((r) => r.state !== 'running' && (!q || `${r.repo || ''}:${r.tag || ''} ${r.target || ''}`.toLowerCase().includes(q.toLowerCase())));
   const checks = comp.filter((r) => !q || `${r.repo}:${r.tag}`.toLowerCase().includes(q.toLowerCase()));
   if (err) return <Alert tone="crit">{err}</Alert>;
   if (!regs) return <Loading />;
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        {([['all', '전체'], ['reg', '규제 대응 보고서'], ['check', '체크리스트 점검']] as const).map(([v, l]) => (
+        {([['all', '전체'], ['reg', '규제 대응 보고서'], ['check', '체크리스트 점검'], ['up', '공개 저장소 분석']] as const).map(([v, l]) => (
           <button key={v} onClick={() => setKind(v)} className={cn('rounded-full border px-3 py-1 text-sm', kind === v ? 'border-primary bg-primary/10 font-medium text-primary' : 'hover:bg-secondary')}>{l}</button>
         ))}
         <div className="relative ml-auto w-64">
@@ -123,7 +126,7 @@ function Library({ reload }: { reload: number }) {
         </div>
       </div>
 
-      {kind !== 'check' && (
+      {(kind === 'all' || kind === 'reg') && (
         <div className="overflow-hidden rounded-lg border bg-card">
           <div className="flex items-center gap-2 border-b bg-secondary/40 px-3 py-2 text-sm font-medium"><Landmark size={15} /> 규제 대응 보고서 <span className="text-xs font-normal text-muted-foreground">같은 조건으로 다시 만들면 판이 올라갑니다 · 한글/영문은 한 줄에</span></div>
           <table className="w-full text-sm">
@@ -136,9 +139,9 @@ function Library({ reload }: { reload: number }) {
         </div>
       )}
 
-      {kind !== 'reg' && (
+      {(kind === 'all' || kind === 'check') && (
         <div className="overflow-hidden rounded-lg border bg-card">
-          <div className="flex items-center gap-2 border-b bg-secondary/40 px-3 py-2 text-sm font-medium"><ClipboardCheck size={15} /> 체크리스트 점검 보고서 <span className="text-xs font-normal text-muted-foreground">업로드한 공급망 체크리스트로 제품 릴리스를 점검한 결과(대외비 체크리스트 기반 — 내부용)</span></div>
+          <div className="flex items-center gap-2 border-b bg-secondary/40 px-3 py-2 text-sm font-medium"><ClipboardCheck size={15} /> 체크리스트 점검 보고서 <span className="text-xs font-normal text-muted-foreground">업로드한 공급망 체크리스트로 제품 릴리스를 점검한 결과(내부용 — 체크리스트 원본은 서버에만 보관)</span></div>
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-muted-foreground"><th className="px-3 py-1.5">제품</th><th className="px-3 py-1.5">공급자 미충족</th><th className="px-3 py-1.5">일부</th><th className="px-3 py-1.5">AI 요약</th><th className="px-3 py-1.5">시각</th><th /></tr></thead>
             <tbody>
@@ -152,7 +155,33 @@ function Library({ reload }: { reload: number }) {
                   <td className="px-3 py-2"><Link to={`/admin/compliance?report=${encodeURIComponent(r.id)}`} className="text-xs text-primary hover:underline">열기</Link></td>
                 </tr>
               ))}
-              {checks.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">없음 — 관리 › 규제 대응 검증에서 점검합니다</td></tr>}
+              {checks.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">아직 없습니다 — 규제·보고 › 규제 대응 검증에서 점검하면 여기에 쌓입니다</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {(kind === 'all' || kind === 'up') && (
+        <div className="overflow-hidden rounded-lg border bg-card">
+          <div className="flex items-center gap-2 border-b bg-secondary/40 px-3 py-2 text-sm font-medium"><GitBranch size={15} /> 공개 저장소 분석 보고서 <span className="text-xs font-normal text-muted-foreground">제품 구성요소의 상류 오픈소스 건강도 · 단건 저장소 점검(분석할 때마다 저장)</span></div>
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-xs text-muted-foreground"><th className="px-3 py-1.5">대상</th><th className="px-3 py-1.5">구성요소</th><th className="px-3 py-1.5">위험</th><th className="px-3 py-1.5">주의</th><th className="px-3 py-1.5">AI 요약</th><th className="px-3 py-1.5">시각</th><th /></tr></thead>
+            <tbody>
+              {upList.map((r) => (
+                <tr key={r.id} className="border-t hover:bg-secondary/40">
+                  <td className="px-3 py-2">{r.kind === 'repo' ? <>{r.target} <span className="text-xs text-muted-foreground">(단건)</span></> : `${r.repo}:${r.tag}`}{r.state === 'error' && <span className="ml-1 text-xs text-red-600">오류</span>}</td>
+                  <td className="px-3 py-2">{r.kind === 'repo' ? '—' : r.comps}</td>
+                  <td className="px-3 py-2">{r.counts?.risk ?? 0}</td>
+                  <td className="px-3 py-2">{r.counts?.warn ?? 0}</td>
+                  <td className="px-3 py-2">{r.summary ? '사용' : '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{fmt(r.created)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <a href={`/admin/upstream/print/${encodeURIComponent(r.id)}`} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">보고서</a>
+                    <Link to={`/admin/upstream?report=${encodeURIComponent(r.id)}`} className="ml-2 text-xs text-muted-foreground hover:underline">화면</Link>
+                  </td>
+                </tr>
+              ))}
+              {upList.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">아직 없습니다 — 규제·보고 › 공개 저장소 분석에서 분석하면 여기에 쌓입니다</td></tr>}
             </tbody>
           </table>
         </div>

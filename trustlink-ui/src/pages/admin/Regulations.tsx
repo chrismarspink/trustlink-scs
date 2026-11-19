@@ -13,7 +13,7 @@ import { Button, Input, Label, Badge, StatusDot } from '@/components/ui/primitiv
 import { PageHeader, SectionTitle, StatCard, Alert, Loading, selectCls } from './_ui';
 import { cn } from '@/lib/utils';
 
-// 관리 › 규제 카탈로그: 공급망 보안 관련 국내외 법규·지침을 요구사항 단위로 관리하고(추가·수정·확인),
+// 규제·보고 › 규제 카탈로그: 공급망 보안 관련 국내외 법규·지침을 요구사항 단위로 관리하고(추가·수정·확인),
 // 빠진 규제를 탐색하며, 역할(개발자·관리자·영업)별 확인 사항 보고서(PDF)를 만든다.
 
 const REGION_ORDER = ['US', 'EU', 'JP', 'KR', 'UK', 'IN', 'INTL'];

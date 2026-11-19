@@ -8,7 +8,7 @@ import { Button, Badge, Card, Input } from '@/components/ui/primitives';
 import { PageHeader, SectionTitle, StatCard, Alert, Loading, Table, Th, Td, selectCls } from './_ui';
 import { cn } from '@/lib/utils';
 
-// 관리 › 공개 저장소 분석: 제품 SBOM 구성요소의 상류(오픈소스) 저장소 건강도를 점검한다 — CRA 제3자 구성요소 실사 증거.
+// 규제·보고 › 공개 저장소 분석: 제품 SBOM 구성요소의 상류(오픈소스) 저장소 건강도를 점검한다 — CRA 제3자 구성요소 실사 증거.
 // 신호는 deps.dev(OpenSSF Scorecard)·GitHub 공개 API, 판정은 규칙(위험·주의·양호·미확인), AI 는 요약만.
 
 const UP_RATING: Record<UpRating, { label: string; cls: string }> = {

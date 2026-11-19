@@ -7,7 +7,7 @@ import { Button, Input, Badge, StatusDot } from '@/components/ui/primitives';
 import { PageHeader, SectionTitle, StatCard, Alert, Loading, Table, Th, Td, selectCls } from './_ui';
 import { cn } from '@/lib/utils';
 
-// 관리 › 취약점 DB 미러: 어떤 DB 를, 어느 주기로, 언제 외부에 접속해 받는지(정책)와 로컬 기준 시점을 보여 준다.
+// 시스템 › 취약점 DB 미러: 어떤 DB 를, 어느 주기로, 언제 외부에 접속해 받는지(정책)와 로컬 기준 시점을 보여 준다.
 
 const KST = { timeZone: 'Asia/Seoul' } as const;
 const fmt = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR', { ...KST, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');

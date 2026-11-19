@@ -7,7 +7,7 @@ import { Button, Input, Label, StatusDot } from '@/components/ui/primitives';
 import { PageHeader, SectionTitle, Alert, Loading } from './_ui';
 import { cn } from '@/lib/utils';
 
-// 관리 › AI 연결: 로컬 LLM(예: Gemma)과 외부 LLM(Claude 또는 OpenAI 호환)을 함께 등록하고,
+// 시스템 › AI 연결: 로컬 LLM(예: Gemma)과 외부 LLM(Claude 또는 OpenAI 호환)을 함께 등록하고,
 // 용도별로 고른다 — VEX 판정·대응 초안 / 규제 보고서·체크리스트 요약·규제 탐색.
 //   로컬 LLM — 데이터가 밖으로 나가지 않음. 외부 LLM — 입력 사실이 외부 서비스로 전송됨.
 
