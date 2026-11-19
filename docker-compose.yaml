@@ -139,6 +139,12 @@ services:
       NOTIFY_STORE: /var/lib/trustlink/notify.json
       NOTIFY_SYNC_INTERVAL: ${NOTIFY_SYNC_INTERVAL:-10m}   # SBOM → DT 감시 대상 동기화 주기
       NOTIFY_CC: ${NOTIFY_CC:-}                    # 모든 통보 사본을 받을 운영 주소(쉼표 구분, 선택)
+      # 취약점 DB 미러(관리 콘솔 화면·DT 연결). 쓰기 키는 미러 볼륨의 api.key 를 읽기 전용으로 읽는다
+      MIRROR_URL: http://vuln-mirror:8090
+      MIRROR_KEY_FILE: /mirror/_state/api.key
+      # 로컬 AI(초안 전용). 비우면 AI 기능 꺼짐. 켜기: .env 에 AI_URL=http://trustlink-ai:8080 + `--profile ai` 로 기동
+      AI_URL: ${AI_URL:-}
+      AI_MODEL_DIR: /ai-models                     # 모델 파일 SHA-256 을 원장에 남기기 위한 읽기 전용 마운트
     configs:
       - source: zot-config               # zot 설정 원본(템플릿) — BFF 가 제품 권한을 더해 렌더
         target: /etc/trustlink/zot-config.json
@@ -147,6 +153,9 @@ services:
       - tl-data:/var/lib/registry:ro
       - tl-logs:/var/log/zot:ro
       - tl-sor:/var/lib/trustlink
+      - vuln-mirror:/mirror:ro
+      - ai-models:/ai-models:ro
+    networks: [default, ai-internal]
     depends_on:
       keycloak:
         condition: service_healthy
@@ -194,6 +203,50 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ---------- 취약점 DB 미러 (TrustLink 이미지를 mirror 모드로 실행, 내부 전용) ----------
+  # NVD·OSV·KEV·EPSS·EUVD·제조사 VEX·Grype/Trivy DB 등 21종을 vuln-mirror 볼륨에 복제(약 10~15GB).
+  # 기본은 폐쇄망 모드(외부 접속 없음) — 관리 콘솔 › 취약점 DB 미러에서 정기 접속으로 바꿔야 받기 시작한다.
+  # 외부 접속은 이 컨테이너만 정책의 접속 창 안에서 한다. 디스크 여유가 최소치(기본 20GB) 아래면 받지 않는다.
+  vuln-mirror:
+    image: ${TRUSTLINK_ADMIN_IMAGE:-jkkim7202/trustlink-admin:latest}
+    command: ["mirror"]
+    environment:
+      MIRROR_DIR: /mirror
+      MIRROR_ADDR: ":8090"
+    volumes: ["vuln-mirror:/mirror"]
+    mem_limit: ${MIRROR_MEM_LIMIT:-256m}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/_api/status >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------- 로컬 AI (llama.cpp, CPU 전용, 선택) ----------
+  # `docker compose --profile ai up -d` 일 때만 뜬다. 외부 망이 없는 내부 네트워크(ai-internal)에만 붙어
+  # BFF 만 접근할 수 있다. 모델은 ai-models 볼륨에 미리 넣는다(scripts/ai-model-fetch.sh, SHA-256 검증).
+  # CPU 는 AI_CPUS(기본 8)로 제한해 같은 서버의 다른 서비스와 나눠 쓴다.
+  trustlink-ai:
+    image: ghcr.io/ggml-org/llama.cpp:server-b12429
+    profiles: ["ai"]
+    command: ["-m", "/models/${AI_MODEL_FILE:-gemma-4-26B-A4B-it-UD-Q4_K_M.gguf}", "--host", "0.0.0.0", "--port", "8080",
+              "-t", "${AI_THREADS:-6}", "-c", "${AI_CTX:-8192}", "--parallel", "1", "--no-webui"]
+    volumes: ["ai-models:/models:ro"]
+    networks: [ai-internal]
+    cpus: ${AI_CPUS:-8}
+    mem_limit: ${AI_MEM_LIMIT:-24g}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:8080/health >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+networks:
+  ai-internal:
+    internal: true          # 외부(인터넷) 경로 없음
+
 volumes:
   kc-db:
   zot-managed:
@@ -202,6 +255,8 @@ volumes:
   tl-sor:
   dtrack-db:
   dtrack-data:
+  vuln-mirror:
+  ai-models:
 
 configs:
   # Keycloak realm (최초 1회 import). 그룹 3개 + OIDC 클라이언트 2개 + TrustLink 관리자 1명.

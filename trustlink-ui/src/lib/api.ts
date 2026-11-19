@@ -152,7 +152,7 @@ export async function vexFindings(project: string, version: string, repo: string
 // 분석 결정 기록(CycloneDX 어휘). DT 감사 이력에 남는다.
 export async function putAnalysis(body: {
   project: string; component: string; vulnerability: string;
-  status: string; justification?: string; comment?: string; suppressed?: boolean;
+  status: string; justification?: string; response?: string; details?: string; comment?: string; suppressed?: boolean;
 }): Promise<void> {
   const r = await zfetch('/api/vex/analysis', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -298,6 +298,25 @@ export const adminVulnSourcesSave = (b: { osv: string[]; github: boolean; github
   aj<{ status: string; changed: number; quietUntil: string }>('/api/vulnsources', jsonInit('PUT', b));
 export const adminVulnReanalyze = () => aj<{ requested: number; failed: number }>('/api/vulnsources/reanalyze', jsonInit('POST', {}));
 export type MailStatus = { configured: boolean; host: string; port: string; from: string; allowlist: string[] };
+// 취약점 DB 미러(vuln-mirror) — 정책·상태·DT 연결
+export type MirrorSourcePolicy = { enabled: boolean; intervalH: number };
+export type MirrorPolicy = { mode: 'scheduled' | 'offline'; windowStart: string; windowEnd: string; upstream: string; minFreeGB: number; sources: Record<string, MirrorSourcePolicy> };
+export type MirrorSource = {
+  id: string; name: string; group: string; category: string; use: string; license: string; hosts: string[]; defaultIntervalH: number;
+  enabled: boolean; intervalH: number; staleH: number; status: 'never' | 'running' | 'ok' | 'error'; error?: string;
+  lastSuccess?: string; lastAttempt?: string; localAsOf?: string; nextAccess?: string; stale: boolean; files: number; bytes: number;
+};
+export type MirrorRun = { id: string; trigger: string; start: string; end: string; status: string; error?: string; changed: number; bytes: number; snapshot: string };
+export type MirrorStatus = {
+  now: string; policy: MirrorPolicy; inWindow: boolean; nextWindow?: string; running?: string; snapshot: string;
+  totalBytes: number; fileCount: number; diskFree: number; diskTotal: number; allowedHosts: string[]; sources: MirrorSource[]; runs: MirrorRun[];
+};
+export type DtMirrorProp = { name: string; value: string; mirrorValue?: string; usingMirror: boolean; original?: string };
+export type MirrorInfo = { installed: boolean; reachable?: boolean; error?: string; status?: MirrorStatus; mirrorUrl?: string; dt?: DtMirrorProp[]; dtError?: string };
+export const adminMirror = () => aj<MirrorInfo>('/api/mirror');
+export const adminMirrorPolicy = (p: MirrorPolicy) => aj<MirrorStatus>('/api/mirror/policy', jsonInit('PUT', p));
+export const adminMirrorSync = (id: string) => aj<{ queued: string[] }>(`/api/mirror/sync/${encodeURIComponent(id)}`, jsonInit('POST', {}));
+export const adminMirrorDT = (use: boolean) => aj<{ changed: Record<string, string> }>('/api/mirror/dt', jsonInit('PUT', { use }));
 export const adminMailStatus = () => aj<MailStatus>('/api/mail');
 export const adminMailTest = (to: string) =>
   aj<{ status: string; to: string[] }>('/api/mail/test', jsonInit('POST', { to }));
@@ -444,3 +463,86 @@ export async function deleteApiKey(id: string): Promise<void> {
   const r = await zfetch(`/zot/auth/apikey?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!r.ok) throw new Error(`API 키 삭제 ${r.status}`);
 }
+
+// ---------- 로컬 AI (초안 전용 — 판정은 규칙·사람) ----------
+export type AIStatus = {
+  enabled: boolean; reachable: boolean; mode?: string; model?: string; modelFile?: string;
+  sha256?: string; sizeBytes?: number; ctx?: number; error?: string;
+};
+export type AIFact = { id: string; text: string; untrusted?: boolean };
+export type VexDraft = {
+  status: string; justification: string; response: string; detail: string;
+  plan: string[]; workaround: string;
+  citations: string[]; missing: string[]; confidence: 'low' | 'medium' | 'high';
+};
+export type Exploits = { edb?: string[]; msf?: string[]; nuclei?: boolean; checked: boolean };
+// 규칙 계산(AI 아님): 우선순위·OSV 수정 버전·KEV 기한·공개 익스플로잇
+export type VexRemedy = {
+  priority: number; targetVersion?: string; fixedVersions?: string[]; inRange?: string;
+  osvId?: string; ranges?: string[]; osvNote?: string; dueBy?: string; exploits: Exploits;
+};
+export type VexDraftResult = {
+  component: string; vulnerability: string; vulnId: string; at: string;
+  draft: VexDraft; remedy: VexRemedy; facts: AIFact[]; warnings: string[]; kev: boolean;
+  meta: { model: string; factsSha256: string; dbSnapshot?: string; elapsedMs: number };
+};
+export const aiStatus = () => aj<AIStatus>('/api/ai/status');
+// AI 연결 설정(관리자). 키는 다시 내려오지 않는다(hasKey·keyHint 만).
+export type AIConfig = {
+  mode: 'off' | 'local' | 'external'; url: string; model?: string; jsonSchema: boolean; sendChecklist: boolean;
+  hasKey: boolean; keyHint?: string; fromEnv: boolean; updatedBy?: string; updatedAt?: string;
+};
+export type AIConfigIn = {
+  mode: AIConfig['mode']; url: string; model: string; apiKey?: string; clearKey?: boolean; jsonSchema: boolean; sendChecklist: boolean;
+};
+export const adminAIConfig = () => aj<{ config: AIConfig; status: AIStatus }>('/api/ai/config');
+export const adminAIConfigSave = (b: AIConfigIn) => aj<{ config: AIConfig; status: AIStatus }>('/api/ai/config', jsonInit('PUT', b));
+export const adminAITest = (b: AIConfigIn) =>
+  aj<{ ok: boolean; model?: string; answer?: string; elapsedMs: number; error?: string }>('/api/ai/test', jsonInit('POST', b));
+export const aiVexDraft = (b: { project: string; component: string; vulnerability: string; context?: string; repo: string; tag: string }) =>
+  aj<VexDraftResult>('/api/ai/vex-draft', jsonInit('POST', b));
+export type KevInfo = {
+  available: boolean; exploitsAvailable?: boolean; asOf?: string;
+  items?: Record<string, { kev: boolean; kevAdded?: string; kevDue?: string; ransomware?: boolean; exploit?: boolean; exploits?: Exploits }>;
+};
+export type VexBatch = {
+  state: 'none' | 'running' | 'done' | 'cancelled' | 'error'; project?: string; total?: number; done?: number;
+  current?: string; started?: string; finished?: string; error?: string; message?: string;
+  results?: Record<string, VexDraftResult>; failed?: Record<string, string>;
+};
+export const aiVexBatchStart = (b: { project: string; repo: string; tag: string; context?: string; limit?: number }) =>
+  aj<VexBatch>('/api/ai/vex-batch', jsonInit('POST', b));
+export const aiVexBatchCancel = (project: string) => aj<{ status: string }>('/api/ai/vex-batch', jsonInit('POST', { project, cancel: true }));
+export const aiVexBatch = (project: string) => aj<VexBatch>(`/api/ai/vex-batch?project=${encodeURIComponent(project)}`);
+export const vexKev = (ids: string[]) => aj<KevInfo>(`/api/vex/kev?ids=${encodeURIComponent(ids.join(','))}`);
+
+// ---------- 규제 대응 검증 ----------
+export type CompRegs = { id: string; name: string; basis: string; mandate: boolean; items: number; noSource?: boolean };
+export type CompCheck = { id: string; name: string; result: 'pass' | 'partial' | 'fail' | 'na'; value: string; fix?: string };
+export type CompItem = {
+  id: string; stage: string; activity: string; question: string; roles: string[]; regs: string[];
+  side: 'supplier' | 'buyer'; result: 'met' | 'partial' | 'unmet' | 'doc'; checks?: string[];
+  selfEval?: string; problem?: string; remedy?: string; aiCitations?: string[]; source?: 'rule' | 'ai';
+};
+export type CompReport = {
+  id: string; repo: string; tag: string; createdAt: string; createdBy: string; checklist: string; checklistSha256: string;
+  profile: { markets: string[] }; regs: CompRegs[]; evidence: CompCheck[]; info: Record<string, string>;
+  items: CompItem[]; counts: Record<string, number>; state: 'running' | 'done' | 'error'; progress?: string;
+  summary?: { summary: string; risks: { title: string; detail: string; citations: string[] }[]; actions: { priority: string; action: string; citations: string[] }[] };
+  ai?: { model: string; modelSha256?: string; dbSnapshot?: string; elapsedMs: number }; aiError?: string; sha256?: string;
+};
+export type CompInfo = {
+  ai: AIStatus; markets: Record<string, string>;
+  checklist?: { name: string; importedAt: string; sha256: string; sheet: string; items: number; regs: Record<string, number>; stages: Record<string, number> };
+  profiles: Record<string, { markets: string[] }>;
+  products: { repo: string; tags: string[] }[];
+  reports: { id: string; repo: string; tag: string; createdAt: string; counts: Record<string, number>; ai: boolean }[];
+  running?: { id: string; progress: string };
+};
+export const adminCompliance = () => aj<CompInfo>('/api/compliance');
+export const adminComplianceUpload = async (f: File) =>
+  aj<CompInfo['checklist']>(`/api/compliance/checklist?name=${encodeURIComponent(f.name)}`, { method: 'PUT', body: await f.arrayBuffer() });
+export const adminComplianceRun = (b: { repo: string; tag: string; profile: { markets: string[] }; ai: boolean }) =>
+  aj<{ id: string }>('/api/compliance/report', jsonInit('POST', b));
+export const adminComplianceReport = (id: string) => aj<CompReport>(`/api/compliance/report/${encodeURIComponent(id)}`);
+export const complianceMdUrl = (id: string) => `/api/compliance/report/${encodeURIComponent(id)}?format=md`;

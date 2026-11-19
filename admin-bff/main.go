@@ -232,6 +232,10 @@ type stateData struct {
 const cookieName = "tl_admin_sid"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "mirror" { // 취약점 DB 미러(별도 컨테이너) — mirror.go
+		runMirror()
+		return
+	}
 	cfg := loadConfig()
 	if cfg.ClientSecret == "" {
 		log.Fatal("CLIENT_SECRET (trustlink-admin) 가 필요합니다")
@@ -288,6 +292,10 @@ func main() {
 	mux.HandleFunc("GET /api/vulnsources", s.guard(s.apiVulnSources))                      // 취약점 DB(OSV·GitHub) 설정
 	mux.HandleFunc("PUT /api/vulnsources", s.guard(s.apiVulnSourcesPut))
 	mux.HandleFunc("POST /api/vulnsources/reanalyze", s.guard(s.apiVulnReanalyze))
+	mux.HandleFunc("GET /api/mirror", s.guard(s.apiMirror)) // 취약점 DB 미러 상태·정책
+	mux.HandleFunc("PUT /api/mirror/policy", s.guard(s.apiMirrorPolicy))
+	mux.HandleFunc("POST /api/mirror/sync/{id}", s.guard(s.apiMirrorSync))
+	mux.HandleFunc("PUT /api/mirror/dt", s.guard(s.apiMirrorDT)) // DT 가 미러를 보게 전환/되돌리기
 	mux.HandleFunc("GET /api/repos", s.guardSession(s.apiRepos)) // 제품 열람: 로그인 사용자(그룹 read 는 zot RBAC 이 최종 판정)
 	mux.HandleFunc("POST /api/registry/delete-tag", s.guard(s.apiDeleteTag))
 	mux.HandleFunc("GET /api/retention", s.guard(s.apiRetention))
@@ -310,6 +318,19 @@ func main() {
 	mux.HandleFunc("GET /api/vex/export", vexEdit(s.apiVexExport))
 	mux.HandleFunc("POST /api/vex/publish", vexEdit(s.apiVexPublish))     // DT VEX → OCI 새 referrer 발행
 	mux.HandleFunc("POST /api/sbom/generate", vexEdit(s.apiSBOMGenerate)) // syft SBOM 생성·부착(제품 쓰기 권한, self 는 admins)
+	mux.HandleFunc("GET /api/vex/kev", vexEdit(s.apiVexKEV))              // KEV 등재 여부(미러 사본) — 우선순위 정렬용
+	mux.HandleFunc("POST /api/ai/vex-draft", vexEdit(s.apiAIVexDraft))    // AI VEX 판정·대응 초안(저장은 사람이)
+	mux.HandleFunc("POST /api/ai/vex-batch", vexEdit(s.apiAIVexBatch))    // 미분석 항목 일괄 초안(비동기)·취소
+	mux.HandleFunc("GET /api/ai/vex-batch", vexEdit(s.apiAIVexBatchGet))  // 일괄 초안 진행·결과
+	mux.HandleFunc("GET /api/ai/status", s.guardSession(s.apiAIStatus))
+	mux.HandleFunc("GET /api/ai/config", s.guard(s.apiAIConfigGet)) // AI 연결 설정(로컬·외부 LLM) — 키는 끝 4자리만
+	mux.HandleFunc("PUT /api/ai/config", s.guard(s.apiAIConfigPut))
+	mux.HandleFunc("POST /api/ai/test", s.guard(s.apiAITest))
+	// 규제 대응 검증(체크리스트 기준 리포트) — 관리자
+	mux.HandleFunc("GET /api/compliance", s.guard(s.apiComplianceInfo))
+	mux.HandleFunc("PUT /api/compliance/checklist", s.guard(s.apiComplianceUpload))
+	mux.HandleFunc("POST /api/compliance/report", s.guard(s.apiComplianceRun))
+	mux.HandleFunc("GET /api/compliance/report/{id}", s.guard(s.apiComplianceGet))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 
 	// 단일 프론트도어: 신규 UI 서빙 + /v2·/zot·/auth 리버스 프록시 (UI_DIR 설정 시 활성)
