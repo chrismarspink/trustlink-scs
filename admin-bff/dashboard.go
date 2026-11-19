@@ -141,12 +141,17 @@ var dashCache struct {
 }
 
 func (s *Server) apiDashboard(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, s.dashboardCached(r.URL.Query().Get("refresh") == "1"))
+}
+
+// dashboardCached: 집계 캐시(메일 요약도 같은 값을 쓴다).
+func (s *Server) dashboardCached(refresh bool) *Dashboard {
 	dashCache.Lock()
 	defer dashCache.Unlock()
-	if dashCache.data == nil || time.Since(dashCache.at) > dashCacheTTL || r.URL.Query().Get("refresh") == "1" {
+	if dashCache.data == nil || time.Since(dashCache.at) > dashCacheTTL || refresh {
 		dashCache.data, dashCache.at = s.buildDashboard(time.Now()), time.Now()
 	}
-	writeJSON(w, 200, dashCache.data)
+	return dashCache.data
 }
 
 func (s *Server) buildDashboard(now time.Time) *Dashboard {

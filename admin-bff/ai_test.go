@@ -90,8 +90,8 @@ func TestKEVAndEOLFromMirror(t *testing.T) {
 	f.Component.Name = "log4j-core"
 	sig := vexSignalsFor(f)
 	facts := vexFacts(f, "", sig)
-	if !sig.KEV || !strings.Contains(factsBlock(facts), "등재됨") {
-		t.Fatalf("KEV 등재를 사실로 넣어야 함: %s", factsBlock(facts))
+	if !sig.KEV || !strings.Contains(factsBlock(facts, "ko"), "등재됨") {
+		t.Fatalf("KEV 등재를 사실로 넣어야 함: %s", factsBlock(facts, "ko"))
 	}
 	hits, ok := eolHits([]sbomComp{
 		{"log4j-core", "2.12.1", "pkg:maven/org.apache.logging.log4j/log4j-core@2.12.1"}, // 2.12 주기 EOL

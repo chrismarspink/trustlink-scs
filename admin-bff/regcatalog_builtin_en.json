@@ -1,0 +1,1001 @@
+{
+  "us-eo14028": {
+    "kind": "Executive order",
+    "authority": "The White House",
+    "binding": "Procurement condition",
+    "status": "In force (partially amended by subsequent executive orders)",
+    "scope": "Companies that supply software to the U.S. federal government. Section 4 (Enhancing Software Supply Chain Security) is the basis for requiring SBOMs, secure development practices and vulnerability disclosure",
+    "tags": [
+      "SBOM",
+      "SSDF",
+      "Procurement"
+    ],
+    "dates": [
+      "Signed / effective",
+      "Strengthened by EO 14144",
+      "Certain provisions amended by EO 14306 (including attestation validation provisions; to be verified)"
+    ],
+    "requirements": {
+      "us-eo14028-sbom": {
+        "title": "Provide an SBOM to purchasers",
+        "text": "Provide a Software Bill of Materials (SBOM) for each product directly to the purchaser or publish it on a public website.",
+        "actions": {
+          "dev": "Generate an SBOM (CycloneDX/SPDX) for every build and attach it to the release",
+          "admin": "Retain SBOMs per product and version and manage the delivery channel to customers",
+          "sales": "Specify the SBOM delivery method (portal download) in proposals and contracts"
+        }
+      },
+      "us-eo14028-ssdf": {
+        "title": "Follow and attest to secure software development practices",
+        "text": "Secure development environments, maintain code integrity and check for vulnerabilities in line with the NIST Secure Software Development Framework (SSDF), and attest to conformity upon request.",
+        "actions": {
+          "dev": "Keep evidence for each SSDF practice (build signatures, vulnerability scan records)",
+          "admin": "Retain attestation submission history and supporting evidence",
+          "sales": "Track the schedule of federal customers' self-attestation requests"
+        }
+      },
+      "us-eo14028-vdp": {
+        "title": "Operate a vulnerability disclosure program",
+        "text": "Operate a vulnerability disclosure program (VDP) process that accepts external reports.",
+        "actions": {
+          "dev": "Publish analysis results of reported vulnerabilities as VEX",
+          "admin": "Operate a security point of contact (e.g. security.txt) and handling deadlines",
+          "sales": "Direct customers to the vulnerability reporting channel when they inquire"
+        }
+      }
+    }
+  },
+  "us-ssdf": {
+    "kind": "Standard / guideline",
+    "authority": "NIST",
+    "binding": "Procurement condition (basis for self-attestation)",
+    "status": "In force (v1.1). Revision in progress — check for the latest version",
+    "scope": "Basis for the federal procurement self-attestation form. Also widely used in the private sector as a benchmark for assessing secure development maturity",
+    "tags": [
+      "SSDF",
+      "Secure development"
+    ],
+    "dates": [
+      "v1.1 published"
+    ],
+    "requirements": {
+      "ssdf-ps1": {
+        "title": "Protect code from unauthorized changes",
+        "text": "Protect all forms of code from unauthorized access and tampering.",
+        "actions": {
+          "dev": "Protected branches, mandatory reviews and signed commits in repositories",
+          "admin": "Minimize and periodically review access rights to repositories and build servers",
+          "sales": ""
+        }
+      },
+      "ssdf-ps2": {
+        "title": "Provide a mechanism for verifying release integrity",
+        "text": "Enable software acquirers to verify the integrity of software releases (hashes, signatures).",
+        "actions": {
+          "dev": "Attach signatures (cosign/notation) to release artifacts",
+          "admin": "Operate signing key custody and rotation procedures; distribute public keys",
+          "sales": "Explain to customers how to verify signatures"
+        }
+      },
+      "ssdf-ps3": {
+        "title": "Archive releases and component provenance (SBOM)",
+        "text": "Archive each software release and collect, maintain and share provenance data for its components (SBOM).",
+        "actions": {
+          "dev": "Generate and attach an SBOM for each release, populating component identifiers (purl)",
+          "admin": "Retain releases and SBOMs long term",
+          "sales": ""
+        }
+      },
+      "ssdf-pw4": {
+        "title": "Verify reused software",
+        "text": "Verify external and open source components before adoption and during use (vulnerabilities, licenses, support status).",
+        "actions": {
+          "dev": "Check vulnerabilities, licenses and end of support when adding new dependencies",
+          "admin": "Manage allowed-license and EOL policies",
+          "sales": ""
+        }
+      },
+      "ssdf-rv1": {
+        "title": "Identify vulnerabilities on an ongoing basis",
+        "text": "Continue to identify and confirm component vulnerabilities after release.",
+        "actions": {
+          "dev": "",
+          "admin": "Keep the vulnerability database up to date and re-analyze periodically",
+          "sales": ""
+        }
+      },
+      "ssdf-rv2": {
+        "title": "Assess, prioritize and remediate vulnerabilities",
+        "text": "Assess vulnerabilities, prioritize them and remediate them.",
+        "actions": {
+          "dev": "Patch KEV and publicly exploited vulnerabilities first; record non-affected cases in VEX with justification",
+          "admin": "Manage remediation deadlines (SLA)",
+          "sales": "Share impact status with customers via VEX"
+        }
+      }
+    }
+  },
+  "us-attestation": {
+    "kind": "Administrative guidance",
+    "authority": "OMB / CISA",
+    "binding": "Procurement condition",
+    "status": "In force (operation after EO 14306 in 2025 to be verified)",
+    "scope": "Producers of software used by federal agencies. The CEO or a designee attests by signature to conformity in four SSDF-based areas",
+    "tags": [
+      "SSDF",
+      "Self-attestation",
+      "Procurement"
+    ],
+    "dates": [
+      "OMB M-22-18",
+      "OMB M-23-16 (supplement)",
+      "CISA common attestation form finalized"
+    ],
+    "requirements": {
+      "att-env": {
+        "title": "Secure development environments",
+        "text": "Separate and protect development and build environments, and control and log access to them.",
+        "actions": {
+          "dev": "Separate build environments and enforce multi-factor authentication",
+          "admin": "Retain build server access logs",
+          "sales": "Confirm the attestation signatory and submission schedule"
+        },
+        "clause": "Attestation 1"
+      },
+      "att-supply": {
+        "title": "Trusted source code supply chains",
+        "text": "Manage the provenance of internal and external code and use automated tools to check supply chain risks.",
+        "actions": {
+          "dev": "Pin dependency sources (lock files) and produce an SBOM",
+          "admin": "",
+          "sales": ""
+        },
+        "clause": "Attestation 2"
+      },
+      "att-provenance": {
+        "title": "Maintain component provenance",
+        "text": "Maintain provenance data for internal code and third-party components.",
+        "actions": {
+          "dev": "Populate supplier and identifier fields in the SBOM",
+          "admin": "Retain SBOMs per release",
+          "sales": ""
+        },
+        "clause": "Attestation 3"
+      },
+      "att-vuln": {
+        "title": "Vulnerability checking and remediation",
+        "text": "Check for vulnerabilities before and after release and address them through a disclosure process.",
+        "actions": {
+          "dev": "Zero vulnerabilities before release, or VEX justification",
+          "admin": "Operate a vulnerability reporting channel",
+          "sales": ""
+        },
+        "clause": "Attestation 4"
+      }
+    }
+  },
+  "us-sbom-min": {
+    "name": "NTIA Minimum Elements for an SBOM (including CISA update work)",
+    "kind": "Technical standard",
+    "authority": "NTIA / CISA",
+    "binding": "Recommended (cited as a procurement benchmark)",
+    "status": "In force (2021). CISA revision (adding component hashes, licenses, etc.) in draft — finalization to be verified",
+    "scope": "All suppliers providing SBOMs. Cited as the SBOM quality benchmark in federal procurement, FDA submissions and private contracts",
+    "tags": [
+      "SBOM"
+    ],
+    "dates": [
+      "NTIA minimum elements published",
+      "CISA revised draft released (to be verified)"
+    ],
+    "requirements": {
+      "sbom-min-fields": {
+        "title": "Required data fields",
+        "text": "Supplier name, component name, version, unique identifier (e.g. purl), dependency relationship, author of SBOM data, timestamp.",
+        "actions": {
+          "dev": "Confirm that the SBOM generation tool populates supplier, purl and timestamp",
+          "admin": "",
+          "sales": ""
+        },
+        "clause": "Data fields"
+      },
+      "sbom-min-format": {
+        "title": "Machine-readable format",
+        "text": "A standard machine-readable format such as SPDX or CycloneDX.",
+        "actions": {
+          "dev": "Output in CycloneDX 1.5 or later, or SPDX 2.3 or later",
+          "admin": "",
+          "sales": ""
+        },
+        "clause": "Automation support"
+      },
+      "sbom-min-practice": {
+        "title": "Update frequency and distribution",
+        "text": "Update the SBOM with every new build or release, explicitly identify unknown components, and define the distribution method and access control.",
+        "actions": {
+          "dev": "Make SBOM generation a fixed step in the build pipeline",
+          "admin": "Manage SBOM access rights per customer",
+          "sales": "Specify SBOM scope and delivery method in contracts"
+        },
+        "clause": "Practices and processes"
+      }
+    }
+  },
+  "us-fda-524b": {
+    "kind": "Law / guidance",
+    "authority": "FDA",
+    "binding": "Mandatory (market authorization)",
+    "status": "In force",
+    "scope": "Premarket submissions for medical devices that include software and can connect to the internet (cyber devices)",
+    "tags": [
+      "SBOM",
+      "Medical devices",
+      "Market authorization"
+    ],
+    "dates": [
+      "Section 524B in effect",
+      "FDA premarket cybersecurity guidance finalized (check for later revisions)"
+    ],
+    "requirements": {
+      "fda-sbom": {
+        "title": "Submit an SBOM",
+        "text": "Submit an SBOM including commercial, open source and off-the-shelf software components. The guidance also expects the level of support and end-of-support date for each component.",
+        "actions": {
+          "dev": "Add support status and end-of-support date for each component to the SBOM",
+          "admin": "Maintain a list of EOL components",
+          "sales": "Account for SBOM submission in the regulatory submission timeline"
+        }
+      },
+      "fda-postmarket": {
+        "title": "Postmarket vulnerability management plan",
+        "text": "Submit a plan to monitor, identify and address postmarket vulnerabilities (including coordinated vulnerability disclosure).",
+        "actions": {
+          "dev": "Document vulnerability analysis and VEX publication procedures",
+          "admin": "Operate periodic re-analysis and customer notification",
+          "sales": "Explain the security advisory process to hospital customers"
+        }
+      },
+      "fda-update": {
+        "title": "Provide updates and patches",
+        "text": "Maintain processes to design, develop and maintain the device for reasonable assurance, and provide means to deliver regular and emergency (out-of-cycle) updates.",
+        "actions": {
+          "dev": "Distribute signed updates",
+          "admin": "Emergency patch distribution procedure",
+          "sales": ""
+        }
+      }
+    }
+  },
+  "us-cmmc": {
+    "kind": "Regulation",
+    "authority": "Department of Defense (DoD)",
+    "binding": "Mandatory (defense contracts)",
+    "status": "In force — contract clauses being phased in",
+    "scope": "Defense contractors and subcontractors handling Federal Contract Information (FCI) or Controlled Unclassified Information (CUI)",
+    "tags": [
+      "Defense",
+      "Certification"
+    ],
+    "dates": [
+      "32 CFR Part 170 effective",
+      "DFARS contract clause Phase 1 effective (to be verified)"
+    ],
+    "requirements": {
+      "cmmc-l2": {
+        "title": "110 NIST SP 800-171 security requirements",
+        "text": "Contractors handling CUI implement the 110 requirements of NIST SP 800-171 Rev. 2 and undergo assessment (self or third-party).",
+        "actions": {
+          "dev": "",
+          "admin": "Manage 800-171 implementation status and SPRS score",
+          "sales": "Check the required level in solicitations and address flow-down clauses"
+        }
+      },
+      "cmmc-sc": {
+        "title": "Flow-down of requirements to subcontractors",
+        "text": "CMMC requirements are flowed down to subcontractors by contract.",
+        "actions": {
+          "dev": "",
+          "admin": "Verify the security posture of partner companies",
+          "sales": "Confirm the prime contractor's required level before contracting"
+        },
+        "clause": "Supply chain"
+      }
+    }
+  },
+  "us-cybertrust": {
+    "name": "U.S. Cyber Trust Mark (FCC IoT security label)",
+    "kind": "Voluntary certification",
+    "authority": "FCC",
+    "binding": "Recommended (voluntary)",
+    "status": "Operating (changes to administrator and schedule to be verified)",
+    "scope": "Consumer wireless IoT products. Security criteria based on NIST IR 8425",
+    "tags": [
+      "IoT",
+      "Label"
+    ],
+    "dates": [
+      "Program adopted by the FCC"
+    ],
+    "requirements": {
+      "ctm-support": {
+        "title": "Disclose updates and support period",
+        "text": "Disclose to consumers whether security updates are provided and the support period.",
+        "actions": {
+          "dev": "Implement a security update mechanism",
+          "admin": "Publish the support period",
+          "sales": "Use label status in marketing"
+        }
+      }
+    }
+  },
+  "eu-cra": {
+    "kind": "Law (regulation)",
+    "authority": "European Commission",
+    "binding": "Mandatory",
+    "status": "In force — applying in phases (reporting obligations apply)",
+    "scope": "Manufacturers, importers and distributors of products with digital elements (hardware and software) placed on the EU market. Products covered by separate rules such as medical devices and motor vehicles are excluded",
+    "tags": [
+      "SBOM",
+      "Vulnerability handling",
+      "Reporting",
+      "CE"
+    ],
+    "dates": [
+      "Entry into force",
+      "Provisions on conformity assessment bodies apply",
+      "Article 14 reporting obligations apply",
+      "Full application"
+    ],
+    "requirements": {
+      "cra-a1p1": {
+        "title": "Product security requirements",
+        "text": "Placed on the market without known exploitable vulnerabilities, secure by default configuration, security update mechanism, access control, data protection, minimized attack surface, recording of security events.",
+        "actions": {
+          "dev": "Confirm zero KEV and publicly exploited vulnerabilities before release; secure defaults",
+          "admin": "Include vulnerability criteria in release decision criteria",
+          "sales": ""
+        },
+        "clause": "Annex I Part I"
+      },
+      "cra-a1p2-1": {
+        "title": "Draw up an SBOM",
+        "text": "Draw up an SBOM in a commonly used, machine-readable format covering at least the top-level dependencies.",
+        "actions": {
+          "dev": "Generate an SBOM for every release (BSI TR-03183-2 fields recommended)",
+          "admin": "Include and retain the SBOM in the technical documentation",
+          "sales": "Prepare a procedure for providing it on request from market surveillance authorities"
+        },
+        "clause": "Annex I Part II (1)"
+      },
+      "cra-a1p2-2": {
+        "title": "Address vulnerabilities without delay and provide free security updates",
+        "text": "Address and remediate vulnerabilities without delay, and provide security updates free of charge, separately from functionality updates where technically feasible.",
+        "actions": {
+          "dev": "Set up the ability to ship security patches as separate releases",
+          "admin": "Manage remediation deadlines (SLA)",
+          "sales": "Distinguish maintenance contracts from the obligation to provide free security updates"
+        },
+        "clause": "Annex I Part II (2)·(8)"
+      },
+      "cra-a1p2-5": {
+        "title": "Coordinated vulnerability disclosure and contact address",
+        "text": "Publicly disclose information about fixed vulnerabilities, and put in place a coordinated vulnerability disclosure (CVD) policy and a contact address for reporting.",
+        "actions": {
+          "dev": "Disclose fixed vulnerabilities via VEX and security advisories",
+          "admin": "Publish the CVD policy and contact address",
+          "sales": "Invite customers to subscribe to security advisories"
+        },
+        "clause": "Annex I Part II (4)–(6)"
+      },
+      "cra-a13-8": {
+        "title": "Support period (at least 5 years as a rule)",
+        "text": "Determine the support period reflecting the expected time the product is in use (at least 5 years as a rule), and handle vulnerabilities throughout that period.",
+        "actions": {
+          "dev": "Choose components usable for the whole support period (avoid EOL)",
+          "admin": "Manage end-of-support dates per product",
+          "sales": "State the support period in product information and contracts"
+        },
+        "clause": "Art. 13(8)"
+      },
+      "cra-a14": {
+        "title": "Report actively exploited vulnerabilities and severe incidents",
+        "text": "On becoming aware of an actively exploited vulnerability: early warning within 24 hours, vulnerability notification within 72 hours, and final report within 14 days after a corrective measure is available (via the ENISA single reporting platform). Severe incidents: 24 hours, 72 hours and 1 month.",
+        "actions": {
+          "dev": "Escalate immediately to the reporting process when a KEV-listed vulnerability is assessed as affecting the product",
+          "admin": "Designate a 24-hour reporting owner and procedure",
+          "sales": "Prepare customer notification templates"
+        },
+        "clause": "Art. 14"
+      },
+      "cra-a2": {
+        "title": "Information and instructions to the user",
+        "text": "Provide the manufacturer's contact details, the vulnerability reporting point of contact, the end date of the support period, instructions for secure installation and updates, and (where made available) the location of the SBOM.",
+        "actions": {
+          "dev": "Document security settings and update procedures",
+          "admin": "Attach user instructions to releases",
+          "sales": "Publish the end-of-support date on product pages"
+        },
+        "clause": "Annex II"
+      },
+      "cra-a13-tech": {
+        "title": "Technical documentation, declaration of conformity and CE marking",
+        "text": "Draw up technical documentation including the cybersecurity risk assessment and keep it for 10 years, draw up the EU declaration of conformity and affix the CE marking.",
+        "actions": {
+          "dev": "Produce risk assessment and test records",
+          "admin": "Retain technical documentation for 10 years",
+          "sales": "Provide the declaration of conformity to importers and distributors"
+        },
+        "clause": "Art. 13 · Annex VII"
+      }
+    }
+  },
+  "eu-bsi-tr03183": {
+    "kind": "Technical standard",
+    "authority": "Federal Office for Information Security (BSI), Germany",
+    "binding": "Recommended (cited as a CRA implementation benchmark)",
+    "status": "In force (v2 series — latest version number to be verified)",
+    "scope": "German technical guideline specifying format and mandatory fields of SBOMs for the CRA. Required by European customers as an SBOM quality benchmark",
+    "tags": [
+      "SBOM",
+      "CRA"
+    ],
+    "dates": [
+      "v2.0 published (to be verified)"
+    ],
+    "requirements": {
+      "tr03183-format": {
+        "title": "SBOM format and version",
+        "text": "Provide CycloneDX or SPDX at or above the specified version (differs by edition — check the original text) in JSON/XML.",
+        "actions": {
+          "dev": "Output in CycloneDX 1.6 / SPDX 2.3 or later",
+          "admin": "",
+          "sales": ""
+        },
+        "clause": "Format"
+      },
+      "tr03183-fields": {
+        "title": "Mandatory component fields",
+        "text": "Creator and timestamp; per component: creator, name, version, filename, dependencies, licence, hash of the executable (SHA-512), etc.",
+        "actions": {
+          "dev": "Complete license, hash and supplier fields (target 0% missing)",
+          "admin": "",
+          "sales": "Confirm European customers' SBOM quality requirements"
+        },
+        "clause": "Required fields"
+      }
+    }
+  },
+  "eu-nis2": {
+    "kind": "Law (directive)",
+    "authority": "EU (Member State national law)",
+    "binding": "Mandatory (customers) → contractual requirements on suppliers",
+    "status": "In force (progress of transposition by Member States to be verified)",
+    "scope": "Essential and important entities in the EU (energy, transport, banking, health, digital infrastructure, etc.). Suppliers receive customers' supply chain security requirements through contracts",
+    "tags": [
+      "Supply chain",
+      "Customer requirements"
+    ],
+    "dates": [
+      "Entry into force",
+      "Transposition deadline"
+    ],
+    "requirements": {
+      "nis2-21d": {
+        "title": "Supply chain security",
+        "text": "Customer entities assess suppliers' security level and development practices and reflect them in contracts.",
+        "actions": {
+          "dev": "",
+          "admin": "Prepare materials for customer security questionnaires (SBOM, VEX, signatures)",
+          "sales": "Check security clauses in contracts with EU public-sector and infrastructure customers"
+        },
+        "clause": "Art. 21(2)(d)"
+      },
+      "nis2-23": {
+        "title": "Incident reporting (24 hours, 72 hours, 1 month)",
+        "text": "Because customer entities must report significant incidents, they require prompt incident notification from suppliers.",
+        "actions": {
+          "dev": "",
+          "admin": "Customer incident notification contact process",
+          "sales": "Check contractual notification deadlines"
+        },
+        "clause": "Art. 23"
+      }
+    }
+  },
+  "eu-dora": {
+    "kind": "Law (regulation)",
+    "authority": "EU",
+    "binding": "Mandatory (financial entities) → contractual requirements on ICT providers",
+    "status": "Applicable",
+    "scope": "EU financial entities and their ICT third-party service providers",
+    "tags": [
+      "Finance",
+      "Third-party risk"
+    ],
+    "dates": [
+      "Date of application"
+    ],
+    "requirements": {
+      "dora-28": {
+        "title": "ICT third-party risk and contractual provisions",
+        "text": "Financial entities include security, audit and termination provisions in contracts with ICT providers and maintain a register of information.",
+        "actions": {
+          "dev": "",
+          "admin": "Procedure for audit cooperation and providing security evidence",
+          "sales": "Review DORA clauses in contracts with EU financial customers"
+        },
+        "clause": "Art. 28–30"
+      }
+    }
+  },
+  "eu-pld": {
+    "kind": "Law (directive)",
+    "authority": "EU (Member State national law)",
+    "binding": "Mandatory (liability)",
+    "status": "In force — transposition deadline 2026-12-09",
+    "scope": "Software is included as a product. Failure to provide security updates may be deemed a defect",
+    "tags": [
+      "Liability",
+      "Updates"
+    ],
+    "dates": [
+      "Entry into force",
+      "Transposition deadline (applies to products placed on the market thereafter)"
+    ],
+    "requirements": {
+      "pld-update": {
+        "title": "Liability for providing security updates",
+        "text": "Failure to provide software updates (including security updates) within the manufacturer's control is a factor in assessing defectiveness.",
+        "actions": {
+          "dev": "Provide security patches within the support period",
+          "admin": "Retain records of patches provided",
+          "sales": "Have legal review contractual limitation-of-liability clauses"
+        },
+        "clause": "Defectiveness"
+      }
+    }
+  },
+  "eu-red-da": {
+    "kind": "Law (delegated regulation)",
+    "authority": "EU",
+    "binding": "Mandatory (radio equipment)",
+    "status": "Applicable (expected to be superseded when the CRA fully applies — to be verified)",
+    "scope": "Internet-connected radio equipment. Harmonised standards EN 18031-1/2/3",
+    "tags": [
+      "IoT",
+      "Radio"
+    ],
+    "dates": [
+      "Date of application"
+    ],
+    "requirements": {
+      "red-en18031": {
+        "title": "Network protection, personal data protection and fraud prevention",
+        "text": "Meet the EN 18031 series criteria (access control, secure updates, secure storage, etc.).",
+        "actions": {
+          "dev": "Signed firmware updates; no default passwords",
+          "admin": "",
+          "sales": "Confirm the EU launch schedule for radio products"
+        },
+        "clause": "Art. 3(3)(d)(e)(f)"
+      }
+    }
+  },
+  "jp-meti-sbom": {
+    "name": "METI Guide on Introducing SBOM for Software Management Ver. 2.0",
+    "kind": "Guideline",
+    "authority": "Ministry of Economy, Trade and Industry (METI)",
+    "binding": "Recommended",
+    "status": "In force (Ver. 2.0)",
+    "scope": "Software suppliers and purchasers. Ver. 2.0 adds a vulnerability management process and a model for SBOM responsibility allocation in contracts",
+    "tags": [
+      "SBOM",
+      "Contracts"
+    ],
+    "dates": [
+      "Ver. 1.0",
+      "Ver. 2.0"
+    ],
+    "requirements": {
+      "meti-process": {
+        "title": "SBOM adoption phases",
+        "text": "Adopt SBOM in phases: environment setup → creation and sharing → operation and management (including vulnerability management).",
+        "actions": {
+          "dev": "Decide on SBOM generation tools and format",
+          "admin": "Operate SBOM-based vulnerability management",
+          "sales": ""
+        },
+        "clause": "Ch. 3–5"
+      },
+      "meti-contract": {
+        "title": "Clarify SBOM responsibilities in contracts",
+        "text": "Define the scope of SBOM creation, delivery format and vulnerability response responsibilities in contracts.",
+        "actions": {
+          "dev": "",
+          "admin": "",
+          "sales": "Include SBOM scope and response responsibility clauses in contracts with Japanese customers"
+        },
+        "clause": "Added in Ver. 2.0"
+      }
+    }
+  },
+  "jp-esa": {
+    "name": "Economic Security Promotion Act — Ensuring Stable Provision of Specified Essential Infrastructure Services",
+    "kind": "Law",
+    "authority": "Cabinet Office and competent ministries",
+    "binding": "Mandatory (designated social infrastructure operators) → supplier information submission",
+    "status": "In force",
+    "scope": "Designated social infrastructure operators in sectors such as electricity, telecommunications and finance must notify in advance information on constituent equipment, parts and outsourcees when introducing critical facilities",
+    "tags": [
+      "Infrastructure",
+      "Supplier information"
+    ],
+    "dates": [
+      "Act enacted",
+      "Prior screening of critical facilities takes effect"
+    ],
+    "requirements": {
+      "esa-info": {
+        "title": "Provide information on constituent equipment, parts and suppliers",
+        "text": "Provide information on components, manufacturers and subcontracting so that the customer (operator) can file its notification.",
+        "actions": {
+          "dev": "Complete supplier information in the SBOM",
+          "admin": "Maintain lists of partners and subcontractors",
+          "sales": "Confirm submission materials when delivering to Japanese infrastructure customers"
+        },
+        "clause": "Notification of introduction plan"
+      }
+    }
+  },
+  "jp-jcstar": {
+    "name": "JC-STAR (IoT Product Security Conformity Assessment Scheme)",
+    "kind": "Voluntary certification",
+    "authority": "Information-technology Promotion Agency, Japan (IPA)",
+    "binding": "Recommended (may be required in government/corporate procurement)",
+    "status": "Operating (started with ★1; higher levels being introduced progressively — to be verified)",
+    "scope": "IoT products",
+    "tags": [
+      "IoT",
+      "Label"
+    ],
+    "dates": [
+      "★1 applications open (to be verified)"
+    ],
+    "requirements": {
+      "jcstar-1": {
+        "title": "Minimum security requirements",
+        "text": "No default passwords, provision of updates, vulnerability reporting point of contact, disclosure of support period, etc.",
+        "actions": {
+          "dev": "Update capability and secure defaults",
+          "admin": "Vulnerability reporting point of contact",
+          "sales": "Use label acquisition in sales in Japan"
+        }
+      }
+    }
+  },
+  "jp-gov-std": {
+    "name": "Common Standards for Cybersecurity Measures for Government Agencies",
+    "kind": "Government standard",
+    "authority": "Cabinet cybersecurity organization (successor to NISC — to be verified)",
+    "binding": "Mandatory (government agencies) → procurement requirements",
+    "status": "In force (revised annually — check for the latest edition)",
+    "scope": "Japanese government agencies and procurement of their information systems. Includes supply chain risk management and software procurement requirements",
+    "tags": [
+      "Public procurement"
+    ],
+    "dates": [
+      "FY2023 (Reiwa 5) edition (to be verified)"
+    ],
+    "requirements": {
+      "jpgov-sc": {
+        "title": "Supply chain security requirements in procurement",
+        "text": "Include security requirements for contractors and products (development controls, vulnerability response, absence of unauthorized functions, etc.) in procurement specifications.",
+        "actions": {
+          "dev": "",
+          "admin": "Prepare a compliance matrix for security requirements in procurement specifications",
+          "sales": "Check specifications of Japanese public tenders"
+        },
+        "clause": "Supply chain risk"
+      }
+    }
+  },
+  "jp-med": {
+    "name": "Cybersecurity of Medical Devices (applying JIS T 81001-5-1)",
+    "kind": "Regulation / guidance",
+    "authority": "Ministry of Health, Labour and Welfare (MHLW)",
+    "binding": "Mandatory (market authorization)",
+    "status": "In force (to be verified)",
+    "scope": "Medical devices marketed in Japan. Cybersecurity added to the Essential Principles; conformity to JIS T 81001-5-1 required",
+    "tags": [
+      "Medical devices",
+      "SBOM"
+    ],
+    "dates": [
+      "JIS T 81001-5-1 conformity requirement applies (to be verified)"
+    ],
+    "requirements": {
+      "jpmed-sbom": {
+        "title": "SBOM creation and vulnerability management",
+        "text": "Create an SBOM and establish a postmarket vulnerability management system.",
+        "actions": {
+          "dev": "SBOM and vulnerability management records",
+          "admin": "Postmarket surveillance procedure",
+          "sales": "Confirm delivery requirements for Japanese medical institutions"
+        }
+      }
+    }
+  },
+  "kr-swsc": {
+    "name": "Software Supply Chain Security Guideline 1.0 (Korea)",
+    "kind": "Guideline",
+    "authority": "Ministry of Science and ICT (MSIT), National Intelligence Service (NIS) and Presidential Committee on Digital Platform Government",
+    "binding": "Recommended (may be required in public-sector procurement)",
+    "status": "In force (1.0) — subsequent revisions and pilot projects to be verified",
+    "scope": "Software developers, suppliers and acquiring organizations (public and private)",
+    "tags": [
+      "SBOM",
+      "Supply chain"
+    ],
+    "dates": [
+      "1.0 announced"
+    ],
+    "requirements": {
+      "kr-swsc-sbom": {
+        "title": "Create, manage and provide SBOMs",
+        "text": "Create and manage SBOMs during development and provide them upon request from the acquiring organization.",
+        "actions": {
+          "dev": "Generate and attach an SBOM for every release",
+          "admin": "Manage SBOM retention and delivery history",
+          "sales": "State the SBOM delivery plan in public-sector proposals"
+        }
+      },
+      "kr-swsc-vuln": {
+        "title": "Component vulnerability management",
+        "text": "Identify and remediate component vulnerabilities based on the SBOM and share the results.",
+        "actions": {
+          "dev": "Remediate vulnerabilities and publish VEX",
+          "admin": "Periodic re-analysis and customer notification",
+          "sales": ""
+        },
+        "clause": "Vulnerability management"
+      },
+      "kr-swsc-integrity": {
+        "title": "Ensure distribution integrity",
+        "text": "Ensure integrity (signing and verification) across development, build and distribution.",
+        "actions": {
+          "dev": "Sign releases",
+          "admin": "Manage signing keys",
+          "sales": "Explain verification methods to customers"
+        },
+        "clause": "Integrity"
+      }
+    }
+  },
+  "kr-n2sf": {
+    "name": "National Network Security Framework (N2SF) Security Guideline",
+    "kind": "Government standard",
+    "authority": "National Intelligence Service (NIS)",
+    "binding": "Mandatory (public institutions) → security requirements on supplied products",
+    "status": "In force (official edition and application schedule to be verified)",
+    "scope": "Classifies public institutions' information services into Classified (C), Sensitive (S) and Open (O) grades and applies security controls per grade. Requirements flow down to supplied software and cloud services",
+    "tags": [
+      "Public sector",
+      "Network security"
+    ],
+    "dates": [
+      "Official edition of the guideline released (to be verified)"
+    ],
+    "requirements": {
+      "n2sf-sc": {
+        "title": "Supply chain security controls for acquired software",
+        "text": "Manage the components, vulnerabilities and integrity of software introduced into information services of each grade.",
+        "actions": {
+          "dev": "Provide SBOMs and signatures",
+          "admin": "Materials for the acquiring organization's security review",
+          "sales": "Confirm public-sector customers' requirements by grade (C/S/O)"
+        },
+        "clause": "Supply chain controls"
+      }
+    }
+  },
+  "kr-ismsp": {
+    "name": "ISMS-P Certification Criteria (Personal Information & Information Security Management System)",
+    "kind": "Certification criteria",
+    "authority": "Ministry of Science and ICT (MSIT) and Personal Information Protection Commission (PIPC) (KISA)",
+    "binding": "Mandatory (businesses above a size threshold) → supplier management",
+    "status": "In force",
+    "scope": "Companies subject to mandatory certification (customers) inspect external party and development security and request evidence from suppliers",
+    "tags": [
+      "Certification",
+      "External parties"
+    ],
+    "dates": [
+      "Integrated ISMS-P certification criteria in effect"
+    ],
+    "requirements": {
+      "ismsp-23": {
+        "title": "External party security requirements and inspection",
+        "text": "Customers contractually require and inspect external software and service providers' implementation of security requirements.",
+        "actions": {
+          "dev": "",
+          "admin": "Respond to customer security checklists",
+          "sales": "Check special security terms in contracts"
+        },
+        "clause": "2.3 External party security"
+      },
+      "ismsp-28": {
+        "title": "Security requirements and testing for acquired software",
+        "text": "Define and test security requirements at acquisition; manage vulnerabilities in open source software.",
+        "actions": {
+          "dev": "Provide security test results and SBOMs",
+          "admin": "",
+          "sales": ""
+        },
+        "clause": "2.8 Security in acquisition and development"
+      },
+      "ismsp-2108": {
+        "title": "Patch management",
+        "text": "Apply software security patches in a timely manner (customer side). Suppliers must provide patch information.",
+        "actions": {
+          "dev": "",
+          "admin": "Patch notices and VEX notifications",
+          "sales": ""
+        },
+        "clause": "2.10.8 Patch management"
+      }
+    }
+  },
+  "kr-fin": {
+    "name": "Regulation on Supervision of Electronic Financial Transactions and Financial-Sector SW Supply Chain Security Requirements",
+    "kind": "Regulation / inspection criteria",
+    "authority": "Financial Services Commission (FSC), Financial Supervisory Service (FSS) and Financial Security Institute (FSI)",
+    "binding": "Mandatory (financial companies) → supplier requirements",
+    "status": "In force (follow-up measures on network separation reform and SBOM to be verified)",
+    "scope": "Companies supplying software to financial companies. Detailed items are assessed against the financial sector inspection checklist (uploaded)",
+    "tags": [
+      "Finance",
+      "Checklist"
+    ],
+    "dates": [
+      "Financial sector network separation reform roadmap announced"
+    ],
+    "requirements": {
+      "krfin-checklist": {
+        "title": "Financial sector supply chain inspection items",
+        "text": "Assess each item of the uploaded financial sector checklist (Admin console › Regulatory compliance verification).",
+        "actions": {
+          "dev": "Evidence for development-phase checklist items",
+          "admin": "Manage checklist assessment reports",
+          "sales": "Confirm financial customers' inspection schedules"
+        },
+        "clause": "Checklist"
+      }
+    }
+  },
+  "kr-secure-coding": {
+    "name": "Guidelines for Building and Operating Information Systems of Public Agencies — Software Security Development",
+    "kind": "Administrative rule",
+    "authority": "Ministry of the Interior and Safety (MOIS)",
+    "binding": "Mandatory (public IT projects)",
+    "status": "In force",
+    "scope": "Software developed in IT projects of administrative and public institutions. Removal and diagnosis of security weaknesses",
+    "tags": [
+      "Public sector",
+      "Secure development"
+    ],
+    "dates": [
+      "Secure software development made mandatory (expanded in phases)"
+    ],
+    "requirements": {
+      "kr-sc-weak": {
+        "title": "Remove and diagnose security weaknesses",
+        "text": "Remove security weaknesses according to the design and implementation-phase security weakness criteria, and submit the diagnosis results.",
+        "actions": {
+          "dev": "Diagnose and fix security weaknesses with static analysis",
+          "admin": "Retain diagnosis results",
+          "sales": "Include in the deliverables list of public-sector projects"
+        },
+        "clause": "Security weakness criteria"
+      }
+    }
+  },
+  "kr-cc": {
+    "name": "Security Conformity Verification and CC Certification (public-sector procurement of security products)",
+    "kind": "Certification scheme",
+    "authority": "National Intelligence Service (NIS) and KISA (IT Security Certification Center)",
+    "binding": "Mandatory (information security products procured by public institutions)",
+    "status": "In force",
+    "scope": "Information security products and network equipment introduced into public institutions",
+    "tags": [
+      "Public sector",
+      "Certification"
+    ],
+    "dates": [],
+    "requirements": {
+      "kr-cc-cert": {
+        "title": "Determine whether certification/verification is required",
+        "text": "Determine, by product type, whether CC certification or a security function confirmation certificate is required.",
+        "actions": {
+          "dev": "",
+          "admin": "Manage certification validity periods",
+          "sales": "Confirm public tender eligibility requirements"
+        },
+        "clause": "Procurement requirements"
+      }
+    }
+  },
+  "kr-csap": {
+    "name": "Cloud Security Assurance Program (CSAP)",
+    "kind": "Certification scheme",
+    "authority": "Ministry of Science and ICT (MSIT) and KISA",
+    "binding": "Procurement condition (certification public bodies must give priority to)",
+    "status": "In force (tiered grading system)",
+    "scope": "Companies supplying cloud (IaaS/SaaS) services to public institutions",
+    "tags": [
+      "Cloud",
+      "Public sector"
+    ],
+    "dates": [],
+    "requirements": {
+      "csap-sc": {
+        "title": "Security management of service components",
+        "text": "Manage vulnerabilities, patches and the supply chain of the software that makes up the service.",
+        "actions": {
+          "dev": "Manage SBOMs for SaaS components",
+          "admin": "Manage certification renewal schedule",
+          "sales": "Confirm certification grade when selling SaaS to the public sector"
+        },
+        "clause": "Supply chain & development security"
+      }
+    }
+  },
+  "uk-psti": {
+    "kind": "Law",
+    "authority": "UK Government (DSIT)",
+    "binding": "Mandatory (consumer connectable products)",
+    "status": "In force",
+    "scope": "Consumer connectable products sold in the UK",
+    "tags": [
+      "IoT"
+    ],
+    "dates": [
+      "Security requirements in force"
+    ],
+    "requirements": {
+      "psti-req": {
+        "title": "Three core requirements",
+        "text": "Ban on default or universal passwords, publication of a point of contact for reporting vulnerabilities, publication of the minimum security update period.",
+        "actions": {
+          "dev": "Remove default passwords",
+          "admin": "Publish the reporting contact and support period",
+          "sales": "Include the statement of compliance"
+        }
+      }
+    }
+  },
+  "in-certin-sbom": {
+    "kind": "Technical guideline",
+    "authority": "CERT-In",
+    "binding": "Recommended (required in government and essential-sector procurement)",
+    "status": "In force (to be verified)",
+    "scope": "Companies supplying software to Indian public and essential sectors",
+    "tags": [
+      "SBOM"
+    ],
+    "dates": [
+      "Guidelines released (to be verified)"
+    ],
+    "requirements": {
+      "certin-fields": {
+        "title": "SBOM fields and updates",
+        "text": "Include component information (supplier, version, license, hash, etc.) and have update and sharing procedures in place.",
+        "actions": {
+          "dev": "Complete license and hash fields in the SBOM",
+          "admin": "",
+          "sales": "Confirm Indian public tender requirements"
+        },
+        "clause": "SBOM elements"
+      }
+    }
+  }
+}

@@ -1,0 +1,3206 @@
+{
+  "version": "2026.11.2",
+  "asOf": "2026-11-19",
+  "note": "TrustLink 내장 규제 카탈로그 — 출시 시점 기준으로 정리한 요약이다. 법률 자문이 아니며, 각 항목은 원문(출처)을 확인한 뒤 '확인됨'으로 표시해 쓴다. 날짜·조항 중 '(확인 필요)' 표시는 개정·후속 조치 여부를 반드시 확인한다.",
+  "regulations": [
+    {
+      "id": "us-eo14028",
+      "region": "US",
+      "rev": 1,
+      "name": "Executive Order 14028 — Improving the Nation's Cybersecurity",
+      "nameKo": "미국 행정명령 14028 (국가 사이버보안 강화)",
+      "kind": "행정명령",
+      "authority": "백악관",
+      "binding": "조달 조건",
+      "status": "시행(후속 행정명령으로 일부 개정)",
+      "scope": "미국 연방정부에 소프트웨어를 공급하는 기업. 4절(소프트웨어 공급망 보안)이 SBOM·보안 개발 관행·취약점 공개를 요구하는 근거",
+      "markets": [
+        "us_fed",
+        "us_def"
+      ],
+      "tags": [
+        "SBOM",
+        "SSDF",
+        "조달"
+      ],
+      "dates": [
+        {
+          "date": "2021-05-12",
+          "label": "서명·시행"
+        },
+        {
+          "date": "2025-01-16",
+          "label": "EO 14144 로 보강"
+        },
+        {
+          "date": "2025-06-06",
+          "label": "EO 14306 으로 일부 조항 개정(증명 검증 조항 등, 확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "Federal Register — EO 14028",
+          "url": "https://www.federalregister.gov/documents/2021/05/17/2021-10460/improving-the-nations-cybersecurity"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "us-eo14028-sbom",
+          "clause": "Sec. 4(e)(vii)",
+          "title": "구매자에게 SBOM 제공",
+          "text": "제품별 SBOM 을 직접 제공하거나 공개 웹사이트에 게시한다.",
+          "evidence": [
+            "sbom.present",
+            "sbom.format"
+          ],
+          "actions": {
+            "dev": "빌드마다 SBOM(CycloneDX/SPDX)을 생성해 릴리스에 첨부",
+            "admin": "제품·버전별 SBOM 보관과 고객 제공 경로 관리",
+            "sales": "제안서·계약서에 SBOM 제공 방식(포털 다운로드) 명시"
+          }
+        },
+        {
+          "id": "us-eo14028-ssdf",
+          "clause": "Sec. 4(e)(i)~(x)",
+          "title": "보안 개발 관행 준수와 증명",
+          "text": "NIST 보안 개발 프레임워크(SSDF)에 따른 개발 환경 보호·코드 무결성·취약점 점검을 수행하고, 요청 시 준수를 증명한다.",
+          "evidence": [
+            "sign.present",
+            "vuln.triaged"
+          ],
+          "actions": {
+            "dev": "SSDF 항목별 근거(빌드 서명·취약점 점검 기록)를 남김",
+            "admin": "증명서 제출 이력과 근거 자료 보관",
+            "sales": "연방 고객의 자기증명서(Attestation) 요청 일정 파악"
+          }
+        },
+        {
+          "id": "us-eo14028-vdp",
+          "clause": "Sec. 4(e)(viii)",
+          "title": "취약점 공개 프로그램 운영",
+          "text": "외부 신고를 받는 취약점 공개(VDP) 절차를 운영한다.",
+          "evidence": [
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "신고 취약점 분석 결과를 VEX 로 발행",
+            "admin": "보안 연락 창구(security.txt 등)와 처리 기한 운영",
+            "sales": "고객 문의 시 취약점 신고 창구 안내"
+          }
+        }
+      ]
+    },
+    {
+      "id": "us-ssdf",
+      "region": "US",
+      "rev": 1,
+      "name": "NIST SP 800-218 Secure Software Development Framework (SSDF) v1.1",
+      "nameKo": "NIST 보안 소프트웨어 개발 프레임워크(SSDF)",
+      "kind": "표준·지침",
+      "authority": "NIST",
+      "binding": "조달 조건(자기증명의 기준)",
+      "status": "시행(v1.1). 개정판 작업 진행 — 최신판 확인 필요",
+      "scope": "연방 조달 자기증명서의 기준. 민간에서도 보안 개발 수준 평가 기준으로 널리 사용",
+      "markets": [
+        "us_fed",
+        "us_def"
+      ],
+      "tags": [
+        "SSDF",
+        "보안 개발"
+      ],
+      "dates": [
+        {
+          "date": "2022-02-03",
+          "label": "v1.1 발행"
+        }
+      ],
+      "sources": [
+        {
+          "title": "NIST SP 800-218",
+          "url": "https://csrc.nist.gov/pubs/sp/800/218/final"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "ssdf-ps1",
+          "clause": "PS.1",
+          "title": "코드 무단 변경 방지",
+          "text": "모든 형태의 코드를 무단 접근·변경으로부터 보호한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "저장소 보호 브랜치·리뷰 필수·서명 커밋",
+            "admin": "저장소·빌드 서버 접근 권한 최소화와 주기 점검",
+            "sales": ""
+          }
+        },
+        {
+          "id": "ssdf-ps2",
+          "clause": "PS.2",
+          "title": "릴리스 무결성 검증 수단 제공",
+          "text": "사용자가 소프트웨어 릴리스의 무결성을 검증할 수 있게 한다(해시·서명).",
+          "evidence": [
+            "sign.present"
+          ],
+          "actions": {
+            "dev": "릴리스 산출물에 서명(cosign/notation) 첨부",
+            "admin": "서명 키 보관·교체 절차 운영, 공개키 배포",
+            "sales": "고객에게 서명 검증 방법 안내"
+          }
+        },
+        {
+          "id": "ssdf-ps3",
+          "clause": "PS.3",
+          "title": "릴리스 보관과 구성요소 출처(SBOM)",
+          "text": "각 릴리스를 보관하고, 구성요소 출처 데이터(SBOM)를 수집·유지·공유한다.",
+          "evidence": [
+            "sbom.present",
+            "sbom.identity",
+            "sbom.supplier"
+          ],
+          "actions": {
+            "dev": "릴리스마다 SBOM 생성·첨부, 구성요소 식별자(purl) 채움",
+            "admin": "릴리스·SBOM 장기 보관",
+            "sales": ""
+          }
+        },
+        {
+          "id": "ssdf-pw4",
+          "clause": "PW.4",
+          "title": "재사용 소프트웨어 검증",
+          "text": "외부·오픈소스 구성요소를 도입 전·사용 중 검증한다(취약점·라이선스·지원 상태).",
+          "evidence": [
+            "sbom.license",
+            "comp.eol"
+          ],
+          "actions": {
+            "dev": "신규 의존성 도입 시 취약점·라이선스·지원 종료 확인",
+            "admin": "허용 라이선스·EOL 정책 관리",
+            "sales": ""
+          }
+        },
+        {
+          "id": "ssdf-rv1",
+          "clause": "RV.1",
+          "title": "취약점 지속 식별",
+          "text": "출시 후에도 구성요소 취약점을 지속적으로 식별·확인한다.",
+          "evidence": [
+            "db.fresh",
+            "vuln.triaged"
+          ],
+          "actions": {
+            "dev": "",
+            "admin": "취약점 DB 최신화와 정기 재분석",
+            "sales": ""
+          }
+        },
+        {
+          "id": "ssdf-rv2",
+          "clause": "RV.2",
+          "title": "취약점 평가·우선순위·대응",
+          "text": "취약점을 평가해 우선순위를 정하고 대응한다.",
+          "evidence": [
+            "vuln.critical",
+            "vuln.kev",
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "KEV·공개 익스플로잇 우선 패치, 영향 없음은 근거와 함께 VEX 기록",
+            "admin": "대응 기한(SLA) 관리",
+            "sales": "고객에게 VEX 로 영향 여부 공유"
+          }
+        }
+      ]
+    },
+    {
+      "id": "us-attestation",
+      "region": "US",
+      "rev": 1,
+      "name": "CISA Secure Software Development Attestation Form (OMB M-22-18 / M-23-16)",
+      "nameKo": "미국 연방 보안 SW 개발 자기증명서",
+      "kind": "행정 지침",
+      "authority": "OMB·CISA",
+      "binding": "조달 조건",
+      "status": "시행(2025년 EO 14306 이후 운영 방식 확인 필요)",
+      "scope": "연방기관이 사용하는 소프트웨어 생산자. CEO 또는 지정자가 SSDF 기반 4개 영역 준수를 서명으로 증명",
+      "markets": [
+        "us_fed"
+      ],
+      "tags": [
+        "SSDF",
+        "자기증명",
+        "조달"
+      ],
+      "dates": [
+        {
+          "date": "2022-09-14",
+          "label": "OMB M-22-18"
+        },
+        {
+          "date": "2023-06-09",
+          "label": "OMB M-23-16(보완)"
+        },
+        {
+          "date": "2024-03-11",
+          "label": "CISA 공통 증명서 확정"
+        }
+      ],
+      "sources": [
+        {
+          "title": "CISA Secure Software Development Attestation Form",
+          "url": "https://www.cisa.gov/secure-software-attestation-form"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "att-env",
+          "clause": "증명 1",
+          "title": "안전한 개발 환경",
+          "text": "개발·빌드 환경을 분리·보호하고 접근을 통제·기록한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "빌드 환경 분리·다중 인증",
+            "admin": "빌드 서버 접근 기록 보관",
+            "sales": "증명서 서명권자·제출 일정 확인"
+          }
+        },
+        {
+          "id": "att-supply",
+          "clause": "증명 2",
+          "title": "신뢰할 수 있는 소스 코드 공급망",
+          "text": "내부·외부 코드의 출처를 관리하고 자동화 도구로 공급망 위험을 점검한다.",
+          "evidence": [
+            "sbom.present"
+          ],
+          "actions": {
+            "dev": "의존성 출처 고정(잠금 파일)과 SBOM",
+            "admin": "",
+            "sales": ""
+          }
+        },
+        {
+          "id": "att-provenance",
+          "clause": "증명 3",
+          "title": "구성요소 출처(Provenance) 유지",
+          "text": "내부 코드와 서드파티 구성요소의 출처 데이터를 유지한다.",
+          "evidence": [
+            "sbom.identity",
+            "sbom.supplier"
+          ],
+          "actions": {
+            "dev": "SBOM 공급자·식별자 필드 채움",
+            "admin": "릴리스별 SBOM 보관",
+            "sales": ""
+          }
+        },
+        {
+          "id": "att-vuln",
+          "clause": "증명 4",
+          "title": "취약점 점검과 대응",
+          "text": "출시 전후 취약점을 점검하고 공개 절차로 대응한다.",
+          "evidence": [
+            "vuln.triaged",
+            "vuln.critical",
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "릴리스 전 취약점 0건 또는 VEX 근거",
+            "admin": "취약점 신고 창구 운영",
+            "sales": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "us-sbom-min",
+      "region": "US",
+      "rev": 1,
+      "name": "NTIA Minimum Elements for an SBOM (CISA 개정 작업 포함)",
+      "nameKo": "미국 SBOM 최소 요소",
+      "kind": "기술 기준",
+      "authority": "NTIA·CISA",
+      "binding": "권고(조달 시 기준으로 인용)",
+      "status": "시행(2021). CISA 개정판(구성요소 해시·라이선스 등 추가) 초안 — 확정 여부 확인 필요",
+      "scope": "SBOM 을 제공하는 모든 공급자. 연방 조달·FDA·민간 계약에서 SBOM 품질 기준으로 인용",
+      "markets": [
+        "us_fed",
+        "us_med",
+        "us_def"
+      ],
+      "tags": [
+        "SBOM"
+      ],
+      "dates": [
+        {
+          "date": "2021-07-12",
+          "label": "NTIA 최소 요소 발행"
+        },
+        {
+          "date": "2025-08-22",
+          "label": "CISA 개정 초안 공개(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "NTIA Minimum Elements",
+          "url": "https://www.ntia.gov/report/2021/minimum-elements-software-bill-materials-sbom"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "sbom-min-fields",
+          "clause": "데이터 필드",
+          "title": "필수 데이터 필드",
+          "text": "공급자, 구성요소 이름, 버전, 고유 식별자(purl 등), 의존 관계, SBOM 작성자, 작성 시각.",
+          "evidence": [
+            "sbom.identity",
+            "sbom.supplier"
+          ],
+          "actions": {
+            "dev": "SBOM 생성 도구에서 공급자·purl·작성 시각이 채워지는지 확인",
+            "admin": "",
+            "sales": ""
+          }
+        },
+        {
+          "id": "sbom-min-format",
+          "clause": "자동화 지원",
+          "title": "기계 판독 형식",
+          "text": "SPDX·CycloneDX 등 기계 판독 가능한 표준 형식.",
+          "evidence": [
+            "sbom.format"
+          ],
+          "actions": {
+            "dev": "CycloneDX 1.5 이상 또는 SPDX 2.3 이상으로 출력",
+            "admin": "",
+            "sales": ""
+          }
+        },
+        {
+          "id": "sbom-min-practice",
+          "clause": "관행",
+          "title": "갱신 주기·제공 방식",
+          "text": "새 빌드·릴리스마다 SBOM 을 갱신하고, 알 수 없는 구성요소는 명시하며, 제공 방식과 접근 통제를 정한다.",
+          "evidence": [
+            "sbom.present"
+          ],
+          "actions": {
+            "dev": "빌드 파이프라인에 SBOM 생성 단계 고정",
+            "admin": "고객별 SBOM 접근 권한 관리",
+            "sales": "SBOM 제공 범위·방식을 계약에 명시"
+          }
+        }
+      ]
+    },
+    {
+      "id": "us-fda-524b",
+      "region": "US",
+      "rev": 1,
+      "name": "FD&C Act Section 524B — Ensuring Cybersecurity of Devices",
+      "nameKo": "미국 FDA 의료기기 사이버보안(524B조)",
+      "kind": "법률·지침",
+      "authority": "FDA",
+      "binding": "의무(인허가)",
+      "status": "시행",
+      "scope": "소프트웨어를 포함하고 인터넷에 연결될 수 있는 의료기기(cyber device)의 시판 전 신청",
+      "markets": [
+        "us_med"
+      ],
+      "tags": [
+        "SBOM",
+        "의료기기",
+        "인허가"
+      ],
+      "dates": [
+        {
+          "date": "2023-03-29",
+          "label": "524B 시행"
+        },
+        {
+          "date": "2023-09-27",
+          "label": "FDA 시판 전 사이버보안 지침 확정(이후 개정판 확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "FDA Cybersecurity in Medical Devices",
+          "url": "https://www.fda.gov/medical-devices/digital-health-center-excellence/cybersecurity"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "fda-sbom",
+          "clause": "524B(b)(3)",
+          "title": "SBOM 제출",
+          "text": "상용·오픈소스·기성 구성요소를 포함한 SBOM 을 제출한다. 지침은 구성요소별 지원 수준과 지원 종료일도 요구한다.",
+          "evidence": [
+            "sbom.present",
+            "sbom.identity",
+            "comp.eol"
+          ],
+          "actions": {
+            "dev": "SBOM 에 구성요소별 지원 상태·지원 종료일 보완",
+            "admin": "EOL 구성요소 목록 관리",
+            "sales": "인허가 일정에 SBOM 제출 반영"
+          }
+        },
+        {
+          "id": "fda-postmarket",
+          "clause": "524B(b)(1)",
+          "title": "시판 후 취약점 관리 계획",
+          "text": "시판 후 취약점을 감시·식별·대응하는 계획(조정된 취약점 공개 포함)을 제출한다.",
+          "evidence": [
+            "vuln.triaged",
+            "vex.present",
+            "db.fresh"
+          ],
+          "actions": {
+            "dev": "취약점 분석·VEX 발행 절차 문서화",
+            "admin": "정기 재분석·고객 통보 운영",
+            "sales": "병원 고객 대상 보안 공지 체계 안내"
+          }
+        },
+        {
+          "id": "fda-update",
+          "clause": "524B(b)(2)",
+          "title": "업데이트·패치 제공",
+          "text": "합리적 보증을 위한 설계·개발·유지 절차와 정기·긴급 업데이트 제공 수단을 갖춘다.",
+          "evidence": [
+            "vuln.critical",
+            "vuln.kev",
+            "sign.present"
+          ],
+          "actions": {
+            "dev": "서명된 업데이트 배포",
+            "admin": "긴급 패치 배포 절차",
+            "sales": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "us-cmmc",
+      "region": "US",
+      "rev": 1,
+      "name": "Cybersecurity Maturity Model Certification (CMMC) 2.0 — 32 CFR Part 170 / DFARS",
+      "nameKo": "미국 국방부 CMMC 2.0",
+      "kind": "규정",
+      "authority": "국방부(DoD)",
+      "binding": "의무(국방 계약)",
+      "status": "시행 — 계약 조항 단계적 도입",
+      "scope": "연방 계약 정보(FCI)·통제 비밀 정보(CUI)를 다루는 국방 계약자와 하도급자",
+      "markets": [
+        "us_def"
+      ],
+      "tags": [
+        "국방",
+        "인증"
+      ],
+      "dates": [
+        {
+          "date": "2024-12-16",
+          "label": "32 CFR Part 170 시행"
+        },
+        {
+          "date": "2025-11-10",
+          "label": "DFARS 계약 조항 1단계 시행(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "DoD CIO — CMMC",
+          "url": "https://dodcio.defense.gov/CMMC/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "cmmc-l2",
+          "clause": "Level 2",
+          "title": "NIST SP 800-171 보안 요구 110개",
+          "text": "CUI 를 다루면 NIST SP 800-171 Rev.2 의 110개 요구를 이행하고 평가(자체·제3자)를 받는다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "800-171 이행 현황과 SPRS 점수 관리",
+            "sales": "입찰 공고의 요구 레벨 확인, 하도급 흐름 조항 대응"
+          }
+        },
+        {
+          "id": "cmmc-sc",
+          "clause": "공급망",
+          "title": "하도급자 요구 전달",
+          "text": "CMMC 요구는 하도급자에게도 계약으로 전달된다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "협력사 보안 수준 확인",
+            "sales": "원청 요구 레벨을 계약 전에 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "us-cybertrust",
+      "region": "US",
+      "rev": 1,
+      "name": "U.S. Cyber Trust Mark (FCC IoT 보안 라벨)",
+      "nameKo": "미국 사이버 트러스트 마크",
+      "kind": "자율 인증",
+      "authority": "FCC",
+      "binding": "권고(자율)",
+      "status": "운영(관리 기관·일정 변동 확인 필요)",
+      "scope": "소비자용 무선 IoT 제품. NIST IR 8425 기반 보안 기준",
+      "markets": [],
+      "tags": [
+        "IoT",
+        "라벨"
+      ],
+      "dates": [
+        {
+          "date": "2024-03-14",
+          "label": "FCC 제도 채택"
+        }
+      ],
+      "sources": [
+        {
+          "title": "FCC Cyber Trust Mark",
+          "url": "https://www.fcc.gov/CyberTrustMark"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "ctm-support",
+          "clause": "NIST IR 8425",
+          "title": "업데이트·지원 기간 공개",
+          "text": "보안 업데이트 제공 여부와 지원 기간을 소비자에게 공개한다.",
+          "evidence": [
+            "docs.present"
+          ],
+          "actions": {
+            "dev": "보안 업데이트 메커니즘 구현",
+            "admin": "지원 기간 공시",
+            "sales": "라벨 획득 여부를 마케팅에 활용"
+          }
+        }
+      ]
+    },
+    {
+      "id": "eu-cra",
+      "region": "EU",
+      "rev": 1,
+      "name": "Cyber Resilience Act — Regulation (EU) 2024/2847",
+      "nameKo": "EU 사이버 복원력법(CRA)",
+      "kind": "법률(규정)",
+      "authority": "EU 집행위원회",
+      "binding": "의무",
+      "status": "발효 — 단계 적용 중(신고 의무 적용 중)",
+      "scope": "EU 시장에 출시되는 디지털 요소를 가진 제품(하드웨어·소프트웨어)의 제조자·수입자·유통자. 의료기기·자동차 등 별도 규정 대상은 제외",
+      "markets": [
+        "eu"
+      ],
+      "tags": [
+        "SBOM",
+        "취약점 처리",
+        "신고",
+        "CE"
+      ],
+      "dates": [
+        {
+          "date": "2024-12-10",
+          "label": "발효"
+        },
+        {
+          "date": "2026-06-11",
+          "label": "적합성 평가기관 규정 적용"
+        },
+        {
+          "date": "2026-09-11",
+          "label": "제14조 신고 의무 적용"
+        },
+        {
+          "date": "2027-12-11",
+          "label": "전면 적용"
+        }
+      ],
+      "sources": [
+        {
+          "title": "EUR-Lex — Regulation (EU) 2024/2847",
+          "url": "https://eur-lex.europa.eu/eli/reg/2024/2847/oj"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "cra-a1p1",
+          "clause": "부속서 I 1부",
+          "title": "제품 보안 요구",
+          "text": "알려진 악용 가능 취약점 없이 출시, 안전한 기본 설정, 보안 업데이트 수단, 접근 통제, 데이터 보호, 공격 표면 최소화, 보안 이벤트 기록.",
+          "evidence": [
+            "vuln.kev",
+            "vuln.critical"
+          ],
+          "actions": {
+            "dev": "출시 전 KEV·공개 익스플로잇 취약점 0건 확인, 안전한 기본값",
+            "admin": "출시 판정 기준에 취약점 조건 포함",
+            "sales": ""
+          }
+        },
+        {
+          "id": "cra-a1p2-1",
+          "clause": "부속서 I 2부 (1)",
+          "title": "SBOM 작성",
+          "text": "최소한 최상위 의존성을 포함한 SBOM 을 일반적으로 쓰이는 기계 판독 형식으로 작성한다.",
+          "evidence": [
+            "sbom.present",
+            "sbom.format"
+          ],
+          "actions": {
+            "dev": "릴리스마다 SBOM 생성(BSI TR-03183-2 필드 권장)",
+            "admin": "기술 문서에 SBOM 포함·보관",
+            "sales": "시장 감시 기관 요청 시 제공 절차 준비"
+          }
+        },
+        {
+          "id": "cra-a1p2-2",
+          "clause": "부속서 I 2부 (2)·(8)",
+          "title": "취약점 지체 없는 해결과 무상 보안 업데이트",
+          "text": "취약점을 지체 없이 해결하고, 보안 업데이트는 가능하면 기능 업데이트와 분리해 무상으로 제공한다.",
+          "evidence": [
+            "vuln.critical",
+            "vuln.triaged"
+          ],
+          "actions": {
+            "dev": "보안 패치를 별도 릴리스로 제공 가능하게 구성",
+            "admin": "대응 기한(SLA) 관리",
+            "sales": "유지보수 계약과 무상 보안 업데이트 의무 구분"
+          }
+        },
+        {
+          "id": "cra-a1p2-5",
+          "clause": "부속서 I 2부 (4)~(6)",
+          "title": "조정된 취약점 공개와 연락처",
+          "text": "수정된 취약점 정보를 공개하고, 조정된 취약점 공개(CVD) 정책과 신고 연락처를 운영한다.",
+          "evidence": [
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "수정 취약점을 VEX·보안 공지로 공개",
+            "admin": "CVD 정책·연락처 게시",
+            "sales": "고객에게 보안 공지 구독 안내"
+          }
+        },
+        {
+          "id": "cra-a13-8",
+          "clause": "제13조(8)",
+          "title": "지원 기간(원칙 5년 이상)",
+          "text": "제품의 예상 사용 기간을 반영해 지원 기간을 정하고(원칙 최소 5년) 그 기간 동안 취약점을 처리한다.",
+          "evidence": [
+            "comp.eol",
+            "docs.present"
+          ],
+          "actions": {
+            "dev": "지원 기간 동안 쓸 수 있는 구성요소 선택(EOL 회피)",
+            "admin": "제품별 지원 종료일 관리",
+            "sales": "지원 기간을 제품 정보·계약에 명시"
+          }
+        },
+        {
+          "id": "cra-a14",
+          "clause": "제14조",
+          "title": "악용 취약점·중대 사고 신고",
+          "text": "적극 악용되는 취약점을 인지하면 24시간 내 조기 경보, 72시간 내 신고, 조치 가능 후 14일 내 최종 보고(ENISA 단일 신고 플랫폼). 중대 사고는 24시간·72시간·1개월.",
+          "evidence": [
+            "vuln.kev"
+          ],
+          "actions": {
+            "dev": "KEV 등재 + 영향 있음 판정 시 즉시 보고 체계로 전달",
+            "admin": "24시간 신고 담당자·절차 지정",
+            "sales": "고객 통보 문안 준비"
+          }
+        },
+        {
+          "id": "cra-a2",
+          "clause": "부속서 II",
+          "title": "사용자 정보·안내",
+          "text": "제조자 연락처, 취약점 신고 창구, 지원 종료일, 안전한 설치·업데이트 방법, (제공하는 경우) SBOM 위치를 안내한다.",
+          "evidence": [
+            "docs.present"
+          ],
+          "actions": {
+            "dev": "보안 설정·업데이트 방법 문서화",
+            "admin": "릴리스에 사용자 안내서 첨부",
+            "sales": "제품 페이지에 지원 종료일 게시"
+          }
+        },
+        {
+          "id": "cra-a13-tech",
+          "clause": "제13조·부속서 VII",
+          "title": "기술 문서·적합성 선언·CE 표시",
+          "text": "위험 평가를 포함한 기술 문서를 작성해 10년 보관하고, EU 적합성 선언 후 CE 를 표시한다.",
+          "evidence": [
+            "sbom.present",
+            "sign.present"
+          ],
+          "actions": {
+            "dev": "위험 평가·시험 기록 작성",
+            "admin": "기술 문서 10년 보관",
+            "sales": "수입자·유통자에게 적합성 선언서 제공"
+          }
+        }
+      ]
+    },
+    {
+      "id": "eu-bsi-tr03183",
+      "region": "EU",
+      "rev": 1,
+      "name": "BSI TR-03183-2 — Cyber Resilience Requirements: SBOM",
+      "nameKo": "독일 BSI 기술 지침 TR-03183-2 (CRA 용 SBOM)",
+      "kind": "기술 기준",
+      "authority": "독일 연방정보보안청(BSI)",
+      "binding": "권고(CRA 이행 기준으로 인용)",
+      "status": "시행(v2 계열 — 최신 판 번호 확인 필요)",
+      "scope": "CRA 대응 SBOM 의 형식·필수 필드를 구체화한 독일 기술 지침. 유럽 고객이 SBOM 품질 기준으로 요구",
+      "markets": [
+        "eu"
+      ],
+      "tags": [
+        "SBOM",
+        "CRA"
+      ],
+      "dates": [
+        {
+          "date": "2024-09-20",
+          "label": "v2.0 발행(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "BSI TR-03183",
+          "url": "https://www.bsi.bund.de/dok/TR-03183"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "tr03183-format",
+          "clause": "형식",
+          "title": "SBOM 형식과 버전",
+          "text": "CycloneDX 또는 SPDX 의 지정 버전 이상(판별 상이 — 원문 확인)을 JSON/XML 로 제공한다.",
+          "evidence": [
+            "sbom.format"
+          ],
+          "actions": {
+            "dev": "CycloneDX 1.6 / SPDX 2.3 이상으로 출력",
+            "admin": "",
+            "sales": ""
+          }
+        },
+        {
+          "id": "tr03183-fields",
+          "clause": "필수 필드",
+          "title": "구성요소 필수 필드",
+          "text": "작성자·작성 시각, 구성요소별 작성자·이름·버전·파일명·의존 관계·라이선스·실행 파일 해시(SHA-512) 등.",
+          "evidence": [
+            "sbom.identity",
+            "sbom.supplier",
+            "sbom.license"
+          ],
+          "actions": {
+            "dev": "라이선스·해시·공급자 필드 보강(누락률 0% 목표)",
+            "admin": "",
+            "sales": "유럽 고객 SBOM 품질 요구 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "eu-nis2",
+      "region": "EU",
+      "rev": 1,
+      "name": "NIS2 Directive — Directive (EU) 2022/2555",
+      "nameKo": "EU NIS2 지침",
+      "kind": "법률(지침)",
+      "authority": "EU(회원국 국내법)",
+      "binding": "의무(고객사) → 공급자에 계약 요구",
+      "status": "시행(회원국별 국내법 전환 진행 상황 확인 필요)",
+      "scope": "EU 의 필수·중요 기관(에너지·운송·금융·보건·디지털 인프라 등). 공급자는 고객의 공급망 보안 요구를 계약으로 받음",
+      "markets": [
+        "eu"
+      ],
+      "tags": [
+        "공급망",
+        "고객 요구"
+      ],
+      "dates": [
+        {
+          "date": "2023-01-16",
+          "label": "발효"
+        },
+        {
+          "date": "2024-10-17",
+          "label": "국내법 전환 기한"
+        }
+      ],
+      "sources": [
+        {
+          "title": "EUR-Lex — Directive (EU) 2022/2555",
+          "url": "https://eur-lex.europa.eu/eli/dir/2022/2555/oj"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "nis2-21d",
+          "clause": "제21조(2)(d)",
+          "title": "공급망 보안",
+          "text": "고객 기관은 공급자의 보안 수준·개발 관행을 평가하고 계약에 반영한다.",
+          "evidence": [
+            "sbom.present",
+            "vex.present",
+            "sign.present"
+          ],
+          "actions": {
+            "dev": "",
+            "admin": "고객 보안 질의서 대응 자료(SBOM·VEX·서명) 준비",
+            "sales": "EU 공공·인프라 고객 계약의 보안 조항 확인"
+          }
+        },
+        {
+          "id": "nis2-23",
+          "clause": "제23조",
+          "title": "사고 신고(24시간·72시간·1개월)",
+          "text": "고객 기관은 중대 사고를 신고해야 하므로 공급자에게 신속한 사고 통지를 요구한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "고객 사고 통지 연락 체계",
+            "sales": "계약상 통지 기한 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "eu-dora",
+      "region": "EU",
+      "rev": 1,
+      "name": "Digital Operational Resilience Act — Regulation (EU) 2022/2554",
+      "nameKo": "EU 디지털 운영 복원력법(DORA)",
+      "kind": "법률(규정)",
+      "authority": "EU",
+      "binding": "의무(금융기관) → ICT 공급자 계약 요구",
+      "status": "적용 중",
+      "scope": "EU 금융기관과 그 ICT 서비스 제3자 공급자",
+      "markets": [
+        "eu"
+      ],
+      "tags": [
+        "금융",
+        "제3자 위험"
+      ],
+      "dates": [
+        {
+          "date": "2025-01-17",
+          "label": "적용"
+        }
+      ],
+      "sources": [
+        {
+          "title": "EUR-Lex — Regulation (EU) 2022/2554",
+          "url": "https://eur-lex.europa.eu/eli/reg/2022/2554/oj"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "dora-28",
+          "clause": "제28조~제30조",
+          "title": "ICT 제3자 위험과 계약 조항",
+          "text": "금융기관은 ICT 공급자 계약에 보안·감사·종료 조항을 넣고 정보 등록부를 관리한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "감사 협조·보안 증빙 제공 절차",
+            "sales": "EU 금융 고객 계약의 DORA 조항 검토"
+          }
+        }
+      ]
+    },
+    {
+      "id": "eu-pld",
+      "region": "EU",
+      "rev": 1,
+      "name": "Product Liability Directive — Directive (EU) 2024/2853",
+      "nameKo": "EU 개정 제조물책임지침",
+      "kind": "법률(지침)",
+      "authority": "EU(회원국 국내법)",
+      "binding": "의무(책임)",
+      "status": "발효 — 국내법 전환 기한 2026-12-09",
+      "scope": "소프트웨어를 제조물로 포함. 보안 업데이트 미제공이 결함으로 인정될 수 있음",
+      "markets": [
+        "eu"
+      ],
+      "tags": [
+        "책임",
+        "업데이트"
+      ],
+      "dates": [
+        {
+          "date": "2024-12-08",
+          "label": "발효"
+        },
+        {
+          "date": "2026-12-09",
+          "label": "전환 기한(이후 출시 제품 적용)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "EUR-Lex — Directive (EU) 2024/2853",
+          "url": "https://eur-lex.europa.eu/eli/dir/2024/2853/oj"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "pld-update",
+          "clause": "결함 판단",
+          "title": "보안 업데이트 제공 책임",
+          "text": "제조자 통제 하의 소프트웨어 업데이트(보안 포함) 미제공은 결함 판단 요소가 된다.",
+          "evidence": [
+            "vuln.critical",
+            "comp.eol"
+          ],
+          "actions": {
+            "dev": "지원 기간 내 보안 패치 제공",
+            "admin": "패치 제공 기록 보관",
+            "sales": "계약상 책임 제한 조항 법무 검토"
+          }
+        }
+      ]
+    },
+    {
+      "id": "eu-red-da",
+      "region": "EU",
+      "rev": 1,
+      "name": "Radio Equipment Directive Delegated Regulation (EU) 2022/30",
+      "nameKo": "EU 무선기기 지침 사이버보안 위임규정(RED DA)",
+      "kind": "법률(위임규정)",
+      "authority": "EU",
+      "binding": "의무(무선기기)",
+      "status": "적용 중(CRA 전면 적용 시 대체 예정 — 확인 필요)",
+      "scope": "인터넷에 연결되는 무선기기. 조화 표준 EN 18031-1/2/3",
+      "markets": [
+        "eu"
+      ],
+      "tags": [
+        "IoT",
+        "무선"
+      ],
+      "dates": [
+        {
+          "date": "2025-08-01",
+          "label": "적용"
+        }
+      ],
+      "sources": [
+        {
+          "title": "EUR-Lex — Delegated Regulation (EU) 2022/30",
+          "url": "https://eur-lex.europa.eu/eli/reg_del/2022/30/oj"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "red-en18031",
+          "clause": "제3조(3)(d)(e)(f)",
+          "title": "네트워크 보호·개인정보·사기 방지",
+          "text": "EN 18031 시리즈 기준(접근 통제, 안전한 업데이트, 보안 저장 등)을 충족한다.",
+          "evidence": [
+            "sign.present"
+          ],
+          "actions": {
+            "dev": "서명된 펌웨어 업데이트·기본 비밀번호 금지",
+            "admin": "",
+            "sales": "무선 제품 EU 출시 일정 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "jp-meti-sbom",
+      "region": "JP",
+      "rev": 1,
+      "name": "ソフトウェア管理に向けたSBOM導入に関する手引 Ver.2.0",
+      "nameKo": "일본 경제산업성 SBOM 도입 안내서",
+      "kind": "가이드라인",
+      "authority": "경제산업성(METI)",
+      "binding": "권고",
+      "status": "시행(Ver.2.0)",
+      "scope": "소프트웨어 공급자·구매자. 2.0 에서 취약점 관리 프로세스와 계약 시 SBOM 책임 범위 모델 추가",
+      "markets": [
+        "jp"
+      ],
+      "tags": [
+        "SBOM",
+        "계약"
+      ],
+      "dates": [
+        {
+          "date": "2023-07-28",
+          "label": "Ver.1.0"
+        },
+        {
+          "date": "2024-08-29",
+          "label": "Ver.2.0"
+        }
+      ],
+      "sources": [
+        {
+          "title": "METI — SBOM 手引",
+          "url": "https://www.meti.go.jp/policy/netsecurity/wg1/sbom.html"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "meti-process",
+          "clause": "3~5장",
+          "title": "SBOM 도입 단계",
+          "text": "환경 구축 → 작성·공유 → 운용·관리(취약점 관리 포함)의 단계로 SBOM 을 도입한다.",
+          "evidence": [
+            "sbom.present",
+            "vuln.triaged"
+          ],
+          "actions": {
+            "dev": "SBOM 생성 도구·형식 결정",
+            "admin": "SBOM 기반 취약점 관리 운영",
+            "sales": ""
+          }
+        },
+        {
+          "id": "meti-contract",
+          "clause": "Ver.2.0 추가",
+          "title": "계약에서 SBOM 책임 범위 명확화",
+          "text": "SBOM 작성 범위·제공 형식·취약점 대응 책임을 계약에서 정한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "",
+            "sales": "일본 고객 계약서에 SBOM 범위·대응 책임 조항 반영"
+          }
+        }
+      ]
+    },
+    {
+      "id": "jp-esa",
+      "region": "JP",
+      "rev": 1,
+      "name": "経済安全保障推進法 — 特定社会基盤役務の安定的な提供の確保",
+      "nameKo": "일본 경제안전보장추진법(기간 인프라 설비 사전 심사)",
+      "kind": "법률",
+      "authority": "내각부·소관 부처",
+      "binding": "의무(특정 사회기반 사업자) → 공급자 정보 제출",
+      "status": "시행",
+      "scope": "전력·통신·금융 등 특정 사회기반 사업자가 중요 설비를 도입할 때 구성 설비·부품·위탁처 정보를 사전 신고",
+      "markets": [
+        "jp"
+      ],
+      "tags": [
+        "인프라",
+        "공급자 정보"
+      ],
+      "dates": [
+        {
+          "date": "2022-05-18",
+          "label": "법 성립"
+        },
+        {
+          "date": "2024-05-17",
+          "label": "설비 사전 심사 제도 시행"
+        }
+      ],
+      "sources": [
+        {
+          "title": "内閣府 経済安全保障推進法",
+          "url": "https://www.cao.go.jp/keizai_anzen_hosho/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "esa-info",
+          "clause": "도입 계획 신고",
+          "title": "구성 설비·부품·공급자 정보 제공",
+          "text": "고객(사업자)의 신고를 위해 구성요소·제조처·재위탁 정보를 제공한다.",
+          "evidence": [
+            "sbom.present",
+            "sbom.supplier"
+          ],
+          "actions": {
+            "dev": "SBOM 공급자 정보 보완",
+            "admin": "협력사·재위탁 목록 관리",
+            "sales": "일본 인프라 고객 납품 시 제출 자료 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "jp-jcstar",
+      "region": "JP",
+      "rev": 1,
+      "name": "JC-STAR (IoT 製品セキュリティ適合性評価制度)",
+      "nameKo": "일본 IoT 제품 보안 적합성 라벨(JC-STAR)",
+      "kind": "자율 인증",
+      "authority": "IPA",
+      "binding": "권고(정부·기업 조달에서 요구 가능)",
+      "status": "운영(★1 시작, 상위 등급 순차 도입 — 확인 필요)",
+      "scope": "IoT 제품",
+      "markets": [
+        "jp"
+      ],
+      "tags": [
+        "IoT",
+        "라벨"
+      ],
+      "dates": [
+        {
+          "date": "2025-03-25",
+          "label": "★1 접수 시작(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "IPA JC-STAR",
+          "url": "https://www.ipa.go.jp/security/jc-star/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "jcstar-1",
+          "clause": "★1",
+          "title": "최소 보안 요구",
+          "text": "기본 비밀번호 금지, 업데이트 제공, 취약점 신고 창구, 지원 기간 공개 등.",
+          "evidence": [
+            "docs.present",
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "업데이트 기능·기본값 보안",
+            "admin": "취약점 신고 창구",
+            "sales": "라벨 취득을 일본 영업에 활용"
+          }
+        }
+      ]
+    },
+    {
+      "id": "jp-gov-std",
+      "region": "JP",
+      "rev": 1,
+      "name": "政府機関等のサイバーセキュリティ対策のための統一基準群",
+      "nameKo": "일본 정부기관 사이버보안 통일기준",
+      "kind": "정부 기준",
+      "authority": "내각 사이버보안 조직(NISC 후신 — 확인 필요)",
+      "binding": "의무(정부기관) → 조달 요구",
+      "status": "시행(연도별 개정 — 최신판 확인 필요)",
+      "scope": "일본 정부기관과 그 정보시스템 조달. 공급망 위험 관리·SW 조달 요건 포함",
+      "markets": [
+        "jp"
+      ],
+      "tags": [
+        "공공 조달"
+      ],
+      "dates": [
+        {
+          "date": "2023-07-04",
+          "label": "令和5년도판(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "統一基準群",
+          "url": "https://www.nisc.go.jp/policy/group/general/kijun.html"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "jpgov-sc",
+          "clause": "공급망 위험",
+          "title": "조달 시 공급망 보안 요건",
+          "text": "위탁처·제품의 보안 요건(개발 관리, 취약점 대응, 부정 기능 미포함 등)을 조달 사양에 넣는다.",
+          "evidence": [
+            "sbom.present",
+            "vuln.triaged"
+          ],
+          "actions": {
+            "dev": "",
+            "admin": "조달 사양서 보안 요건 대응표 작성",
+            "sales": "일본 공공 입찰 사양 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "jp-med",
+      "region": "JP",
+      "rev": 1,
+      "name": "医療機器のサイバーセキュリティ (JIS T 81001-5-1 적용)",
+      "nameKo": "일본 의료기기 사이버보안 요건",
+      "kind": "규정·지침",
+      "authority": "후생노동성",
+      "binding": "의무(인허가)",
+      "status": "시행(확인 필요)",
+      "scope": "일본 출시 의료기기. 기본 요건 기준에 사이버보안 추가, JIS T 81001-5-1 적합 요구",
+      "markets": [
+        "jp"
+      ],
+      "tags": [
+        "의료기기",
+        "SBOM"
+      ],
+      "dates": [
+        {
+          "date": "2024-04-01",
+          "label": "JIS T 81001-5-1 적합 요구 적용(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "厚生労働省 医療機器サイバーセキュリティ",
+          "url": "https://www.mhlw.go.jp/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "jpmed-sbom",
+          "clause": "手引書",
+          "title": "SBOM 작성과 취약점 관리",
+          "text": "SBOM 을 작성하고 시판 후 취약점 관리 체계를 갖춘다.",
+          "evidence": [
+            "sbom.present",
+            "vuln.triaged"
+          ],
+          "actions": {
+            "dev": "SBOM·취약점 관리 기록",
+            "admin": "시판 후 감시 절차",
+            "sales": "일본 의료기관 납품 요건 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-swsc",
+      "region": "KR",
+      "rev": 1,
+      "name": "SW 공급망 보안 가이드라인 1.0",
+      "nameKo": "SW 공급망 보안 가이드라인 1.0",
+      "kind": "가이드라인",
+      "authority": "과학기술정보통신부·국가정보원·디지털플랫폼정부위원회",
+      "binding": "권고(공공 도입 시 요구 가능)",
+      "status": "시행(1.0) — 후속 개정·시범사업 확인 필요",
+      "scope": "SW 개발기업·공급기업·도입기관(공공·민간)",
+      "markets": [
+        "kr_pub",
+        "kr_fin"
+      ],
+      "tags": [
+        "SBOM",
+        "공급망"
+      ],
+      "dates": [
+        {
+          "date": "2024-05-13",
+          "label": "1.0 발표"
+        }
+      ],
+      "sources": [
+        {
+          "title": "과학기술정보통신부 보도자료",
+          "url": "https://www.msit.go.kr/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "kr-swsc-sbom",
+          "clause": "SBOM",
+          "title": "SBOM 작성·관리·제공",
+          "text": "개발 단계에서 SBOM 을 작성·관리하고 도입기관 요청 시 제공한다.",
+          "evidence": [
+            "sbom.present",
+            "sbom.format",
+            "sbom.identity"
+          ],
+          "actions": {
+            "dev": "릴리스마다 SBOM 생성·첨부",
+            "admin": "SBOM 보관·제공 이력 관리",
+            "sales": "공공 제안서에 SBOM 제공 계획 명시"
+          }
+        },
+        {
+          "id": "kr-swsc-vuln",
+          "clause": "취약점 관리",
+          "title": "구성요소 취약점 관리",
+          "text": "SBOM 기반으로 구성요소 취약점을 확인·조치하고 결과를 공유한다.",
+          "evidence": [
+            "vuln.triaged",
+            "vuln.critical",
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "취약점 조치·VEX 발행",
+            "admin": "정기 재분석·고객 통보",
+            "sales": ""
+          }
+        },
+        {
+          "id": "kr-swsc-integrity",
+          "clause": "무결성",
+          "title": "배포 무결성 보장",
+          "text": "개발·빌드·배포 단계 무결성(서명·검증)을 확보한다.",
+          "evidence": [
+            "sign.present"
+          ],
+          "actions": {
+            "dev": "릴리스 서명",
+            "admin": "서명 키 관리",
+            "sales": "고객 검증 방법 안내"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-n2sf",
+      "region": "KR",
+      "rev": 1,
+      "name": "국가 망 보안체계(N2SF) 보안 가이드라인",
+      "nameKo": "국가 망 보안체계(N2SF)",
+      "kind": "정부 기준",
+      "authority": "국가정보원",
+      "binding": "의무(공공기관) → 공급 제품 보안 요구",
+      "status": "시행(정식판·적용 일정 확인 필요)",
+      "scope": "공공기관 정보서비스를 기밀(C)·민감(S)·공개(O) 등급으로 나눠 등급별 보안 통제 적용. 공급 SW·클라우드 서비스에 요구가 전달됨",
+      "markets": [
+        "kr_pub"
+      ],
+      "tags": [
+        "공공",
+        "망 보안"
+      ],
+      "dates": [
+        {
+          "date": "2025-09-30",
+          "label": "가이드라인 정식판 공개(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "국가정보원 국가사이버안보센터",
+          "url": "https://www.ncsc.go.kr/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "n2sf-sc",
+          "clause": "공급망 통제",
+          "title": "도입 SW 공급망 보안 통제",
+          "text": "등급별 정보서비스에 도입하는 SW 의 구성요소·취약점·무결성을 관리한다.",
+          "evidence": [
+            "sbom.present",
+            "vuln.triaged",
+            "sign.present"
+          ],
+          "actions": {
+            "dev": "SBOM·서명 제공",
+            "admin": "도입기관 보안성 검토 대응 자료",
+            "sales": "공공 고객의 등급(C/S/O)별 요구 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-ismsp",
+      "region": "KR",
+      "rev": 1,
+      "name": "정보보호 및 개인정보보호 관리체계(ISMS-P) 인증기준",
+      "nameKo": "ISMS-P 인증기준",
+      "kind": "인증 기준",
+      "authority": "과학기술정보통신부·개인정보보호위원회(KISA)",
+      "binding": "의무(일정 규모 이상 사업자) → 공급자 관리",
+      "status": "시행",
+      "scope": "인증 의무 대상 기업(고객)이 외부자·개발 보안을 점검하며 공급자에게 증빙을 요구",
+      "markets": [
+        "kr_pub",
+        "kr_fin"
+      ],
+      "tags": [
+        "인증",
+        "외부자"
+      ],
+      "dates": [
+        {
+          "date": "2018-11-07",
+          "label": "ISMS-P 통합 인증기준 시행"
+        }
+      ],
+      "sources": [
+        {
+          "title": "KISA ISMS-P",
+          "url": "https://isms.kisa.or.kr/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "ismsp-23",
+          "clause": "2.3 외부자 보안",
+          "title": "외부자 보안 요구와 점검",
+          "text": "고객은 외부 SW·서비스 공급자의 보안 요구 이행을 계약·점검한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "고객 보안 점검표 대응",
+            "sales": "계약 보안 특약 확인"
+          }
+        },
+        {
+          "id": "ismsp-28",
+          "clause": "2.8 도입 및 개발 보안",
+          "title": "도입 SW 보안 요구·시험",
+          "text": "도입 시 보안 요구사항 정의·시험, 공개 SW 취약점 관리.",
+          "evidence": [
+            "vuln.triaged",
+            "sbom.present"
+          ],
+          "actions": {
+            "dev": "보안 시험 결과·SBOM 제공",
+            "admin": "",
+            "sales": ""
+          }
+        },
+        {
+          "id": "ismsp-2108",
+          "clause": "2.10.8 패치관리",
+          "title": "패치 관리",
+          "text": "SW 보안 패치를 적시에 적용한다(고객 측). 공급자는 패치 정보를 제공해야 함.",
+          "evidence": [
+            "vuln.critical",
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "",
+            "admin": "패치 공지·VEX 통보",
+            "sales": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-fin",
+      "region": "KR",
+      "rev": 2,
+      "name": "전자금융감독규정 및 금융권 SW 공급망 보안 요구",
+      "nameKo": "금융권 SW 공급망 보안(전자금융감독규정·금융보안원 점검)",
+      "kind": "규정·점검 기준",
+      "authority": "금융위원회·금융감독원·금융보안원",
+      "binding": "의무(금융회사) → 공급자 요구",
+      "status": "시행(망분리 개선·SBOM 관련 후속 조치 확인 필요)",
+      "scope": "금융회사에 SW 를 공급하는 기업. 금융권 점검 체크리스트(업로드)로 세부 항목 판정",
+      "markets": [
+        "kr_fin"
+      ],
+      "tags": [
+        "금융",
+        "체크리스트"
+      ],
+      "dates": [
+        {
+          "date": "2024-08-13",
+          "label": "금융분야 망분리 개선 로드맵 발표"
+        }
+      ],
+      "sources": [
+        {
+          "title": "금융보안원",
+          "url": "https://www.fsec.or.kr/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "krfin-checklist",
+          "clause": "체크리스트",
+          "title": "금융권 공급망 점검 항목",
+          "text": "업로드한 금융권 체크리스트 항목별로 판정한다(관리 콘솔 › 규제 대응 검증).",
+          "evidence": [
+            "sbom.present",
+            "vex.present",
+            "sign.present",
+            "vuln.triaged"
+          ],
+          "actions": {
+            "dev": "체크리스트 개발 단계 항목 증빙",
+            "admin": "체크리스트 판정 보고서 관리",
+            "sales": "금융 고객 점검 일정 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-secure-coding",
+      "region": "KR",
+      "rev": 1,
+      "name": "행정기관 및 공공기관 정보시스템 구축·운영 지침 — SW 개발보안",
+      "nameKo": "공공 SW 개발보안(시큐어코딩) 의무",
+      "kind": "행정 규칙",
+      "authority": "행정안전부",
+      "binding": "의무(공공 정보화 사업)",
+      "status": "시행",
+      "scope": "행정·공공기관 정보화 사업으로 개발하는 SW. 보안약점 제거·진단",
+      "markets": [
+        "kr_pub"
+      ],
+      "tags": [
+        "공공",
+        "개발보안"
+      ],
+      "dates": [
+        {
+          "date": "2012-12-01",
+          "label": "개발보안 의무화(단계 확대)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "행정안전부",
+          "url": "https://www.mois.go.kr/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "kr-sc-weak",
+          "clause": "보안약점 기준",
+          "title": "보안약점 제거와 진단",
+          "text": "설계·구현 단계 보안약점 기준에 따라 제거하고 진단 결과를 제출한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "정적 분석으로 보안약점 진단·조치",
+            "admin": "진단 결과 보관",
+            "sales": "공공 사업 산출물 목록에 반영"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-cc",
+      "region": "KR",
+      "rev": 1,
+      "name": "보안적합성 검증·CC 인증(정보보호제품 공공 도입)",
+      "nameKo": "보안적합성 검증·CC 인증",
+      "kind": "인증 제도",
+      "authority": "국가정보원·KISA(IT보안인증사무국)",
+      "binding": "의무(공공기관 정보보호제품 도입)",
+      "status": "시행",
+      "scope": "공공기관에 도입되는 정보보호제품·네트워크 장비",
+      "markets": [
+        "kr_pub"
+      ],
+      "tags": [
+        "공공",
+        "인증"
+      ],
+      "dates": [],
+      "sources": [
+        {
+          "title": "IT보안인증사무국",
+          "url": "https://itscc.kr/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "kr-cc-cert",
+          "clause": "도입 요건",
+          "title": "인증·검증 필요 여부 확인",
+          "text": "제품 유형별로 CC 인증 또는 보안기능 확인서가 필요한지 확인한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "인증 유효기간 관리",
+            "sales": "공공 입찰 자격 요건 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-csap",
+      "region": "KR",
+      "rev": 2,
+      "name": "클라우드 보안인증(CSAP)",
+      "nameKo": "클라우드 보안인증(CSAP)",
+      "kind": "인증 제도",
+      "authority": "과학기술정보통신부·KISA",
+      "binding": "조달 조건(공공기관 우선 고려 인증)",
+      "status": "시행(등급제 운영)",
+      "scope": "공공기관에 클라우드(IaaS·SaaS) 서비스를 공급하는 기업",
+      "markets": [
+        "kr_pub"
+      ],
+      "tags": [
+        "클라우드",
+        "공공"
+      ],
+      "dates": [],
+      "sources": [
+        {
+          "title": "KISA CSAP",
+          "url": "https://isms.kisa.or.kr/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "csap-sc",
+          "clause": "공급망·개발 보안",
+          "title": "서비스 구성요소 보안 관리",
+          "text": "서비스 구성 SW 의 취약점·패치·공급망을 관리한다.",
+          "evidence": [
+            "vuln.triaged",
+            "sbom.present"
+          ],
+          "actions": {
+            "dev": "SaaS 구성요소 SBOM 관리",
+            "admin": "인증 갱신 일정 관리",
+            "sales": "공공 SaaS 영업 시 인증 등급 확인"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kr-netact",
+      "region": "KR",
+      "rev": 1,
+      "name": "정보통신망 이용촉진 및 정보보호 등에 관한 법률 — SW 보안 패치 통지·침해사고 신고",
+      "nameKo": "정보통신망법 — SW 보안 패치 통지·침해사고 신고",
+      "kind": "법률",
+      "authority": "과학기술정보통신부·KISA",
+      "binding": "의무(SW 사업자·정보통신서비스 제공자)",
+      "status": "시행(2026.3.31 개정으로 침해사고 24시간 신고를 법률에 규정)",
+      "scope": "보안 패치를 제작하는 소프트웨어사업자(제47조의4제4항), 침해사고를 신고해야 하는 정보통신서비스 제공자(제48조의3)",
+      "markets": [],
+      "tags": [
+        "법률",
+        "보안 패치",
+        "침해사고"
+      ],
+      "dates": [
+        {
+          "date": "2026-10-01",
+          "label": "침해사고 24시간 신고 법률 조항 시행(공포 후 6개월, 확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "국가법령정보센터 — 정보통신망법",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "netact-patch",
+          "clause": "제47조의4제4항",
+          "title": "보안 패치 제작 시 KISA·사용자 통지",
+          "text": "보안 취약점을 보완하는 프로그램을 제작하면 KISA 에 알리고, 사용자에게 제작일부터 1개월 이내 2회 이상 알린다.",
+          "evidence": [
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "보안 패치 릴리스에 VEX·변경 내역 첨부",
+            "admin": "KISA 통지·사용자 2회 이상 통지 기록 관리",
+            "sales": "고객 보안 공지 채널 확인"
+          }
+        },
+        {
+          "id": "netact-incident",
+          "clause": "제48조의3제1항",
+          "title": "침해사고 24시간 이내 신고",
+          "text": "정보통신서비스 제공자는 침해사고를 알게 된 때부터 24시간 이내 과기정통부 또는 KISA 에 신고한다.",
+          "evidence": [],
+          "actions": {
+            "dev": "",
+            "admin": "침해사고 신고 절차·연락 체계 수립",
+            "sales": "SaaS 계약의 사고 통지 조항 확인"
+          }
+        }
+      ],
+      "en": {
+        "name": "Act on Promotion of Information and Communications Network Utilization and Information Protection — security patch notice and incident reporting",
+        "kind": "Act",
+        "authority": "Ministry of Science and ICT (MSIT) and KISA",
+        "binding": "Mandatory (software businesses and ICT service providers)",
+        "status": "In force (2026-03-31 amendment put 24-hour incident reporting into the Act)",
+        "scope": "Software businesses that produce security patches (Art. 47-4(4)) and ICT service providers that must report security incidents (Art. 48-3)",
+        "tags": [
+          "Act",
+          "Security patch",
+          "Incident"
+        ],
+        "dates": [
+          "24-hour incident reporting provision of the Act takes effect (6 months after promulgation; to be verified)"
+        ],
+        "requirements": {
+          "netact-patch": {
+            "clause": "Art. 47-4(4)",
+            "title": "Notify KISA and users of security patches",
+            "text": "When a program fixing a security vulnerability is produced, notify KISA and notify users at least twice within one month of production.",
+            "actions": {
+              "dev": "Attach VEX and change notes to security patch releases",
+              "admin": "Keep records of KISA notice and at least two user notices",
+              "sales": "Confirm customers' security notice channels"
+            }
+          },
+          "netact-incident": {
+            "clause": "Art. 48-3(1)",
+            "title": "Report security incidents within 24 hours",
+            "text": "ICT service providers report a security incident to MSIT or KISA within 24 hours of becoming aware of it.",
+            "actions": {
+              "dev": "",
+              "admin": "Set up incident reporting procedure and contacts",
+              "sales": "Check incident notice clauses in SaaS contracts"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "kr-pipa",
+      "region": "KR",
+      "rev": 1,
+      "name": "개인정보 보호법 — 안전조치의무·수탁자 관리",
+      "nameKo": "개인정보 보호법 — 안전조치의무·수탁자",
+      "kind": "법률·고시",
+      "authority": "개인정보보호위원회",
+      "binding": "의무(개인정보처리자·수탁자)",
+      "status": "시행",
+      "scope": "개인정보를 처리하는 기업과 처리 업무를 위탁받은 SW·SaaS 공급자(수탁자). 세부 기준은 「개인정보의 안전성 확보조치 기준」 고시",
+      "markets": [],
+      "tags": [
+        "법률",
+        "개인정보",
+        "수탁자"
+      ],
+      "dates": [
+        {
+          "date": "2027-07-01",
+          "label": "일정 대상 개인정보 보호 인증 의무화 시행 예정(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "국가법령정보센터 — 개인정보 보호법",
+          "url": "https://www.law.go.kr/법령/개인정보보호법"
+        },
+        {
+          "title": "국가법령정보센터 — 개인정보의 안전성 확보조치 기준",
+          "url": "https://www.law.go.kr/행정규칙/개인정보의안전성확보조치기준"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "pipa-safety",
+          "clause": "제29조·제26조제8항",
+          "title": "안전성 확보조치(수탁자 준용)",
+          "text": "접근통제·접속기록 보관 등 기술적·관리적·물리적 안전조치를 한다. 수탁자에게도 준용된다.",
+          "evidence": [
+            "vuln.triaged",
+            "vuln.critical"
+          ],
+          "actions": {
+            "dev": "접근통제·접속기록·보안 업데이트 기능 점검",
+            "admin": "안전성 확보조치 기준 자체 점검",
+            "sales": "위탁 계약서 안전조치 조항 확인"
+          }
+        },
+        {
+          "id": "pipa-update",
+          "clause": "고시 제9조",
+          "title": "보안 업데이트 즉시 적용 지원",
+          "text": "제작업체가 보안 업데이트를 공지하면 정당한 사유가 없는 한 즉시 업데이트한다(고객 측). 공급자는 업데이트 정보를 신속히 제공한다.",
+          "evidence": [
+            "vex.present",
+            "vuln.critical"
+          ],
+          "actions": {
+            "dev": "보안 패치 릴리스·VEX 발행",
+            "admin": "보안 업데이트 고객 공지",
+            "sales": ""
+          }
+        }
+      ],
+      "en": {
+        "name": "Personal Information Protection Act — safeguard obligations and processors",
+        "kind": "Act and notice",
+        "authority": "Personal Information Protection Commission (PIPC)",
+        "binding": "Mandatory (personal information controllers and processors)",
+        "status": "In force",
+        "scope": "Companies processing personal information and software/SaaS suppliers entrusted with processing (processors). Details in the PIPC notice on standards for safeguard measures",
+        "tags": [
+          "Act",
+          "Personal data",
+          "Processor"
+        ],
+        "dates": [
+          "Mandatory personal information protection certification for certain entities expected to take effect (to be verified)"
+        ],
+        "requirements": {
+          "pipa-safety": {
+            "clause": "Art. 29, Art. 26(8)",
+            "title": "Safeguard measures (applied to processors)",
+            "text": "Take technical, managerial and physical safeguards such as access control and access-log retention. Also applies to processors.",
+            "actions": {
+              "dev": "Review access control, access logging and security update features",
+              "admin": "Self-assess against the safeguard standards",
+              "sales": "Check safeguard clauses in processing contracts"
+            }
+          },
+          "pipa-update": {
+            "clause": "Notice Art. 9",
+            "title": "Support immediate security updates",
+            "text": "When the vendor announces a security update, customers update immediately unless there is a justifiable reason. Suppliers provide update information promptly.",
+            "actions": {
+              "dev": "Release security patches and issue VEX",
+              "admin": "Announce security updates to customers",
+              "sales": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "uk-psti",
+      "region": "UK",
+      "rev": 1,
+      "name": "Product Security and Telecommunications Infrastructure Act 2022 (PSTI)",
+      "nameKo": "영국 제품 보안·통신 인프라법(PSTI)",
+      "kind": "법률",
+      "authority": "영국 정부(DSIT)",
+      "binding": "의무(소비자 연결 제품)",
+      "status": "시행",
+      "scope": "영국에 판매되는 소비자용 연결 제품",
+      "markets": [],
+      "tags": [
+        "IoT"
+      ],
+      "dates": [
+        {
+          "date": "2024-04-29",
+          "label": "보안 요구 시행"
+        }
+      ],
+      "sources": [
+        {
+          "title": "UK PSTI regime",
+          "url": "https://www.gov.uk/government/publications/the-uk-product-security-and-telecommunications-infrastructure-product-security-regime"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "psti-req",
+          "clause": "Schedule 1",
+          "title": "3대 요구",
+          "text": "기본·공통 비밀번호 금지, 취약점 신고 창구 공개, 최소 보안 업데이트 기간 공개.",
+          "evidence": [
+            "docs.present",
+            "vex.present"
+          ],
+          "actions": {
+            "dev": "기본 비밀번호 제거",
+            "admin": "신고 창구·지원 기간 공개",
+            "sales": "적합성 선언서 동봉"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-certin-sbom",
+      "region": "IN",
+      "rev": 1,
+      "name": "CERT-In Technical Guidelines on SBOM",
+      "nameKo": "인도 CERT-In SBOM 기술 지침",
+      "kind": "기술 지침",
+      "authority": "CERT-In",
+      "binding": "권고(정부·필수 부문 조달에서 요구)",
+      "status": "시행(확인 필요)",
+      "scope": "인도 공공·필수 부문에 SW 를 공급하는 기업",
+      "markets": [],
+      "tags": [
+        "SBOM"
+      ],
+      "dates": [
+        {
+          "date": "2024-10-03",
+          "label": "지침 발표(확인 필요)"
+        }
+      ],
+      "sources": [
+        {
+          "title": "CERT-In",
+          "url": "https://www.cert-in.org.in/"
+        }
+      ],
+      "requirements": [
+        {
+          "id": "certin-fields",
+          "clause": "SBOM 요소",
+          "title": "SBOM 필드·갱신",
+          "text": "구성요소 정보(공급자·버전·라이선스·해시 등)와 갱신·공유 절차를 갖춘다.",
+          "evidence": [
+            "sbom.identity",
+            "sbom.license"
+          ],
+          "actions": {
+            "dev": "SBOM 라이선스·해시 필드 보강",
+            "admin": "",
+            "sales": "인도 공공 입찰 요건 확인"
+          }
+        }
+      ]
+    }
+  ],
+  "analyses": {
+    "kr-swsc": {
+      "nature": "가이드라인",
+      "duty": "voluntary",
+      "dutyNote": "법령이 아닌 정부 가이드라인으로 법적 의무·제재는 없다. 공공 정보화 사업 제안요청서나 고객 계약이 SBOM·공급망 보안 항목을 요구하면 그 계약의 요건이 된다. 2026-06 과기정통부·국정원 「SW 공급망 보안 로드맵」은 가이드라인 2.0 개편, 공공 정보화사업 SBOM 제출 절차, 보안적합성 검증 기준에 SBOM 제출 추가를 예고했다(보도 기준, 확인 필요).",
+      "questions": [
+        "공공기관·지자체 정보화 사업에 SW 를 개발·납품하는가?",
+        "고객(도입기관)의 제안요청서·계약서에 SBOM 제출이나 공급망 보안 점검 항목이 있는가?",
+        "오픈소스 등 외부 구성요소가 포함된 SW 를 공급하는가?",
+        "국정원 보안적합성 검증 대상 제품을 공급하는가?(로드맵상 SBOM 제출 추가 예정)"
+      ],
+      "subjects": [
+        "SW 개발기업·공급기업",
+        "SW 도입·운영기관(공공·민간)"
+      ],
+      "articles": [],
+      "sanctions": "직접 제재 없음 — 자율 권고. 공공 사업·고객 계약에 요구 조항이 들어가면 계약 불이행·평가 감점 등 계약상 불이익이 생긴다.",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "릴리스마다 SBOM 을 생성해 첨부하고 릴리스에 서명"
+          },
+          {
+            "stage": "3m",
+            "do": "SBOM 기반 구성요소 취약점 판단(VEX)을 릴리스 절차에 넣음"
+          },
+          {
+            "stage": "6m",
+            "do": "가이드라인 단계별 체크리스트로 개발 단계 항목을 자체 점검하고 증빙 축적"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "SBOM·VEX·서명 보관 위치와 고객 제공 절차를 정함"
+          },
+          {
+            "stage": "3m",
+            "do": "제공 이력 관리·정기 재분석·고객 통보 운영"
+          },
+          {
+            "stage": "6m",
+            "do": "가이드라인 2.0·공공 SBOM 제출 절차가 나오면 차이를 반영"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "공공 제안서에 SBOM 제공·취약점 관리 계획을 명시"
+          },
+          {
+            "stage": "3m",
+            "do": "주요 고객의 공급망 보안 요구(체크리스트) 수집"
+          },
+          {
+            "stage": "6m",
+            "do": "로드맵 시범사업·검증제도 시범운영 참여 검토"
+          }
+        ]
+      },
+      "evidence": [
+        "릴리스별 SBOM(CycloneDX·SPDX)",
+        "구성요소 취약점 판단 기록(VEX)",
+        "릴리스 서명과 검증 방법",
+        "SBOM 제공·통보 이력"
+      ],
+      "trustlink": [
+        {
+          "feature": "sbom",
+          "how": "릴리스마다 SBOM(CycloneDX·SPDX) 생성·첨부·보관"
+        },
+        {
+          "feature": "vex",
+          "how": "구성요소 취약점 판단을 VEX 로 발행·이력 관리"
+        },
+        {
+          "feature": "sign",
+          "how": "릴리스 서명(cosign·notation)과 고객 검증 방법 제공"
+        },
+        {
+          "feature": "notify",
+          "how": "새 취약점·보안 패치를 고객에게 통보(통보 이력 보관)"
+        },
+        {
+          "feature": "report",
+          "how": "규제 대응 보고서로 고객·심사 제출 자료 작성"
+        }
+      ],
+      "talking": [
+        "법적 의무는 아니지만 공공 고객이 제안요청서에서 SBOM 을 요구하기 시작했다 — 릴리스마다 SBOM·VEX·서명을 바로 제출할 수 있다.",
+        "정부 로드맵(2026-06)이 공공 정보화사업 SBOM 제출과 보안적합성 검증 반영을 예고했다(확인 필요) — 미리 갖추면 입찰 대응이 빠르다."
+      ],
+      "checks": [
+        "가이드라인 2.0 개편 내용과 시점",
+        "공공 정보화사업 SBOM 제출 절차 시행 여부와 근거(지침·고시)"
+      ],
+      "sources": [
+        {
+          "title": "과학기술정보통신부",
+          "url": "https://www.msit.go.kr/"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-n2sf": {
+      "nature": "가이드라인(국가정보원 보안 기준)",
+      "duty": "conditional",
+      "dutyNote": "공공기관에는 국정원 보안 지침 체계(「국가 사이버보안 기본지침」에 N2SF 기준 반영 — 2026-05 시행, 보도 기준)로 준수 대상이 되는 행정 기준이다. SW·클라우드 공급기업에는 법적 의무가 아니고 도입기관의 보안성 검토·계약 요건으로 전달된다. 클라우드 이용은 행정안전부 고시 제11조제1항이 N2SF 준수를 명시한다.",
+      "questions": [
+        "공공기관 정보시스템에 SW·클라우드 서비스를 공급하는가?",
+        "도입기관이 해당 정보서비스를 C(기밀)·S(민감)·O(공개) 중 어느 등급으로 분류했는가?",
+        "도입기관이 N2SF 보안 통제 이행 증빙(구성요소·취약점·무결성 등)을 요구하는가?"
+      ],
+      "subjects": [
+        "행정기관·공공기관(N2SF 적용)",
+        "공급기업(계약·보안성 검토를 통해)"
+      ],
+      "articles": [
+        {
+          "law": "행정기관 및 공공기관의 클라우드컴퓨팅서비스 이용 기준 및 안전성 확보 등에 관한 고시",
+          "kind": "admrul",
+          "article": "제11조제1항",
+          "title": "",
+          "gist": "행정기관등은 클라우드컴퓨팅서비스를 이용할 때 「국가 정보보안 기본지침」과 「국가 망 보안체계(N2SF) 보안가이드라인」을 준수한다.",
+          "url": "https://www.law.go.kr/행정규칙/행정기관및공공기관의클라우드컴퓨팅서비스이용기준및안전성확보등에관한고시"
+        },
+        {
+          "law": "국가정보원법",
+          "kind": "law",
+          "article": "제4조제1항제4호",
+          "title": "직무",
+          "gist": "국정원 직무에 공공기관 대상 사이버공격 예방·대응이 포함된다. N2SF 가 이 조문을 직접 근거로 인용하는지는 원문 확인 필요.",
+          "url": "https://www.law.go.kr/법령/국가정보원법/제4조",
+          "check": true
+        },
+        {
+          "law": "사이버안보 업무규정",
+          "kind": "law",
+          "article": "제3조의2제1항제2호",
+          "title": "",
+          "gist": "국정원장이 사이버보안 업무에 관한 기본지침을 수립한다. N2SF 와의 관계(인용 여부)는 원문 확인 필요.",
+          "url": "https://www.law.go.kr/법령/사이버안보업무규정/제3조의2",
+          "check": true
+        }
+      ],
+      "sanctions": "공급기업에 대한 직접 제재 없음 — 도입기관 보안성 검토·계약 요건을 못 맞추면 도입 불가·보완 요구. 공공기관은 국정원 실태평가 지표로 점검받는다(보도 기준).",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "공공 납품 제품의 SBOM·릴리스 서명 제공"
+          },
+          {
+            "stage": "3m",
+            "do": "등급(C/S/O)별 고객 요구에 맞춘 보안 기능·구성 문서 정리"
+          },
+          {
+            "stage": "6m",
+            "do": "N2SF 보안 통제 항목 대비 제품 기능 대응표 작성"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "도입기관 보안성 검토 대응 자료(SBOM·VEX·서명 검증법) 묶음 준비"
+          },
+          {
+            "stage": "3m",
+            "do": "취약점 정기 재분석과 고객 통보 운영"
+          },
+          {
+            "stage": "6m",
+            "do": "N2SF 개정·국정원 지침 변경 모니터링"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "공공 고객의 정보서비스 등급(C/S/O)과 요구 통제 확인"
+          },
+          {
+            "stage": "3m",
+            "do": "등급별 납품 요건을 제안서 표준 문구로 정리"
+          },
+          {
+            "stage": "6m",
+            "do": "N2SF 적용 사업(망 분리 완화 사업) 기회 발굴"
+          }
+        ]
+      },
+      "evidence": [
+        "SBOM",
+        "취약점 판단·조치 기록(VEX)",
+        "릴리스 서명·검증 방법",
+        "등급별 보안 통제 대응표"
+      ],
+      "trustlink": [
+        {
+          "feature": "sbom",
+          "how": "릴리스마다 SBOM(CycloneDX·SPDX) 생성·첨부·보관"
+        },
+        {
+          "feature": "vex",
+          "how": "구성요소 취약점 판단을 VEX 로 발행·이력 관리"
+        },
+        {
+          "feature": "sign",
+          "how": "릴리스 서명(cosign·notation)과 고객 검증 방법 제공"
+        },
+        {
+          "feature": "report",
+          "how": "도입기관 보안성 검토 제출용 보고서 작성"
+        }
+      ],
+      "talking": [
+        "N2SF 는 공공기관의 망 분리를 등급별 보안 통제로 바꾸는 기준이다 — 공급 SW 의 구성요소·취약점·무결성 증빙을 TrustLink 로 제공할 수 있다."
+      ],
+      "checks": [
+        "N2SF 1.0(2025-09-30 공개, 보도 기준)이 직접 인용하는 법적 근거",
+        "「국가 사이버보안 기본지침」의 N2SF 반영 조항"
+      ],
+      "sources": [
+        {
+          "title": "국가정보원 국가사이버안보센터",
+          "url": "https://www.ncsc.go.kr/"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-ismsp": {
+      "nature": "법률에 근거한 인증기준(고시)",
+      "duty": "legal",
+      "dutyNote": "ISMS 인증은 정보통신망법 제47조제2항 대상자(주요정보통신서비스 제공자, 집적정보통신시설 사업자, 매출·이용자 수 기준 해당자)에게 법적 의무다. SW 공급자는 자사가 대상 규모가 아니면 직접 의무가 없지만, 인증 대상 고객이 외부자 보안(2.3)·도입 및 개발 보안(2.8)·패치관리(2.10.8) 통제로 공급자에게 증빙을 요구한다. 개인정보 보호 인증은 현재 임의 인증이며 2027-07-01 시행 개정으로 일정 대상 의무화가 예정돼 있다(확인 필요).",
+      "questions": [
+        "자사가 정보통신서비스를 제공하며 정보통신서비스 부문 전년도 매출 100억원 이상 또는 일평균 이용자 100만명 이상 등 ISMS 의무 대상인가?",
+        "고객이 ISMS·ISMS-P 인증(또는 의무) 대상이고 자사 SW·서비스가 그 인증 범위 시스템에 들어가는가?",
+        "고객이 인증 심사를 위해 외부자(공급자) 보안 점검표·계약 보안 특약을 요구하는가?"
+      ],
+      "subjects": [
+        "ISMS 의무 대상 정보통신서비스 제공자(고객 또는 자사)",
+        "외부자(공급자) — 고객 계약으로 통제"
+      ],
+      "articles": [
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제47조제2항",
+          "title": "정보보호 관리체계의 인증",
+          "gist": "주요정보통신서비스 제공자, 집적정보통신시설 사업자, 매출액·이용자 수 기준에 해당하는 자는 정보보호 관리체계 인증을 받아야 한다(2026.3.31 개정으로 수치 기준을 법률에 규정).",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제47조"
+        },
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률 시행령",
+          "kind": "law",
+          "article": "제49조",
+          "title": "",
+          "gist": "인증 의무 대상의 세부 기준(상급종합병원·재학생 1만명 이상 대학, 정보통신서비스 부문 매출 100억원 이상, 일평균 이용자 100만명 이상 등).",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률시행령/제49조"
+        },
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제76조제2항제6호의5",
+          "title": "과태료",
+          "gist": "제47조제2항을 위반해 정보보호 관리체계 인증을 받지 아니한 자에게 3천만원 이하 과태료.",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제76조"
+        },
+        {
+          "law": "개인정보 보호법",
+          "kind": "law",
+          "article": "제32조의2",
+          "title": "개인정보 보호 인증",
+          "gist": "보호위원회는 개인정보 처리·보호 조치가 법에 맞는지 인증할 수 있다(유효기간 3년). 2027.7.1 시행 개정 단서로 일정 대상 의무화 예정 — 단서 원문 확인 필요.",
+          "url": "https://www.law.go.kr/법령/개인정보보호법/제32조의2",
+          "check": true
+        },
+        {
+          "law": "정보보호 및 개인정보보호 관리체계 인증 등에 관한 고시",
+          "kind": "admrul",
+          "article": "",
+          "title": "",
+          "gist": "인증기준(2.3 외부자 보안, 2.8 정보시스템 도입 및 개발 보안, 2.10.8 패치관리 등)을 정한 고시 — 조문 번호 확인 필요.",
+          "url": "https://www.law.go.kr/행정규칙/정보보호및개인정보보호관리체계인증등에관한고시",
+          "check": true
+        }
+      ],
+      "sanctions": "의무 대상자가 ISMS 인증을 받지 않으면 3천만원 이하 과태료(정보통신망법 제76조제2항제6호의5). 공급자에게는 직접 제재가 없고, 고객 인증 심사 결함이 계약상 보완 요구·거래 제한으로 이어진다.",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "고객 제출용 SBOM·보안 시험 결과 준비(2.8 도입 보안)"
+          },
+          {
+            "stage": "3m",
+            "do": "공개 SW 구성요소 취약점 판단을 VEX 로 정례화"
+          },
+          {
+            "stage": "6m",
+            "do": "보안 패치 릴리스 절차와 패치 정보 제공 형식 표준화(2.10.8)"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "자사가 ISMS 의무 대상인지 매출·이용자 수로 판정"
+          },
+          {
+            "stage": "3m",
+            "do": "고객 외부자 보안 점검표 답변 표준본 작성"
+          },
+          {
+            "stage": "6m",
+            "do": "패치 공지·VEX 통보 이력을 심사 증빙으로 정리"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "고객 계약의 보안 특약·점검 조항 확인"
+          },
+          {
+            "stage": "3m",
+            "do": "ISMS·ISMS-P 대상 고객 목록화"
+          },
+          {
+            "stage": "6m",
+            "do": "2027 개인정보 보호 인증 의무화(예정) 대상 고객 대응 준비"
+          }
+        ]
+      },
+      "evidence": [
+        "외부자 보안 점검표 답변",
+        "SBOM·보안 시험 결과",
+        "패치 공지·VEX 통보 이력",
+        "계약 보안 특약"
+      ],
+      "trustlink": [
+        {
+          "feature": "sbom",
+          "how": "릴리스마다 SBOM(CycloneDX·SPDX) 생성·첨부·보관"
+        },
+        {
+          "feature": "vex",
+          "how": "패치·비영향 판단을 VEX 로 제공(패치관리 증빙)"
+        },
+        {
+          "feature": "notify",
+          "how": "새 취약점·보안 패치를 고객에게 통보(통보 이력 보관)"
+        },
+        {
+          "feature": "report",
+          "how": "고객 인증 심사 제출용 보고서"
+        }
+      ],
+      "talking": [
+        "ISMS 의무 대상 고객은 심사에서 공급자 보안 증빙을 요구한다 — SBOM·VEX·패치 통보 이력을 그대로 제출할 수 있다."
+      ],
+      "checks": [
+        "인증 고시의 현행 번호와 외부자 보안 관련 조문",
+        "개인정보 보호법 제32조의2제1항 단서(2027.7.1 시행) 의무 대상 범위"
+      ],
+      "sources": [
+        {
+          "title": "KISA ISMS-P",
+          "url": "https://isms.kisa.or.kr/"
+        },
+        {
+          "title": "국가법령정보센터 — 정보통신망법",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-fin": {
+      "nature": "법률·고시(전자금융거래법·전자금융감독규정)",
+      "duty": "legal",
+      "dutyNote": "금융회사·전자금융업자에게 법적 의무(전자금융거래법 제21조, 감독규정은 금융위원회 고시). SW 공급자는 직접 의무 주체가 아니지만, 금융회사가 외부주문(제40조)·감독규정 기준을 계약으로 공급자에게 요구하고, 금융보안원 점검 체크리스트로 판정한다.",
+      "questions": [
+        "금융회사·전자금융업자에 SW 를 공급하거나 전산 업무를 수탁(외부주문)하는가?",
+        "공급 SW 가 금융회사의 전자금융기반시설·내부 업무망에 설치되는가?",
+        "고객이 금융보안원 점검 체크리스트나 SBOM 제출을 요구하는가?"
+      ],
+      "subjects": [
+        "금융회사·전자금융업자(법적 의무)",
+        "전자금융보조업자·IT 공급자(계약을 통해)"
+      ],
+      "articles": [
+        {
+          "law": "전자금융거래법",
+          "kind": "law",
+          "article": "제21조제2항",
+          "title": "안전성의 확보의무",
+          "gist": "금융회사등은 인력·시설·전자적 장치 등 정보기술부문과 전자금융업무에 관해 금융위원회가 정하는 기준을 준수해야 한다.",
+          "url": "https://www.law.go.kr/법령/전자금융거래법/제21조"
+        },
+        {
+          "law": "전자금융거래법",
+          "kind": "law",
+          "article": "제21조의3",
+          "title": "전자금융기반시설의 취약점 분석ㆍ평가",
+          "gist": "전자금융기반시설의 취약점을 분석·평가해 금융위원회에 보고하고 보완조치 이행계획을 수립·시행한다.",
+          "url": "https://www.law.go.kr/법령/전자금융거래법/제21조의3"
+        },
+        {
+          "law": "전자금융거래법",
+          "kind": "law",
+          "article": "제40조",
+          "title": "외부주문등에 대한 감독 및 검사",
+          "gist": "전자금융보조업자와 제휴·위탁·외부주문 계약을 맺을 때 금융위원회 기준을 준수한다(제1항). 정보보호 관련 수탁업무는 원칙적으로 재위탁할 수 없다(제6항).",
+          "url": "https://www.law.go.kr/법령/전자금융거래법/제40조"
+        },
+        {
+          "law": "전자금융거래법",
+          "kind": "law",
+          "article": "제51조제1항제1호",
+          "title": "과태료",
+          "gist": "제21조제1항·제2항을 위반한 자에게 5천만원 이하 과태료.",
+          "url": "https://www.law.go.kr/법령/전자금융거래법/제51조"
+        },
+        {
+          "law": "전자금융감독규정",
+          "kind": "admrul",
+          "article": "제15조",
+          "title": "해킹 등 방지대책",
+          "gist": "긴급·중요 보정(patch) 즉시 적용, 내부 업무용시스템과 외부통신망 분리(망분리) 등.",
+          "url": "https://www.law.go.kr/행정규칙/전자금융감독규정"
+        },
+        {
+          "law": "전자금융감독규정",
+          "kind": "admrul",
+          "article": "제29조",
+          "title": "프로그램 통제",
+          "gist": "프로그램 등록·변경·폐기 절차를 통제한다.",
+          "url": "https://www.law.go.kr/행정규칙/전자금융감독규정"
+        },
+        {
+          "law": "전자금융감독규정",
+          "kind": "admrul",
+          "article": "제37조의2",
+          "title": "전자금융기반시설의 취약점 분석ㆍ평가 주기, 내용 등",
+          "gist": "취약점 분석·평가는 연 1회 이상(홈페이지는 6개월에 1회 이상).",
+          "url": "https://www.law.go.kr/행정규칙/전자금융감독규정"
+        },
+        {
+          "law": "전자금융감독규정",
+          "kind": "admrul",
+          "article": "제60조",
+          "title": "외부주문등에 대한 기준",
+          "gist": "IT 외부주문(아웃소싱) 계약·관리 기준.",
+          "url": "https://www.law.go.kr/행정규칙/전자금융감독규정"
+        }
+      ],
+      "sanctions": "금융회사: 제21조제1항·제2항 위반 시 5천만원 이하 과태료(제51조제1항제1호), 6개월 이내 업무정지(제43조제2항제1호), 정보 누설 등에는 50억원 이하 과징금(제46조제1항), 금융위 시정명령·기관 제재(제39조제6항). 공급자에게는 직접 제재가 없고 외부주문 계약 요건으로 전달된다.",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "금융 고객용 릴리스에 SBOM·서명 첨부, 긴급 보안 패치 릴리스 절차 마련"
+          },
+          {
+            "stage": "3m",
+            "do": "취약점 판단(VEX)과 패치 정보를 고객 취약점 분석·평가 일정에 맞춰 제공"
+          },
+          {
+            "stage": "6m",
+            "do": "망분리 환경(폐쇄망) 설치·업데이트 절차 문서화"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "금융권 체크리스트 업로드·판정 보고서 관리"
+          },
+          {
+            "stage": "3m",
+            "do": "외부주문 계약 보안 요건(재위탁 금지 등) 이행 기록"
+          },
+          {
+            "stage": "6m",
+            "do": "망분리 개선(SaaS 허용 등) 후속 감독규정 개정 모니터링"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "금융 고객 점검 일정·제출 자료 확인"
+          },
+          {
+            "stage": "3m",
+            "do": "외부주문 계약서 보안 조항 표준화"
+          },
+          {
+            "stage": "6m",
+            "do": "금융권 SW 공급망 보안 플랫폼(SBOM) 제출 요구 여부 확인"
+          }
+        ]
+      },
+      "evidence": [
+        "SBOM",
+        "취약점 판단·패치 기록(VEX)",
+        "릴리스 서명",
+        "금융권 체크리스트 판정 보고서",
+        "외부주문 계약 보안 조항"
+      ],
+      "trustlink": [
+        {
+          "feature": "sbom",
+          "how": "릴리스마다 SBOM(CycloneDX·SPDX) 생성·첨부·보관"
+        },
+        {
+          "feature": "vex",
+          "how": "구성요소 취약점 판단을 VEX 로 발행·이력 관리"
+        },
+        {
+          "feature": "sign",
+          "how": "릴리스 서명(cosign·notation)과 고객 검증 방법 제공"
+        },
+        {
+          "feature": "notify",
+          "how": "긴급 패치·취약점을 금융 고객에게 통보"
+        },
+        {
+          "feature": "report",
+          "how": "금융권 체크리스트 판정·규제 보고서"
+        }
+      ],
+      "talking": [
+        "금융회사는 전자금융거래법 제21조로 법적 의무를 지고 그 기준을 공급자 계약에 넣는다 — 점검 자료를 TrustLink 로 바로 낼 수 있다.",
+        "금융보안원이 금융권 SW 공급망 보안 플랫폼(SBOM 관리)을 운영한다는 보도가 있다(2026-02, 확인 필요)."
+      ],
+      "checks": [
+        "망분리 개선 로드맵(2024-08-13) 후속 감독규정·시행세칙 개정(SaaS 통제)",
+        "금융보안원 SBOM 플랫폼 제출 요구 범위"
+      ],
+      "sources": [
+        {
+          "title": "국가법령정보센터 — 전자금융거래법",
+          "url": "https://www.law.go.kr/법령/전자금융거래법"
+        },
+        {
+          "title": "국가법령정보센터 — 전자금융감독규정",
+          "url": "https://www.law.go.kr/행정규칙/전자금융감독규정"
+        },
+        {
+          "title": "금융보안원",
+          "url": "https://www.fsec.or.kr/"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-secure-coding": {
+      "nature": "행정규칙(행정안전부 고시)",
+      "duty": "legal",
+      "dutyNote": "전자정부법 제45조제3항에 따라 행정안전부가 고시한 지침으로 행정기관등의 장이 준수한다. 감리대상 정보화사업은 별표 3 보안약점이 없도록 개발해야 하며, 개발 사업자에게는 사업 계약·감리를 통해 요구된다. 상용 SW 는 적용 범위에서 빠진다.",
+      "questions": [
+        "행정기관·공공기관의 감리대상 정보화사업(전자정부법 시행령 제71조제1항)으로 SW 를 개발·유지관리하는가?",
+        "신규 개발인가(설계산출물·소스 전체), 유지관리인가(변경분)?",
+        "납품 SW 가 상용 SW 로 분류되는가(적용 제외)?"
+      ],
+      "subjects": [
+        "행정기관·공공기관(발주)",
+        "정보화사업 수행 사업자(계약·감리를 통해)",
+        "감리법인(보안약점 진단)"
+      ],
+      "articles": [
+        {
+          "law": "전자정부법",
+          "kind": "law",
+          "article": "제45조제3항",
+          "title": "",
+          "gist": "행정안전부장관은 정보시스템의 구축·운영에 관한 지침을 고시하고, 행정기관등의 장은 이를 준수한다.",
+          "url": "https://www.law.go.kr/법령/전자정부법/제45조"
+        },
+        {
+          "law": "행정기관 및 공공기관 정보시스템 구축·운영 지침",
+          "kind": "admrul",
+          "article": "제50조",
+          "title": "소프트웨어 개발보안 원칙",
+          "gist": "감리대상 정보화사업은 별표 3 보안약점이 없도록 개발한다. 신규는 설계산출물·소스 전체, 유지관리는 변경분, 상용 SW 는 제외.",
+          "url": "https://www.law.go.kr/행정규칙/행정기관및공공기관정보시스템구축·운영지침"
+        },
+        {
+          "law": "행정기관 및 공공기관 정보시스템 구축·운영 지침",
+          "kind": "admrul",
+          "article": "제51조",
+          "title": "소프트웨어 개발보안 활동",
+          "gist": "제안서 평가에 개발보안을 반영할 수 있고 착수 시 개발보안 교육을 한다.",
+          "url": "https://www.law.go.kr/행정규칙/행정기관및공공기관정보시스템구축·운영지침"
+        },
+        {
+          "law": "행정기관 및 공공기관 정보시스템 구축·운영 지침",
+          "kind": "admrul",
+          "article": "제52조",
+          "title": "보안약점 진단기준",
+          "gist": "별표 3(설계단계 20개·구현단계 49개 보안약점)을 필수 진단항목으로 포함한다.",
+          "url": "https://www.law.go.kr/행정규칙/행정기관및공공기관정보시스템구축·운영지침"
+        },
+        {
+          "law": "행정기관 및 공공기관 정보시스템 구축·운영 지침",
+          "kind": "admrul",
+          "article": "제53조",
+          "title": "보안약점 진단절차",
+          "gist": "감리법인이 보안약점 제거 여부를 진단한다. 진단도구는 CC인증·성능평가·보안기능 확인서 중 하나를 갖춰야 한다(제4항).",
+          "url": "https://www.law.go.kr/행정규칙/행정기관및공공기관정보시스템구축·운영지침"
+        }
+      ],
+      "sanctions": "지침 자체에 과태료 등 직접 제재 조항은 없다 — 감리에서 보안약점 미제거가 지적되면 시정 요구·검사 불합격 등 사업 이행상 불이익.",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "정적 분석 도구로 별표 3 보안약점 진단·조치(구현단계 49개)"
+          },
+          {
+            "stage": "3m",
+            "do": "설계 산출물에 설계단계 보안약점(20개) 대응 반영"
+          },
+          {
+            "stage": "6m",
+            "do": "오픈소스 구성요소는 SBOM·VEX 로 별도 관리해 감리 자료에 첨부"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "진단 결과·조치 내역 보관"
+          },
+          {
+            "stage": "3m",
+            "do": "감리 대응 산출물 목록 표준화"
+          },
+          {
+            "stage": "6m",
+            "do": "지침 개정(별표 3 변경) 모니터링"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "공공 사업 산출물 목록에 보안약점 진단 결과 반영"
+          },
+          {
+            "stage": "3m",
+            "do": "제안서에 개발보안 수행 계획 명시"
+          }
+        ]
+      },
+      "evidence": [
+        "보안약점 진단 결과서(진단도구 요건 충족)",
+        "조치 내역",
+        "개발보안 교육 기록",
+        "SBOM(오픈소스 구성요소)"
+      ],
+      "trustlink": [
+        {
+          "feature": "none",
+          "how": "보안약점(정적 분석) 진단 도구가 아니다 — 진단 결과는 별도 도구로 만든다"
+        },
+        {
+          "feature": "sbom",
+          "how": "오픈소스 구성요소 목록(SBOM)으로 감리 자료 보완"
+        },
+        {
+          "feature": "vex",
+          "how": "구성요소 취약점 판단 기록"
+        },
+        {
+          "feature": "report",
+          "how": "감리 제출용 규제 보고서"
+        }
+      ],
+      "talking": [
+        "공공 SW 개발보안은 소스 보안약점 진단이 핵심이다 — TrustLink 는 오픈소스 구성요소 관리(SBOM·VEX)로 이를 보완한다."
+      ],
+      "checks": [
+        "지침 현행 고시 번호(행정안전부고시 제2025-1호 기준 확인)와 별표 3 개정 여부"
+      ],
+      "sources": [
+        {
+          "title": "국가법령정보센터 — 행정기관 및 공공기관 정보시스템 구축·운영 지침",
+          "url": "https://www.law.go.kr/행정규칙/행정기관및공공기관정보시스템구축·운영지침"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-cc": {
+      "nature": "인증·검증 제도(법령 근거 + 국정원 지침)",
+      "duty": "conditional",
+      "dutyNote": "공공기관이 정보보호시스템을 도입할 때 국정원장이 안전성을 검증한 제품을 써야 한다(전자정부법 시행령 제69조제1항제1호, 사이버안보 업무규정 제9조제3항). 공급기업에는 법적 의무가 아니라 공공 도입(조달) 요건이다. 세부 대상·절차는 비공개 「국가 정보보안 기본지침」에 따른다.",
+      "questions": [
+        "공공기관에 정보보호제품·네트워크 장비를 공급하는가?",
+        "제품 유형이 CC 인증·보안기능 확인서·보안적합성 검증 대상인가?",
+        "보유 인증의 유효기간이 남아 있는가?"
+      ],
+      "subjects": [
+        "공공기관(도입 시 검증 제품 사용)",
+        "정보보호제품 공급기업(조달 요건)"
+      ],
+      "articles": [
+        {
+          "law": "전자정부법",
+          "kind": "law",
+          "article": "제56조제3항",
+          "title": "정보통신망 등의 보안대책 수립ㆍ시행",
+          "gist": "행정기관의 장은 전자문서를 보관·유통할 때 국가정보원장이 안전성을 확인한 보안조치를 하고, 국정원장은 이행 여부를 확인할 수 있다.",
+          "url": "https://www.law.go.kr/법령/전자정부법/제56조"
+        },
+        {
+          "law": "전자정부법 시행령",
+          "kind": "law",
+          "article": "제69조제1항제1호",
+          "title": "전자문서의 보관ㆍ유통 관련 보안조치",
+          "gist": "국가정보원장이 개발하거나 안전성을 검증한 암호장치와 정보보호시스템을 도입·운용한다.",
+          "url": "https://www.law.go.kr/법령/전자정부법시행령/제69조"
+        },
+        {
+          "law": "사이버안보 업무규정",
+          "kind": "law",
+          "article": "제9조제3항",
+          "title": "",
+          "gist": "국정원장은 정보보호시스템등과 클라우드컴퓨팅서비스가 보안대책에 적합한지 검증할 수 있다(보안적합성 검증).",
+          "url": "https://www.law.go.kr/법령/사이버안보업무규정/제9조"
+        },
+        {
+          "law": "지능정보화 기본법",
+          "kind": "law",
+          "article": "제58조",
+          "title": "정보보호시스템에 관한 기준 고시 등",
+          "gist": "과학기술정보통신부장관이 정보보호시스템의 성능·신뢰도 기준을 고시한다(CC 평가·인증의 근거).",
+          "url": "https://www.law.go.kr/법령/지능정보화기본법/제58조"
+        },
+        {
+          "law": "정보보호시스템 평가·인증 지침",
+          "kind": "admrul",
+          "article": "",
+          "title": "",
+          "gist": "CC 평가·인증 절차 고시 — 현행 고시 번호·조문 확인 필요.",
+          "url": "https://www.law.go.kr/행정규칙/정보보호시스템평가·인증지침",
+          "check": true
+        }
+      ],
+      "sanctions": "직접 제재 없음 — 공공 도입 요건이다. 인증·검증이 없으면 공공기관에 도입할 수 없다.",
+      "plans": {
+        "dev": [
+          {
+            "stage": "3m",
+            "do": "인증·검증 평가 대비 보안 기능·설계 문서 정비"
+          },
+          {
+            "stage": "6m",
+            "do": "보안적합성 검증에 SBOM 제출이 추가되면 바로 낼 수 있게 SBOM 체계 유지(로드맵, 확인 필요)"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "보유 인증·확인서 유효기간 관리"
+          },
+          {
+            "stage": "6m",
+            "do": "국정원 검증 기준 변경 모니터링"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "공공 입찰 자격 요건(인증 종류) 확인"
+          },
+          {
+            "stage": "3m",
+            "do": "제품 유형별 필요 인증 표 작성"
+          }
+        ]
+      },
+      "evidence": [
+        "CC 인증서·보안기능 확인서·검증필 목록 등재",
+        "인증 유효기간",
+        "SBOM(검증 기준 반영 시)"
+      ],
+      "trustlink": [
+        {
+          "feature": "sbom",
+          "how": "검증 기준에 SBOM 제출이 추가될 때 제출 자료(로드맵, 확인 필요)"
+        },
+        {
+          "feature": "sign",
+          "how": "릴리스 서명(cosign·notation)과 고객 검증 방법 제공"
+        },
+        {
+          "feature": "report",
+          "how": "규제 대응 보고서로 고객·심사 제출 자료 작성"
+        }
+      ],
+      "talking": [
+        "CC·보안적합성 검증은 공공 납품 자격 요건이다 — 정부 로드맵은 검증 기준에 SBOM 제출 추가를 예고했다(확인 필요)."
+      ],
+      "checks": [
+        "「정보보호시스템 평가·인증 지침」 현행 고시",
+        "보안적합성 검증 기준의 SBOM 제출 반영 시점"
+      ],
+      "sources": [
+        {
+          "title": "IT보안인증사무국",
+          "url": "https://itscc.kr/"
+        },
+        {
+          "title": "국가법령정보센터 — 전자정부법",
+          "url": "https://www.law.go.kr/법령/전자정부법"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-csap": {
+      "nature": "법률에 근거한 임의 인증(고시 기준)",
+      "duty": "conditional",
+      "dutyNote": "클라우드컴퓨팅법 제23조의2 보안인증은 임의 인증이다. 국가기관등은 보안인증 받은 서비스를 '우선 고려'해야 하므로(법 제20조제2항, 행정안전부 고시 제11조제2항) 공공 클라우드 공급에는 사실상 조달 요건이다. 등급(상·중·하)은 보안인증 고시 제14조.",
+      "questions": [
+        "공공기관(국가기관등)에 클라우드 서비스(IaaS·PaaS·SaaS)를 공급하는가?",
+        "공급 대상 시스템의 등급(상·중·하)과 고객이 요구하는 인증 등급은?",
+        "보유 보안인증의 유효기간과 사후점검 일정은?"
+      ],
+      "subjects": [
+        "공공에 클라우드를 공급하는 사업자(조달 요건)",
+        "국가기관등(이용 시 우선 고려)"
+      ],
+      "articles": [
+        {
+          "law": "클라우드컴퓨팅 발전 및 이용자 보호에 관한 법률",
+          "kind": "law",
+          "article": "제23조의2",
+          "title": "클라우드컴퓨팅서비스의 보안인증",
+          "gist": "과학기술정보통신부장관은 보안인증기준에 적합한 클라우드 서비스를 인증할 수 있다(임의 인증). 미인증 서비스에 인증 표시를 할 수 없다.",
+          "url": "https://www.law.go.kr/법령/클라우드컴퓨팅발전및이용자보호에관한법률/제23조의2"
+        },
+        {
+          "law": "클라우드컴퓨팅 발전 및 이용자 보호에 관한 법률",
+          "kind": "law",
+          "article": "제20조제2항",
+          "title": "",
+          "gist": "국가기관등은 보안인증을 받은 클라우드컴퓨팅서비스를 우선적으로 고려해야 한다.",
+          "url": "https://www.law.go.kr/법령/클라우드컴퓨팅발전및이용자보호에관한법률/제20조"
+        },
+        {
+          "law": "행정기관 및 공공기관의 클라우드컴퓨팅서비스 이용 기준 및 안전성 확보 등에 관한 고시",
+          "kind": "admrul",
+          "article": "제11조제2항",
+          "title": "",
+          "gist": "행정기관등은 보안인증된 서비스를 우선 고려하고 국정원 「국가 클라우드 컴퓨팅 보안 가이드라인」에 따라 이용한다.",
+          "url": "https://www.law.go.kr/행정규칙/행정기관및공공기관의클라우드컴퓨팅서비스이용기준및안전성확보등에관한고시"
+        },
+        {
+          "law": "클라우드컴퓨팅서비스 보안인증에 관한 고시",
+          "kind": "admrul",
+          "article": "제14조",
+          "title": "",
+          "gist": "보안인증 유형(IaaS·SaaS·PaaS·복합)과 등급(상·중·하).",
+          "url": "https://www.law.go.kr/행정규칙/클라우드컴퓨팅서비스보안인증에관한고시"
+        }
+      ],
+      "sanctions": "직접 제재 없음(임의 인증) — 미인증이면 공공 조달에서 불리하거나 배제된다. 미인증 서비스의 인증 표시에 대한 제재 조문은 확인 필요.",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "SaaS 구성요소 SBOM 관리·취약점 판단"
+          },
+          {
+            "stage": "3m",
+            "do": "패치·취약점 관리 증빙을 인증 통제 항목에 맞춰 정리"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "인증 유효기간·사후점검 일정 관리"
+          },
+          {
+            "stage": "3m",
+            "do": "공공 제공 추가 요건(고시 별표 4) 점검"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "공공 SaaS 영업 시 고객 요구 등급 확인"
+          },
+          {
+            "stage": "3m",
+            "do": "인증 등급별 공급 가능 범위 정리"
+          }
+        ]
+      },
+      "evidence": [
+        "CSAP 인증서(등급)",
+        "구성요소 SBOM·취약점 관리 기록",
+        "사후점검 결과"
+      ],
+      "trustlink": [
+        {
+          "feature": "sbom",
+          "how": "릴리스마다 SBOM(CycloneDX·SPDX) 생성·첨부·보관"
+        },
+        {
+          "feature": "vex",
+          "how": "구성요소 취약점 판단을 VEX 로 발행·이력 관리"
+        },
+        {
+          "feature": "notify",
+          "how": "새 취약점·보안 패치를 고객에게 통보(통보 이력 보관)"
+        },
+        {
+          "feature": "report",
+          "how": "규제 대응 보고서로 고객·심사 제출 자료 작성"
+        }
+      ],
+      "talking": [
+        "CSAP 는 법적 의무는 아니지만 공공기관이 '우선 고려'해야 하는 사실상 조달 요건이다."
+      ],
+      "checks": [
+        "국정원 「국가 클라우드 컴퓨팅 보안 가이드라인」 요구사항"
+      ],
+      "sources": [
+        {
+          "title": "국가법령정보센터 — 클라우드컴퓨팅법",
+          "url": "https://www.law.go.kr/법령/클라우드컴퓨팅발전및이용자보호에관한법률"
+        },
+        {
+          "title": "KISA CSAP",
+          "url": "https://isms.kisa.or.kr/"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-netact": {
+      "nature": "법률",
+      "duty": "legal",
+      "dutyNote": "SW 공급기업에 직접 적용되는 법적 의무다. 「소프트웨어 진흥법」 제2조의 소프트웨어사업자는 보안 취약점을 보완하는 프로그램을 만들면 KISA 와 사용자에게 알려야 한다(제47조의4제4항). SaaS 등 정보통신서비스를 운영하면 침해사고를 24시간 이내 신고해야 한다(제48조의3제1항).",
+      "questions": [
+        "SW 를 개발·공급하는 소프트웨어사업자인가(「소프트웨어 진흥법」 제2조)?",
+        "보안 취약점을 고친 패치(보안 업데이트)를 제작해 배포하는가?",
+        "SaaS·웹서비스 등 정보통신서비스를 직접 제공하는가?",
+        "서비스 장애·이용자 정보 유출 등 이용자 통지 대상 사고가 날 수 있는가?"
+      ],
+      "subjects": [
+        "소프트웨어사업자(보안 패치 통지)",
+        "정보통신서비스 제공자(침해사고 신고·이용자 통지)"
+      ],
+      "articles": [
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제47조의4제4항",
+          "title": "이용자의 정보보호",
+          "gist": "소프트웨어사업자는 보안 취약점을 보완하는 프로그램을 제작하면 한국인터넷진흥원에 알리고, 사용자에게 제작일부터 1개월 이내에 2회 이상 알려야 한다.",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제47조의4"
+        },
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제76조제4항제10호",
+          "title": "과태료",
+          "gist": "제47조의4제4항을 위반해 소프트웨어 사용자에게 알리지 아니한 자에게 1천만원 이하 과태료.",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제76조"
+        },
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제48조의3제1항",
+          "title": "침해사고의 신고 등",
+          "gist": "정보통신서비스 제공자는 침해사고를 알게 된 때부터 24시간 이내에 과학기술정보통신부장관 또는 한국인터넷진흥원에 신고해야 한다(2026.3.31 개정으로 법률에 규정).",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제48조의3"
+        },
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제76조제1항제2호",
+          "title": "과태료",
+          "gist": "제48조의3제1항을 위반해 침해사고를 신고하지 않거나 늦게 신고한 자에게 5천만원 이하 과태료.",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제76조"
+        },
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제48조의3제4항",
+          "title": "침해사고의 신고 등",
+          "gist": "일정한 침해사고(시행령 제58조의9 — 2시간 이상 서비스 장애, 이용자 정보 유출 등)는 이용자에게 알려야 한다(위반 시 제76조제4항제11호의4, 1천만원 이하 과태료).",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제48조의3"
+        },
+        {
+          "law": "정보통신망 이용촉진 및 정보보호 등에 관한 법률",
+          "kind": "law",
+          "article": "제45조",
+          "title": "정보통신망의 안정성 확보 등",
+          "gist": "정보통신서비스 제공자 등은 정보통신망의 안정성과 정보의 신뢰성을 확보하는 보호조치를 해야 한다.",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률/제45조"
+        }
+      ],
+      "sanctions": "보안 패치를 사용자에게 알리지 않으면 1천만원 이하 과태료(제76조제4항제10호). 침해사고 미신고·지연신고는 5천만원 이하 과태료(제76조제1항제2호), 이용자 미통지는 1천만원 이하 과태료(제76조제4항제11호의4). 개정 시행 전 행위에는 종전 규정 적용(부칙).",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "보안 패치 릴리스마다 취약점·영향 범위(VEX)와 변경 내역을 첨부"
+          },
+          {
+            "stage": "3m",
+            "do": "패치 제작일을 릴리스 기록에 남겨 1개월 이내 통지 기한을 계산할 수 있게 함"
+          },
+          {
+            "stage": "6m",
+            "do": "SaaS 는 침해 탐지·로그 보존을 24시간 신고 절차와 연결"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "보안 패치 KISA 통지 절차와 담당자 지정, 사용자 2회 이상 통지 기록 관리"
+          },
+          {
+            "stage": "now",
+            "do": "침해사고 24시간 신고 절차·연락 체계 수립"
+          },
+          {
+            "stage": "3m",
+            "do": "통지·신고 이력 정기 점검(누락 시 과태료)"
+          },
+          {
+            "stage": "6m",
+            "do": "이용자 통지 대상 사고 기준(시행령) 반영한 대응 매뉴얼 개정"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "고객 보안 공지 채널(메일·포털) 확인과 계약서 통지 조항 정비"
+          },
+          {
+            "stage": "3m",
+            "do": "고객에게 '보안 패치 법정 통지'를 제공 가치로 설명"
+          }
+        ]
+      },
+      "evidence": [
+        "보안 패치 제작일·배포 기록",
+        "KISA 통지 기록",
+        "사용자 통지 2회 이상 발송 기록",
+        "침해사고 신고 절차·신고 기록"
+      ],
+      "trustlink": [
+        {
+          "feature": "vex",
+          "how": "패치한 취약점과 영향 여부를 VEX 로 발행"
+        },
+        {
+          "feature": "notify",
+          "how": "새 취약점·보안 패치를 고객에게 메일로 통보하고 이력 보관(2회 이상 통지 증빙)"
+        },
+        {
+          "feature": "sbom",
+          "how": "SBOM 으로 영향받는 고객 제품 버전 식별"
+        },
+        {
+          "feature": "report",
+          "how": "규제 대응 보고서로 고객·심사 제출 자료 작성"
+        }
+      ],
+      "talking": [
+        "SW 사업자는 보안 패치를 만들면 KISA 와 사용자에게 알려야 하는 법적 의무가 있다(위반 시 과태료) — TrustLink 통보 기능이 통지 이력을 남긴다.",
+        "SaaS 침해사고는 24시간 이내 신고가 법률로 상향됐다(2026 개정)."
+      ],
+      "checks": [
+        "침해사고 24시간 신고 법률 조항 시행일(공포 후 6개월 — 2026-10 전후, 확인 필요)",
+        "KISA 통지 방법(접수 채널·서식)"
+      ],
+      "sources": [
+        {
+          "title": "국가법령정보센터 — 정보통신망법",
+          "url": "https://www.law.go.kr/법령/정보통신망이용촉진및정보보호등에관한법률"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    },
+    "kr-pipa": {
+      "nature": "법률·고시(개인정보 보호법·안전성 확보조치 기준)",
+      "duty": "legal",
+      "dutyNote": "개인정보처리자에게 법적 의무이며, 개인정보 처리 업무를 위탁받은 수탁자(SaaS·운영 대행 등)에게도 제26조제8항으로 안전조치의무(제29조)가 준용된다. 개인정보를 처리하지 않는 패키지 SW 공급자는 직접 대상이 아니지만, 고객이 안전성 확보조치 기준을 지키도록 제품 기능(접근통제·접속기록·보안 업데이트)을 요구한다.",
+      "questions": [
+        "자사 서비스·운영 업무에서 고객의 개인정보를 처리(수탁)하는가?",
+        "공급 SW 가 고객의 개인정보처리시스템에 해당하거나 그 일부인가?",
+        "고객이 접근통제·접속기록 보관·보안 업데이트 등 안전성 확보조치 기능을 요구하는가?",
+        "재위탁(하도급)이 있는가(위탁자 동의 필요)?"
+      ],
+      "subjects": [
+        "개인정보처리자(고객 또는 자사)",
+        "수탁자(제26조제8항 준용)"
+      ],
+      "articles": [
+        {
+          "law": "개인정보 보호법",
+          "kind": "law",
+          "article": "제29조",
+          "title": "안전조치의무",
+          "gist": "개인정보처리자는 개인정보가 유출등이 되지 않도록 내부 관리계획 수립, 접속기록 보관 등 기술적·관리적·물리적 안전조치를 해야 한다.",
+          "url": "https://www.law.go.kr/법령/개인정보보호법/제29조"
+        },
+        {
+          "law": "개인정보 보호법",
+          "kind": "law",
+          "article": "제26조제8항",
+          "title": "업무위탁에 따른 개인정보의 처리 제한",
+          "gist": "수탁자에게 제29조 등을 준용한다(수탁자도 안전조치의무).",
+          "url": "https://www.law.go.kr/법령/개인정보보호법/제26조"
+        },
+        {
+          "law": "개인정보의 안전성 확보조치 기준",
+          "kind": "admrul",
+          "article": "제6조",
+          "title": "접근통제",
+          "gist": "IP 주소 등으로 개인정보처리시스템 접속 권한을 제한하는 등 접근통제 조치.",
+          "url": "https://www.law.go.kr/행정규칙/개인정보의안전성확보조치기준"
+        },
+        {
+          "law": "개인정보의 안전성 확보조치 기준",
+          "kind": "admrul",
+          "article": "제8조",
+          "title": "접속기록의 보관 및 점검",
+          "gist": "접속기록을 1년 이상(정보주체 5만명 이상·고유식별정보·민감정보 처리 시 2년 이상) 보관·점검.",
+          "url": "https://www.law.go.kr/행정규칙/개인정보의안전성확보조치기준"
+        },
+        {
+          "law": "개인정보의 안전성 확보조치 기준",
+          "kind": "admrul",
+          "article": "제9조",
+          "title": "악성프로그램 등 방지",
+          "gist": "보안 프로그램을 최신으로 유지하고, 제작업체가 보안 업데이트를 공지하면 정당한 사유가 없는 한 즉시 업데이트한다.",
+          "url": "https://www.law.go.kr/행정규칙/개인정보의안전성확보조치기준"
+        },
+        {
+          "law": "개인정보 보호법",
+          "kind": "law",
+          "article": "제64조의2제1항제9호",
+          "title": "과징금의 부과",
+          "gist": "개인정보가 유출등이 된 경우 전체 매출액의 100분의 3 이하 과징금(안전조치를 다한 경우 제외).",
+          "url": "https://www.law.go.kr/법령/개인정보보호법/제64조의2"
+        },
+        {
+          "law": "개인정보 보호법",
+          "kind": "law",
+          "article": "제75조제2항제5호",
+          "title": "과태료",
+          "gist": "안전성 확보 조치(제29조, 수탁자 준용 포함)를 하지 않은 자에게 3천만원 이하 과태료.",
+          "url": "https://www.law.go.kr/법령/개인정보보호법/제75조"
+        }
+      ],
+      "sanctions": "안전조치 미이행 3천만원 이하 과태료(제75조제2항제5호). 유출 시 전체 매출액 3% 이하 과징금(제64조의2제1항제9호), 반복·대규모 등 가중 사유는 10% 이하(2026.3.10 개정 제2항).",
+      "plans": {
+        "dev": [
+          {
+            "stage": "now",
+            "do": "보안 업데이트를 신속히 릴리스하고 공지(고객의 즉시 업데이트 의무 지원)"
+          },
+          {
+            "stage": "3m",
+            "do": "접근통제·접속기록(1~2년 보관) 기능 점검"
+          },
+          {
+            "stage": "6m",
+            "do": "개인정보 처리 구성요소의 취약점을 VEX 로 지속 판단"
+          }
+        ],
+        "admin": [
+          {
+            "stage": "now",
+            "do": "수탁 업무 여부와 위탁 계약의 안전조치 조항 확인"
+          },
+          {
+            "stage": "3m",
+            "do": "안전성 확보조치 기준 항목별 자체 점검"
+          },
+          {
+            "stage": "6m",
+            "do": "2027-07 개인정보 보호 인증 의무화(예정) 대상 여부 판단"
+          }
+        ],
+        "sales": [
+          {
+            "stage": "now",
+            "do": "위탁 계약서의 안전조치·재위탁 조항 확인"
+          },
+          {
+            "stage": "3m",
+            "do": "제품의 안전성 확보조치 지원 기능을 고객 자료로 정리"
+          }
+        ]
+      },
+      "evidence": [
+        "위탁 계약서(안전조치·재위탁 조항)",
+        "내부 관리계획",
+        "접속기록 보관 설정",
+        "보안 업데이트 공지·배포 기록"
+      ],
+      "trustlink": [
+        {
+          "feature": "vex",
+          "how": "개인정보 처리 구성요소 취약점 판단"
+        },
+        {
+          "feature": "notify",
+          "how": "보안 업데이트 공지를 고객에게 통보(고객의 즉시 업데이트 근거)"
+        },
+        {
+          "feature": "sbom",
+          "how": "릴리스마다 SBOM(CycloneDX·SPDX) 생성·첨부·보관"
+        },
+        {
+          "feature": "report",
+          "how": "규제 대응 보고서로 고객·심사 제출 자료 작성"
+        }
+      ],
+      "talking": [
+        "고객은 보안 업데이트가 공지되면 즉시 적용해야 한다(안전성 확보조치 기준 제9조) — 신속한 패치 공지가 고객의 법적 의무 이행을 돕는다."
+      ],
+      "checks": [
+        "「개인정보의 안전성 확보조치 기준」 현행 고시(2026-9호) 조문 재확인",
+        "제32조의2제1항 단서(2027.7.1 시행) 의무 인증 대상"
+      ],
+      "sources": [
+        {
+          "title": "국가법령정보센터 — 개인정보 보호법",
+          "url": "https://www.law.go.kr/법령/개인정보보호법"
+        },
+        {
+          "title": "국가법령정보센터 — 개인정보의 안전성 확보조치 기준",
+          "url": "https://www.law.go.kr/행정규칙/개인정보의안전성확보조치기준"
+        }
+      ],
+      "asOf": "2026-11-19",
+      "rev": 1
+    }
+  }
+}

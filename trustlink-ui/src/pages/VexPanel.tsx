@@ -91,13 +91,13 @@ function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
 }) {
   const [ctx, setCtx] = useState('');
   const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState<VexDraftResult | null>(initial || null);
+  const [asked, setAsked] = useState<VexDraftResult | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { if (initial) setRes(initial); }, [initial]);
+  const res = asked || initial || null; // 직접 요청한 초안이 일괄 판정 결과보다 우선
   async function ask() {
     setBusy(true); setErr('');
     try {
-      setRes(await aiVexDraft({ project: uuid, component: f.component.uuid, vulnerability: f.vulnerability.uuid, context: ctx, repo, tag }));
+      setAsked(await aiVexDraft({ project: uuid, component: f.component.uuid, vulnerability: f.vulnerability.uuid, context: ctx, repo, tag }));
     } catch (e) { setErr(String(e)); }
     setBusy(false);
   }

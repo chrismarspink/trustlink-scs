@@ -285,6 +285,10 @@ func main() {
 	mux.HandleFunc("GET /api/health", s.guard(s.apiHealth))
 	mux.HandleFunc("GET /api/mail", s.guard(s.apiMailStatus))                              // 통보 메일 설정 상태
 	mux.HandleFunc("POST /api/mail/test", s.guard(s.apiMailTest))                          // 시험 메일 발송
+	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))   // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
+	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))  // 본문 미리보기
+	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))  // 받는 사람·항목·첨부 추천(규칙 + AI)
+	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF)) // 규제 보고서 PDF(Gotenberg)
 	mux.HandleFunc("GET /api/notifications", s.guardSession(s.apiNotifications))           // 내 통보
 	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead)) // 읽음 표시
 	mux.HandleFunc("GET /api/notify/log", s.guard(s.apiNotifyLog))                         // 전체 통보 기록
@@ -326,11 +330,35 @@ func main() {
 	mux.HandleFunc("GET /api/ai/config", s.guard(s.apiAIConfigGet)) // AI 연결 설정(로컬·외부 LLM) — 키는 끝 4자리만
 	mux.HandleFunc("PUT /api/ai/config", s.guard(s.apiAIConfigPut))
 	mux.HandleFunc("POST /api/ai/test", s.guard(s.apiAITest))
+	// 규제 요구사항 카탈로그·탐색·보고서(관리자)
+	mux.HandleFunc("GET /api/regs", s.guard(s.apiRegs))
+	mux.HandleFunc("PUT /api/regs/{id}", s.guard(s.apiRegPut))
+	mux.HandleFunc("DELETE /api/regs/{id}", s.guard(s.apiRegDelete))
+	mux.HandleFunc("POST /api/regs/{id}/verify", s.guard(s.apiRegVerify))
+	mux.HandleFunc("POST /api/regs-builtin/apply", s.guard(s.apiRegBuiltinApply))
+	mux.HandleFunc("GET /api/regs-discover", s.guard(s.apiRegDiscoverGet))
+	mux.HandleFunc("POST /api/regs-discover", s.guard(s.apiRegDiscover))
+	mux.HandleFunc("PUT /api/regs-discover/config", s.guard(s.apiRegDiscoverCfg))
+	mux.HandleFunc("POST /api/regs-candidates/{id}", s.guard(s.apiRegCandidate))
+	mux.HandleFunc("POST /api/regs-report", s.guard(s.apiRegReport))
+	mux.HandleFunc("GET /api/regs-report", s.guard(s.apiRegReports))
+	mux.HandleFunc("GET /api/regs-report/{id}", s.guard(s.apiRegReportGet))
+	// 국내 법규 분석
+	mux.HandleFunc("POST /api/regs/{id}/law-fetch", s.guard(s.apiRegLawFetch))
+	mux.HandleFunc("POST /api/regs/{id}/law-analyze", s.guard(s.apiRegLawAnalyze))
+	mux.HandleFunc("POST /api/regs/{id}/law-review", s.guard(s.apiRegLawReview))
 	// 규제 대응 검증(체크리스트 기준 리포트) — 관리자
 	mux.HandleFunc("GET /api/compliance", s.guard(s.apiComplianceInfo))
 	mux.HandleFunc("PUT /api/compliance/checklist", s.guard(s.apiComplianceUpload))
 	mux.HandleFunc("POST /api/compliance/report", s.guard(s.apiComplianceRun))
 	mux.HandleFunc("GET /api/compliance/report/{id}", s.guard(s.apiComplianceGet))
+	// 공개 저장소(상류) 분석
+	mux.HandleFunc("GET /api/upstream/config", s.guard(s.apiUpstreamConfigGet))
+	mux.HandleFunc("PUT /api/upstream/config", s.guard(s.apiUpstreamConfigPut))
+	mux.HandleFunc("POST /api/upstream/run", s.guard(s.apiUpstreamRun))
+	mux.HandleFunc("POST /api/upstream/repo", s.guard(s.apiUpstreamRepo))
+	mux.HandleFunc("GET /api/upstream/reports", s.guard(s.apiUpstreamList))
+	mux.HandleFunc("GET /api/upstream/report/{id}", s.guard(s.apiUpstreamGet))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 
 	// 단일 프론트도어: 신규 UI 서빙 + /v2·/zot·/auth 리버스 프록시 (UI_DIR 설정 시 활성)

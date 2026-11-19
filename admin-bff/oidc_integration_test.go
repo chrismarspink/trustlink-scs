@@ -5,7 +5,7 @@ package main
 //
 //	docker run --network zot-keycloak_default \
 //	  -e OIDC_TEST_TOKEN=... -e KC_INTERNAL=... -e REALM=... -e CLIENT_ID=... \
-//	  golang:1.22 go test -run TestOIDCVerify -v ./...
+//	  golang:1.25 go test -run TestOIDCVerify -v ./...
 
 import (
 	"net/http"

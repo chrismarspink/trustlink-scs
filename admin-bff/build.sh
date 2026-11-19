@@ -3,7 +3,7 @@
 #  - compose 가 쓰는 이미지 이름(.env TRUSTLINK_ADMIN_IMAGE)으로 태깅한 뒤 BFF 만 재생성한다.
 #    개발 PC 의 .env 에는 TRUSTLINK_ADMIN_IMAGE=trustlink-admin:latest 를 권장
 #    (Docker Hub 이름을 그대로 쓰면 `docker compose pull` 시 로컬 빌드가 덮어써진다).
-#  - go 1.22+ 필요 → 로컬 go 버전 무관하게 golang:1.22 컨테이너로 cross-compile.
+#  - go 1.25+ 필요(Anthropic SDK) → 로컬 go 버전 무관하게 golang:1.25 컨테이너로 cross-compile.
 set -e
 cd "$(dirname "$0")"
 
@@ -15,10 +15,10 @@ echo "[1/4] UI 빌드 + ui-dist 동기화"
 ( cd ../trustlink-ui && { [ node_modules/.package-lock.json -nt package-lock.json ] || npm ci; } && npm run build )
 rm -rf ui-dist && cp -R ../trustlink-ui/dist ui-dist
 
-echo "[2/4] go 빌드 (linux/$ARCH, golang:1.22)"
+echo "[2/4] go 빌드 (linux/$ARCH, golang:1.25)"
 docker run --rm -v "$PWD":/src -w /src \
   -e CGO_ENABLED=0 -e GOOS=linux -e "GOARCH=$ARCH" \
-  golang:1.22 go build -o trustlink-admin-linux .
+  golang:1.25 go build -o trustlink-admin-linux .
 
 echo "[3/4] 이미지 빌드 → $IMAGE"
 docker build -t "$IMAGE" .

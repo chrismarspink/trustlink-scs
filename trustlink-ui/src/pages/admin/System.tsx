@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { adminHealth, adminMailStatus, adminMailTest, type Health, type MailStatus } from '@/lib/api';
-import { Button, Input } from '@/components/ui/primitives';
+import { adminHealth, adminMailStatus, type Health, type MailStatus } from '@/lib/api';
+import MailCompose from './MailCompose';
 import { PageTitle, SectionTitle, Loading, Alert, Table, Th, Td } from './_ui';
 
 function StatusDot({ ok }: { ok: boolean }) {
@@ -12,24 +12,11 @@ function StatusDot({ ok }: { ok: boolean }) {
   );
 }
 
-// 통보 메일: 설정 상태와 시험 발송. 허용 목록이 있으면 그 주소로만 발송된다.
+// 통보 메일: 설정 상태 + 현황 메일 보내기(항목 체크·보고서 PDF 첨부·추천). 허용 목록이 있으면 그 주소로만 발송된다.
 function MailCard() {
   const [m, setM] = useState<MailStatus | null>(null);
-  const [to, setTo] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState<{ tone: 'ok' | 'crit'; text: string } | null>(null);
-  useEffect(() => { adminMailStatus().then((x) => { setM(x); setTo(x.allowlist[0] || ''); }).catch(() => setM(null)); }, []);
+  useEffect(() => { adminMailStatus().then(setM).catch(() => setM(null)); }, []);
   if (!m) return null;
-  const send = async () => {
-    setBusy(true); setRes(null);
-    try {
-      await adminMailTest(to);
-      setRes({ tone: 'ok', text: `${to} 로 시험 메일을 보냈습니다. 받은편지함(스팸함 포함)을 확인하세요.` });
-    } catch (e) {
-      setRes({ tone: 'crit', text: `발송 실패: ${String(e).replace(/^Error: /, '')}` });
-    }
-    setBusy(false);
-  };
   return (
     <>
       <SectionTitle>통보 메일</SectionTitle>
@@ -41,12 +28,11 @@ function MailCard() {
         </tbody>
       </Table>
       {m.configured && (
-        <div className="mt-3 flex max-w-xl items-center gap-2">
-          <Input type="email" placeholder="받는 주소" value={to} onChange={(e) => setTo(e.target.value)} />
-          <Button onClick={send} disabled={busy || !to}>{busy ? '보내는 중…' : '시험 메일 보내기'}</Button>
-        </div>
+        <>
+          <SectionTitle>현황 메일 보내기</SectionTitle>
+          <MailCompose allowlist={m.allowlist} />
+        </>
       )}
-      {res && <div className="mt-3"><Alert tone={res.tone}>{res.text}</Alert></div>}
     </>
   );
 }

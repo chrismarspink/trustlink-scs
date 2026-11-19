@@ -57,6 +57,6 @@ docs/                      설계·가이드 문서
 
 ```bash
 # .env 에 TRUSTLINK_ADMIN_IMAGE=trustlink-admin:latest (로컬 빌드 이미지 사용)
-bash admin-bff/build.sh   # UI 빌드 → go 빌드(golang:1.22 컨테이너) → 이미지 → BFF 재생성
-docker run --rm -v "$PWD/admin-bff":/src -w /src golang:1.22 go test ./...
+bash admin-bff/build.sh   # UI 빌드 → go 빌드(golang:1.25 컨테이너) → 이미지 → BFF 재생성
+docker run --rm -v "$PWD/admin-bff":/src -w /src golang:1.25 go test ./...
 ```

@@ -180,7 +180,9 @@ export default function Compliance() {
   const load = () => adminCompliance().then((i) => {
     setInfo(i);
     if (!repo && i.products.length) pick(i, i.products[0].repo);
-    if (i.running) adminComplianceReport(i.running.id).then(setRep).catch(() => {});
+    const want = new URLSearchParams(window.location.search).get('report'); // 보고서함에서 열기
+    if (want && !rep) adminComplianceReport(want).then(setRep).catch(() => {});
+    else if (i.running) adminComplianceReport(i.running.id).then(setRep).catch(() => {});
     else if (!rep && i.reports.length) adminComplianceReport(i.reports[0].id).then(setRep).catch(() => {}); // 최근 리포트 기본 표시
   }).catch((e) => setErr(String(e)));
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps

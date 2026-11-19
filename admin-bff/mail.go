@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"mime"
 	"net"
@@ -54,8 +53,37 @@ func (m *Mailer) filter(to []string) (ok, dropped []string) {
 	return
 }
 
+// mailAttachment: 첨부 파일(PDF 등).
+type mailAttachment struct {
+	Name, Type string
+	Data       []byte
+}
+
+// mailContent: 평문(필수) + HTML(선택) + 첨부.
+type mailContent struct {
+	Text, HTML  string
+	Attachments []mailAttachment
+}
+
+func writeB64(b *bytes.Buffer, data []byte) {
+	enc := base64.StdEncoding.EncodeToString(data)
+	for len(enc) > 76 {
+		b.WriteString(enc[:76] + "\r\n")
+		enc = enc[76:]
+	}
+	b.WriteString(enc + "\r\n")
+}
+
 // buildMessage: UTF-8 평문 메일(제목은 RFC 2047, 본문은 base64).
 func buildMessage(from string, to []string, subject, body string, now time.Time) []byte {
+	return buildMessageRich(from, to, subject, mailContent{Text: body}, now, "")
+}
+
+// buildMessageRich: 평문만이면 단일 파트, HTML 이 있으면 multipart/alternative, 첨부가 있으면 multipart/mixed 로 감싼다.
+func buildMessageRich(from string, to []string, subject string, c mailContent, now time.Time, boundary string) []byte {
+	if boundary == "" {
+		boundary = fmt.Sprintf("tl-%d", now.UnixNano())
+	}
 	var b bytes.Buffer
 	h := func(k, v string) { fmt.Fprintf(&b, "%s: %s\r\n", k, v) }
 	h("From", (&mail.Address{Name: "TrustLink", Address: from}).String())
@@ -63,20 +91,51 @@ func buildMessage(from string, to []string, subject, body string, now time.Time)
 	h("Subject", mime.BEncoding.Encode("UTF-8", subject))
 	h("Date", now.Format(time.RFC1123Z))
 	h("MIME-Version", "1.0")
-	h("Content-Type", `text/plain; charset="UTF-8"`)
-	h("Content-Transfer-Encoding", "base64")
-	b.WriteString("\r\n")
-	enc := base64.StdEncoding.EncodeToString([]byte(body))
-	for len(enc) > 76 {
-		b.WriteString(enc[:76] + "\r\n")
-		enc = enc[76:]
+	part := func(ct string, data []byte, extra ...string) {
+		h("Content-Type", ct)
+		h("Content-Transfer-Encoding", "base64")
+		for i := 0; i+1 < len(extra); i += 2 {
+			h(extra[i], extra[i+1])
+		}
+		b.WriteString("\r\n")
+		writeB64(&b, data)
 	}
-	b.WriteString(enc + "\r\n")
+	body := func() {
+		if c.HTML == "" {
+			part(`text/plain; charset="UTF-8"`, []byte(c.Text))
+			return
+		}
+		alt := boundary + "-alt"
+		h("Content-Type", `multipart/alternative; boundary="`+alt+`"`)
+		b.WriteString("\r\n--" + alt + "\r\n")
+		part(`text/plain; charset="UTF-8"`, []byte(c.Text))
+		b.WriteString("--" + alt + "\r\n")
+		part(`text/html; charset="UTF-8"`, []byte(c.HTML))
+		b.WriteString("--" + alt + "--\r\n")
+	}
+	if len(c.Attachments) == 0 {
+		body()
+		return b.Bytes()
+	}
+	h("Content-Type", `multipart/mixed; boundary="`+boundary+`"`)
+	b.WriteString("\r\n--" + boundary + "\r\n")
+	body()
+	for _, a := range c.Attachments {
+		b.WriteString("--" + boundary + "\r\n")
+		name := mime.BEncoding.Encode("UTF-8", a.Name)
+		part(a.Type+`; name="`+name+`"`, a.Data, "Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": a.Name}))
+	}
+	b.WriteString("--" + boundary + "--\r\n")
 	return b.Bytes()
 }
 
-// Send: 허용된 수신자에게 발송. 보낸 주소·버린 주소를 돌려준다.
+// Send: 허용된 수신자에게 평문 발송. 보낸 주소·버린 주소를 돌려준다.
 func (m *Mailer) Send(to []string, subject, body string) (sent, dropped []string, err error) {
+	return m.SendRich(to, subject, mailContent{Text: body})
+}
+
+// SendRich: HTML 본문·첨부 포함 발송.
+func (m *Mailer) SendRich(to []string, subject string, content mailContent) (sent, dropped []string, err error) {
 	if !m.Configured() {
 		return nil, nil, fmt.Errorf("메일 서버 미설정(SMTP_HOST)")
 	}
@@ -128,7 +187,7 @@ func (m *Mailer) Send(to []string, subject, body string) (sent, dropped []string
 	if err != nil {
 		return nil, dropped, err
 	}
-	if _, err := wc.Write(buildMessage(m.From, sent, subject, body, time.Now())); err != nil {
+	if _, err := wc.Write(buildMessageRich(m.From, sent, subject, content, time.Now(), "")); err != nil {
 		return nil, dropped, err
 	}
 	if err := wc.Close(); err != nil {
@@ -147,35 +206,6 @@ func (s *Server) apiMailStatus(w http.ResponseWriter, r *http.Request) {
 		"configured": s.mail.Configured(), "host": s.mail.Host, "port": s.mail.Port,
 		"from": s.mail.From, "allowlist": allow,
 	})
-}
-
-// POST /api/mail/test {to} — 시험 메일 발송(관리자).
-func (s *Server) apiMailTest(w http.ResponseWriter, r *http.Request) {
-	var in struct{ To string }
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.To == "" {
-		writeJSON(w, 400, map[string]string{"error": "to 필수"})
-		return
-	}
-	actor := w.Header().Get("X-User")
-	body := fmt.Sprintf("TrustLink 메일 발송 시험입니다.\n\n보낸 사람(관리자): %s\n보낸 시각: %s\n서버: %s\n\n이 메일을 받았다면 TrustLink 통보 메일 설정이 정상입니다.",
-		actor, time.Now().Format("2006-01-02 15:04:05 MST"), r.Host)
-	sent, dropped, err := s.mail.Send([]string{in.To}, "[TrustLink] 메일 발송 시험", body)
-	status := "sent"
-	if err != nil {
-		status = "failed"
-	} else if len(sent) == 0 {
-		status = "blocked"
-	}
-	_ = s.sor.append(SoREvent{Actor: actor, Action: "mail-test", Status: status,
-		Detail: map[string]any{"to": in.To, "dropped": dropped, "error": errString(err)}})
-	switch {
-	case err != nil:
-		writeJSON(w, 502, map[string]string{"error": err.Error()})
-	case len(sent) == 0:
-		writeJSON(w, 403, map[string]string{"error": "허용 목록(MAIL_ALLOWLIST)에 없는 주소라 보내지 않았습니다"})
-	default:
-		writeJSON(w, 200, map[string]any{"status": "sent", "to": sent})
-	}
 }
 
 func errString(err error) string {

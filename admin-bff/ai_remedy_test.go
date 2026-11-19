@@ -99,7 +99,7 @@ func TestOSVAndExploits(t *testing.T) {
 		t.Fatal("공개 익스플로잇이면 P2")
 	}
 	facts := vexFacts(f, "", sig)
-	blk := factsBlock(facts)
+	blk := factsBlock(facts, "ko")
 	if !strings.Contains(blk, "[R1]") || !strings.Contains(blk, "최소 수정 버전 2.15.0") || !strings.Contains(blk, "[X3]") {
 		t.Fatalf("대응 사실 누락: %s", blk)
 	}

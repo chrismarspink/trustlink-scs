@@ -318,8 +318,29 @@ export const adminMirrorPolicy = (p: MirrorPolicy) => aj<MirrorStatus>('/api/mir
 export const adminMirrorSync = (id: string) => aj<{ queued: string[] }>(`/api/mirror/sync/${encodeURIComponent(id)}`, jsonInit('POST', {}));
 export const adminMirrorDT = (use: boolean) => aj<{ changed: Record<string, string> }>('/api/mirror/dt', jsonInit('PUT', { use }));
 export const adminMailStatus = () => aj<MailStatus>('/api/mail');
-export const adminMailTest = (to: string) =>
-  aj<{ status: string; to: string[] }>('/api/mail/test', jsonInit('POST', { to }));
+// 현황 메일: 넣을 항목(체크)·첨부 보고서(PDF)·받는 사람. 항목 없이 보내면 짧은 시험 메일.
+export type MailSection = { id: string; label: string; desc: string };
+export type MailRole = 'admin' | 'dev' | 'sales' | 'customer' | 'user';
+export type MailUser = { username: string; email: string; groups: string[]; role: MailRole };
+export type MailReport = {
+  id: string; docNo: string; title: string; audience: string; audienceKo: string; lang: string; edition: number;
+  created: string; fileName: string; repo?: string; tag?: string; pdf: boolean;
+};
+export type MailOptions = {
+  sections: MailSection[]; reports: MailReport[]; users: MailUser[]; usersError?: string;
+  pdf: boolean; ai: boolean; allowlist: string[]; configured: boolean; roles: Record<string, string>;
+};
+export type MailCompose = { recipients: string[]; sections: string[]; reports: string[]; subject: string; note: string };
+export type MailSuggestion = {
+  by: 'ai' | 'rule'; recipients: { username: string; email: string; role: MailRole; reason: string }[];
+  sections: string[]; reports: string[]; subject: string; note: string; reasons?: string[]; aiError?: string; aiMeta?: { model: string; provider?: string };
+};
+export const adminMailOptions = () => aj<MailOptions>('/api/mail/options');
+export const adminMailPreview = (c: MailCompose) => aj<{ subject: string; html: string; text: string }>('/api/mail/preview', jsonInit('POST', c));
+export const adminMailSuggest = (goal: string, ai: boolean) => aj<MailSuggestion>('/api/mail/suggest', jsonInit('POST', { goal, ai }));
+export const adminMailTest = (c: string | MailCompose) =>
+  aj<{ status: string; to: string[]; dropped?: string[]; attachments?: number }>('/api/mail/test', jsonInit('POST', typeof c === 'string' ? { to: c } : c));
+export const regReportPdfUrl = (id: string) => `/api/regs-report/${encodeURIComponent(id)}/pdf`;
 
 export type LogsResult = {
   file: string;
@@ -467,7 +488,7 @@ export async function deleteApiKey(id: string): Promise<void> {
 // ---------- 로컬 AI (초안 전용 — 판정은 규칙·사람) ----------
 export type AIStatus = {
   enabled: boolean; reachable: boolean; mode?: string; model?: string; modelFile?: string;
-  sha256?: string; sizeBytes?: number; ctx?: number; error?: string;
+  sha256?: string; sizeBytes?: number; ctx?: number; error?: string; provider?: string;
 };
 export type AIFact = { id: string; text: string; untrusted?: boolean };
 export type VexDraft = {
@@ -486,19 +507,25 @@ export type VexDraftResult = {
   draft: VexDraft; remedy: VexRemedy; facts: AIFact[]; warnings: string[]; kev: boolean;
   meta: { model: string; factsSha256: string; dbSnapshot?: string; elapsedMs: number };
 };
-export const aiStatus = () => aj<AIStatus>('/api/ai/status');
-// AI 연결 설정(관리자). 키는 다시 내려오지 않는다(hasKey·keyHint 만).
+export const aiStatus = (use?: 'report') => aj<AIStatus>('/api/ai/status' + (use ? `?use=${use}` : ''));
+// AI 연결 설정(관리자). 로컬·외부 LLM 을 함께 등록하고 용도(VEX / 보고서)별로 고른다. 키는 다시 내려오지 않는다(hasKey·keyHint 만).
+export type AIMode = 'off' | 'local' | 'external';
+export type AIExternal = {
+  provider: 'anthropic' | 'openai'; url?: string; model?: string; jsonSchema: boolean; effort?: '' | 'low' | 'medium' | 'high';
+  hasKey: boolean; keyHint?: string;
+};
 export type AIConfig = {
-  mode: 'off' | 'local' | 'external'; url: string; model?: string; jsonSchema: boolean; sendChecklist: boolean;
-  hasKey: boolean; keyHint?: string; fromEnv: boolean; updatedBy?: string; updatedAt?: string;
+  mode: AIMode; reportMode: AIMode; url: string; model?: string; jsonSchema: boolean; external: AIExternal; sendChecklist: boolean;
+  fromEnv: boolean; updatedBy?: string; updatedAt?: string;
 };
 export type AIConfigIn = {
-  mode: AIConfig['mode']; url: string; model: string; apiKey?: string; clearKey?: boolean; jsonSchema: boolean; sendChecklist: boolean;
+  mode: AIMode; reportMode: AIMode; url: string; model: string; jsonSchema: boolean; sendChecklist: boolean;
+  external: { provider: AIExternal['provider']; url: string; model: string; apiKey?: string; clearKey?: boolean; jsonSchema: boolean; effort: string };
 };
-export const adminAIConfig = () => aj<{ config: AIConfig; status: AIStatus }>('/api/ai/config');
-export const adminAIConfigSave = (b: AIConfigIn) => aj<{ config: AIConfig; status: AIStatus }>('/api/ai/config', jsonInit('PUT', b));
-export const adminAITest = (b: AIConfigIn) =>
-  aj<{ ok: boolean; model?: string; answer?: string; elapsedMs: number; error?: string }>('/api/ai/test', jsonInit('POST', b));
+export type AITestResult = { ok: boolean; model?: string; answer?: string; elapsedMs: number; error?: string };
+export const adminAIConfig = () => aj<{ config: AIConfig; status: AIStatus; reportStatus: AIStatus }>('/api/ai/config');
+export const adminAIConfigSave = (b: AIConfigIn) => aj<{ config: AIConfig; status: AIStatus; reportStatus: AIStatus }>('/api/ai/config', jsonInit('PUT', b));
+export const adminAITest = (b: AIConfigIn & { target: 'local' | 'external' }) => aj<AITestResult>('/api/ai/test', jsonInit('POST', b));
 export const aiVexDraft = (b: { project: string; component: string; vulnerability: string; context?: string; repo: string; tag: string }) =>
   aj<VexDraftResult>('/api/ai/vex-draft', jsonInit('POST', b));
 export type KevInfo = {
@@ -546,3 +573,131 @@ export const adminComplianceRun = (b: { repo: string; tag: string; profile: { ma
   aj<{ id: string }>('/api/compliance/report', jsonInit('POST', b));
 export const adminComplianceReport = (id: string) => aj<CompReport>(`/api/compliance/report/${encodeURIComponent(id)}`);
 export const complianceMdUrl = (id: string) => `/api/compliance/report/${encodeURIComponent(id)}?format=md`;
+
+// ---------- 규제 요구사항 카탈로그·탐색·보고서(관리자) ----------
+export type RegDate = { date: string; label: string };
+export type RegSource = { title: string; url: string };
+export type RegAudience = 'dev' | 'admin' | 'sales';
+export type RegReq = {
+  id: string; clause: string; title: string; text: string; evidence: string[];
+  actions: Partial<Record<RegAudience, string>>;
+};
+export type Regulation = {
+  id: string; region: string; name: string; nameKo: string; kind: string; authority: string; binding: string;
+  status: string; scope: string; markets: string[]; tags: string[]; dates: RegDate[]; sources: RegSource[];
+  requirements: RegReq[]; rev: number; origin?: string; edited?: boolean; builtinRev?: number;
+  verified: boolean; verifiedBy?: string; verifiedAt?: string; note?: string; updatedBy?: string; updatedAt?: string;
+};
+export type RegDiff = { id: string; name: string; change: 'added' | 'changed' | 'removed'; localEdit: boolean; builtinRev: number; currentRev: number };
+export type RegsInfo = {
+  catalog: { version: string; builtinVersion: string; note?: string; updatedAt?: string; regulations: Regulation[] };
+  builtin: { version: string; diff: RegDiff[] };
+  audiences: Record<string, string>; regions: Record<string, string>; checks: Record<string, string>;
+  analyses?: Record<string, RegAnalysis>; lawOC?: boolean; // 국내 법규 분석(한국 규제)
+};
+export const adminRegs = () => aj<RegsInfo>('/api/regs');
+export const adminRegSave = (r: Regulation) => aj<{ regulation: Regulation }>(`/api/regs/${encodeURIComponent(r.id)}`, jsonInit('PUT', r));
+export const adminRegDelete = (id: string) => aj(`/api/regs/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const adminRegVerify = (id: string, verified: boolean, note?: string) =>
+  aj<{ regulation: Regulation }>(`/api/regs/${encodeURIComponent(id)}/verify`, jsonInit('POST', { verified, note }));
+export const adminRegBuiltinApply = (ids: string[], overwrite: boolean) =>
+  aj<{ applied: string[]; skipped: string[] }>('/api/regs-builtin/apply', jsonInit('POST', { ids, overwrite }));
+
+export type RegCandidate = {
+  id: string; source: 'federal-register' | 'law-kr' | 'watch' | 'ai'; region: string; title: string; summary?: string;
+  url?: string; date?: string; keyword?: string; regId?: string; state: 'new' | 'dismissed' | 'adopted'; foundAt: string;
+};
+export type RegDiscoverInfo = {
+  state: { running: boolean; started?: string; finished?: string; log: string[]; added: number };
+  candidates: RegCandidate[]; config: { keywordsUS: string[]; keywordsKR: string[] }; hasLawOC: boolean;
+};
+export const adminRegDiscover = () => aj<RegDiscoverInfo>('/api/regs-discover');
+export const adminRegDiscoverRun = (sources: string[]) => aj('/api/regs-discover', jsonInit('POST', { sources }));
+export const adminRegDiscoverCfg = (b: { keywordsUS: string[]; keywordsKR: string[]; lawOC?: string; clearLawOC?: boolean }) =>
+  aj<{ hasLawOC: boolean }>('/api/regs-discover/config', jsonInit('PUT', b));
+export const adminRegCandidate = (id: string, action: 'adopt' | 'dismiss' | 'restore') =>
+  aj<{ candidate: RegCandidate }>(`/api/regs-candidates/${encodeURIComponent(id)}`, jsonInit('POST', { action }));
+
+export type RegReportReq = RegReq & { status: 'met' | 'partial' | 'unmet' | 'manual'; checks?: CompCheck[]; action?: string };
+export type RegReportReg = Regulation & { reqs: RegReportReq[]; counts: Record<string, number>; next?: RegDate; untranslated?: boolean };
+export type RegChange = { kind: 'added' | 'removed' | 'revised' | 'date' | 'status'; reg: string; detail?: string };
+export type RegReport = {
+  id: string; state: 'running' | 'done'; lang: 'ko' | 'en'; edition: number; docNo: string; fileName: string;
+  prevId?: string; prevDate?: string; changes?: RegChange[];
+  title: string; audience: string; audienceKo: string; regions: string[]; regionNames: Record<string, string>;
+  repo?: string; tag?: string; created: string; createdBy: string; catalogVersion: string; builtinVersion: string;
+  regs: RegReportReg[]; totals: Record<string, number>;
+  timeline: { date: string; label: string; reg: string; region: string; future: boolean }[];
+  evidence?: CompCheck[]; unverified: number;
+  summary?: { headline: string; points: string[]; priority: string[]; citations: string[] };
+  aiError?: string; aiMeta?: { model: string; elapsedMs: number; provider?: string }; disclaimer: string;
+  law?: RegLawSection[]; // 국내 법규 분석 및 대응 방안(한글 보고서)
+};
+export type RegReportItem = {
+  id: string; title: string; audienceKo: string; repo?: string; tag?: string; created: string; createdBy: string; regs: number; state: string;
+  lang: 'ko' | 'en'; docNo?: string; edition?: number; fileName?: string; key?: string; audience?: string; regions?: string[]; summary?: boolean;
+};
+export const adminRegReportRun = (b: { audience: string; regions: string[]; repo?: string; tag?: string; ai: boolean; lang: 'ko' | 'en' }) =>
+  aj<RegReport>('/api/regs-report', jsonInit('POST', b));
+export const adminRegReports = () => aj<RegReportItem[]>('/api/regs-report');
+export const adminRegReport = (id: string) => aj<RegReport>(`/api/regs-report/${encodeURIComponent(id)}`);
+
+// 공개 저장소(상류) 분석 — 제품 SBOM 구성요소의 상류 저장소 건강도 / 공개 GitHub 저장소 단건 점검
+export type UpRating = 'risk' | 'warn' | 'ok' | 'unknown';
+export type UpRate = { limit: number; remaining: number; reset?: string; hit: boolean; auth: boolean };
+export type UpRepo = {
+  id: string; url: string; host: string; stars?: number; forks?: number; openIssues?: number;
+  scorecard?: number; scorecardDate?: string; checks?: Record<string, number>;
+  archived: boolean; disabled: boolean; fork?: boolean; pushedAt?: string; license?: string; release?: string; releaseAt?: string;
+  secPolicy?: boolean; secPolicySrc?: string; advisories?: number; advCritical?: number; advHigh?: number; advOpenCritical?: number;
+  depsDev: string; github: string; fetchedAt?: string; cached?: boolean; rating?: UpRating; reasons?: string[]; comps?: number;
+};
+export type UpComp = {
+  name: string; version?: string; purl?: string; system?: string; repo?: string; repoSrc?: string; deprecated?: boolean;
+  vulns?: string[]; vulnCritical?: number; vulnHigh?: number; rating: UpRating; reasons?: string[];
+};
+export type UpFlag = { name: string; version?: string; repo?: string; rating: UpRating; reasons: string[] };
+export type UpReport = {
+  id: string; kind: 'product' | 'repo'; repo?: string; tag?: string; target?: string; created: string; createdBy: string; finished?: string;
+  state: 'running' | 'done' | 'error'; progress?: string; error?: string; sbom?: string;
+  comps: UpComp[]; repos: Record<string, UpRepo>; counts?: Record<UpRating, number>; top?: UpFlag[]; replace?: UpFlag[];
+  rate?: UpRate; notes?: string[]; depGraph?: { packages: number; ecosystems?: Record<string, number>; sample?: string[]; error?: string };
+  summary?: { headline: string; points: string[]; actions: string[]; citations: string[] };
+  aiError?: string; aiMeta?: { model: string; elapsedMs: number; provider?: string }; disclaimer: string;
+};
+export type UpReportItem = {
+  id: string; kind: 'product' | 'repo'; repo?: string; tag?: string; target?: string; created: string; createdBy: string;
+  state: string; progress?: string; comps: number; repos: number; counts?: Record<UpRating, number>; rating?: UpRating; summary: boolean;
+};
+export type UpConfig = { hasToken: boolean; tokenHint?: string; maxRepos: number; effective: number; updatedBy?: string; updatedAt?: string };
+export const adminUpstreamConfig = () => aj<{ config: UpConfig; ai: boolean; rate?: UpRate; rateError?: string }>('/api/upstream/config');
+export const adminUpstreamConfigSave = (b: { githubToken?: string; clearToken?: boolean; maxRepos: number }) =>
+  aj<{ config: UpConfig }>('/api/upstream/config', jsonInit('PUT', b));
+export const adminUpstreamRun = (b: { repo: string; tag: string; ai: boolean }) => aj<{ id: string }>('/api/upstream/run', jsonInit('POST', b));
+export const adminUpstreamRepo = (b: { url: string; ai: boolean }) => aj<{ id: string }>('/api/upstream/repo', jsonInit('POST', b));
+export const adminUpstreamReports = () => aj<UpReportItem[]>('/api/upstream/reports');
+export const adminUpstreamReport = (id: string) => aj<UpReport>(`/api/upstream/report/${encodeURIComponent(id)}`);
+
+// ---------- 국내 법규 분석 및 대응 방안 ----------
+export type LawArticle = {
+  law: string; kind?: 'law' | 'admrul'; article?: string; title?: string; gist: string; url?: string; check?: boolean;
+  text?: string; fetchedAt?: string;
+};
+export type LawStep = { stage: 'now' | '3m' | '6m'; do: string };
+export type RegAnalysis = {
+  nature: string; duty: 'legal' | 'conditional' | 'voluntary'; dutyNote?: string; questions: string[]; subjects: string[];
+  articles: LawArticle[]; sanctions: string; plans: Partial<Record<RegAudience, LawStep[]>>; evidence: string[];
+  trustlink: { feature: string; how: string }[]; talking?: string[]; checks?: string[]; sources?: RegSource[];
+  asOf?: string; rev: number; origin?: 'builtin' | 'ai'; verified: boolean; verifiedBy?: string; verifiedAt?: string;
+  updatedBy?: string; updatedAt?: string; aiMeta?: { model: string; elapsedMs: number; provider?: string }; citations?: string[];
+  draft?: RegAnalysis; running?: boolean; aiError?: string; builtinNewer?: boolean;
+};
+export type RegLawSection = { regId: string; name: string; analysis: RegAnalysis };
+export type LawFetchResult = {
+  status: 'done' | 'no-oc'; fetched: number; message?: string;
+  results?: { law: string; article: string; ok: boolean; error?: string }[];
+};
+export const adminRegLawFetch = (id: string) => aj<LawFetchResult>(`/api/regs/${encodeURIComponent(id)}/law-fetch`, { method: 'POST' });
+export const adminRegLawAnalyze = (id: string) => aj<{ status: string }>(`/api/regs/${encodeURIComponent(id)}/law-analyze`, { method: 'POST' });
+export const adminRegLawReview = (id: string, action: 'verify' | 'unverify' | 'adopt' | 'discard' | 'reset') =>
+  aj<{ status: string }>(`/api/regs/${encodeURIComponent(id)}/law-review`, jsonInit('POST', { action }));

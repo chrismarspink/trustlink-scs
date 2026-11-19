@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles
+  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch
 } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,8 @@ const PRODUCT: Item[] = [
     ]
   }
 ];
-// 관리 콘솔 섹션 — admins 일 때 노출.
+// 관리 콘솔 섹션 — admins 일 때 노출. 성격별로 세 묶음:
+//   관리(운영 현황·계정·통보) / 규제·보고(문서 발행과 규제 관리) / 시스템(인프라·연결 설정).
 const ADMIN: Item[] = [
   { to: '/admin', label: '대시보드', icon: LayoutDashboard, end: true },
   {
@@ -41,12 +42,19 @@ const ADMIN: Item[] = [
     ]
   },
   { to: '/admin/notify', label: '취약점 통보', icon: Bell },
-  { to: '/admin/capacity', label: '용량', icon: HardDrive },
-  { to: '/admin/logs', label: '로그', icon: ScrollText },
-  { to: '/admin/registry', label: '레지스트리', icon: Boxes },
-  { to: '/admin/system', label: '시스템 상태', icon: Activity },
-  { to: '/admin/mirror', label: '취약점 DB 미러', icon: DatabaseZap },
+  { to: '/admin/logs', label: '로그', icon: ScrollText }
+];
+const COMPLY: Item[] = [
+  { to: '/admin/reports', label: '보고서함', icon: Archive },
+  { to: '/admin/regs', label: '규제 카탈로그', icon: Landmark },
   { to: '/admin/compliance', label: '규제 대응 검증', icon: ClipboardCheck },
+  { to: '/admin/upstream', label: '공개 저장소 분석', icon: GitBranch }
+];
+const SYSTEM: Item[] = [
+  { to: '/admin/system', label: '시스템 상태', icon: Activity },
+  { to: '/admin/capacity', label: '용량', icon: HardDrive },
+  { to: '/admin/registry', label: '레지스트리', icon: Boxes },
+  { to: '/admin/mirror', label: '취약점 DB 미러', icon: DatabaseZap },
   { to: '/admin/ai', label: 'AI 연결', icon: Sparkles },
   { to: '/admin/storage', label: '설정·스토리지', icon: Database }
 ];
@@ -66,6 +74,10 @@ export function navTrail(pathname: string): string[] | null {
   };
   const a = hit(ADMIN);
   if (a) return ['관리', ...a];
+  const c = hit(COMPLY);
+  if (c) return ['규제·보고', ...c];
+  const y = hit(SYSTEM);
+  if (y) return ['시스템', ...y];
   if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
   const p = hit(PRODUCT);
   return p ? ['제품', ...p] : null;
@@ -175,6 +187,10 @@ export function Sidebar() {
           <>
             <SectionLabel>관리</SectionLabel>
             {render(ADMIN)}
+            <SectionLabel>규제·보고</SectionLabel>
+            {render(COMPLY)}
+            <SectionLabel>시스템</SectionLabel>
+            {render(SYSTEM)}
           </>
         )}
       </nav>

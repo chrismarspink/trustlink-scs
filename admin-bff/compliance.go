@@ -928,11 +928,11 @@ func (s *Server) buildReport(rep *compReport, c *checklist, useAI bool) {
 	rep.Regs, rep.Evidence, rep.Info, rep.Items, rep.Counts = regs, ev, info, items, counts
 	compMu.Unlock()
 
-	if useAI && aiEnabled() && aiConf().Mode == "external" && !aiConf().SendChecklist {
+	if useAI && aiEnabledFor("report") && aiConf().useMode("report") == "external" && !aiConf().SendChecklist {
 		compMu.Lock()
 		rep.AIError = "외부 LLM 사용 중 — 체크리스트 외부 전송이 허용되지 않아 AI 요약을 건너뛰었습니다(관리 콘솔 › AI 연결)"
 		compMu.Unlock()
-	} else if useAI && aiEnabled() {
+	} else if useAI && aiEnabledFor("report") {
 		if err := s.reportAI(rep, c, set); err != nil {
 			compMu.Lock()
 			rep.AIError = err.Error()
@@ -1047,7 +1047,7 @@ func (s *Server) reportAI(rep *compReport, c *checklist, set func(string)) error
 				Citations []string `json:"citations"`
 			} `json:"items"`
 		}
-		if _, err := s.aiDraft(facts, task, gapSchema, 1600, &out); err != nil {
+		if _, err := s.aiDraftFor("report", "ko", facts, task, gapSchema, 1600, &out); err != nil {
 			failed = append(failed, strings.Join(ids, ","))
 			if len(failed) >= 2 && len(failed)*4 >= len(gaps) {
 				return err // 대부분 실패 — AI 서버 문제로 보고 중단
@@ -1084,7 +1084,7 @@ func (s *Server) reportAI(rep *compReport, c *checklist, set func(string)) error
 	facts = append(facts, aiFact{ID: "N2", Text: fmt.Sprintf("원청 확인 항목: 충족 %d, 일부 %d, 미충족 %d, 문서 증거 필요 %d", cn["buyer.met"], cn["buyer.partial"], cn["buyer.unmet"], cn["buyer.doc"])})
 	task := rep.Repo + ":" + rep.Tag + " 릴리스의 규제 대응 검증 요약을 쓴다. summary: 어떤 규제 대상인지와 전체 상태(4~6문장). risks: 가장 중요한 문제(최대 4개). actions: 이 릴리스에서 실제로 할 구체적 보완 조치(예: 'log4j-core 를 지원 버전으로 교체', '릴리스 서명 첨부')를 급한 순서로 P1~P3 와 함께 최대 5개. 미충족(E-) 사실마다 조치가 하나 이상 있어야 한다. '리포트 작성' 같은 문서 작업은 쓰지 않는다. 모든 항목에 근거 사실 ID 를 citations 로 넣는다."
 	var sum compSummary
-	meta, err := s.aiDraft(facts, task, summarySchema, 1600, &sum)
+	meta, err := s.aiDraftFor("report", "ko", facts, task, summarySchema, 1600, &sum)
 	if err != nil {
 		return err
 	}
@@ -1095,7 +1095,7 @@ func (s *Server) reportAI(rep *compReport, c *checklist, set func(string)) error
 		sum.Actions[i].Citations = validCitations(sum.Actions[i].Citations, facts)
 	}
 	meta.Snapshot = rep.Info["dbSnapshot"]
-	st := s.aiStatusNow()
+	st := s.aiStatusFor("report")
 	meta.ModelSHA256 = st.SHA256
 	if meta.Model == "" {
 		meta.Model = st.Model
@@ -1187,7 +1187,7 @@ func (s *Server) apiComplianceGet(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/compliance — 체크리스트 요약, AI 상태, 제품 목록, 저장된 프로필, 최근 리포트
 func (s *Server) apiComplianceInfo(w http.ResponseWriter, r *http.Request) {
-	out := map[string]any{"ai": s.aiStatusNow(), "markets": marketName}
+	out := map[string]any{"ai": s.aiStatusFor("report"), "markets": marketName}
 	if c, err := s.loadChecklist(); err == nil {
 		out["checklist"] = checklistSummary(c)
 	}
