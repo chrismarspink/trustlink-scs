@@ -380,6 +380,15 @@ export default function VexPanel({ repo, tag }: { repo: string; tag: string }) {
               {data && <span className="text-xs text-muted-foreground">· 우선순위 순 정렬 {kev?.available ? `(KEV 사본 ${kev.asOf?.slice(0, 10)})` : '(KEV 사본 없음 — 미러 확인)'}</span>}
               {ai && <span className="text-xs text-violet-700">· AI 초안 사용 가능</span>}
             </div>
+            {!ai && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-violet-300 bg-violet-50/30 p-2 text-xs text-violet-900">
+                <Sparkles size={14} />
+                <span>AI 판정 초안(상태·근거·대응·목표 버전)과 AI 일괄 판정은 서버의 AI 연결(VEX 용도)이 켜지면 이 자리에 나타납니다.</span>
+                {sess.groups.includes('admins')
+                  ? <a href="/admin/ai" className="font-medium underline">AI 연결 설정</a>
+                  : <span className="text-muted-foreground">관리자에게 요청하세요.</span>}
+              </div>
+            )}
             {data && ai && (
               <div className="flex flex-wrap items-center gap-2 rounded-md border border-violet-200 bg-violet-50/40 p-2 text-xs">
                 {batch?.state === 'running' ? (
