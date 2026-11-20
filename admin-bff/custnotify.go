@@ -289,6 +289,8 @@ type CustNotice struct {
 	ID          string                 `json:"id"`
 	Kind        string                 `json:"kind"`   // patch | notaffected
 	Status      string                 `json:"status"` // draft | sent | partial | dropped | failed
+	AIState     string                 `json:"aiState,omitempty"`   // running | done — AI 설명은 뒤에서 만든다(로컬 LLM 은 수 분)
+	AIStarted   string                 `json:"aiStarted,omitempty"` // 진행 표시용
 	Created     string                 `json:"created"`
 	CreatedBy   string                 `json:"createdBy"`
 	SentAt      string                 `json:"sentAt,omitempty"`
@@ -642,6 +644,7 @@ func guardCustAI(t *custAIText, facts []aiFact) error {
 
 // runNoticeAI: 대상 언어별로 AI 설명을 만든다. 실패·꺼짐이면 규칙 문구를 유지하고 사유를 남긴다.
 func (s *Server) runNoticeAI(n *CustNotice, actor string) {
+	defer aiInteractive()()
 	if !aiEnabledFor("vex") {
 		n.AIError = "AI 꺼짐 — 규칙 문구로 작성"
 		return
@@ -956,13 +959,23 @@ func (s *Server) apiCustNotifyAI(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 404, map[string]string{"error": "초안 없음(이미 보낸 통지는 바꿀 수 없음)"})
 		return
 	}
-	s.runNoticeAI(n, w.Header().Get("X-User"))
-	renderMails(s, n)
+	if t, _ := time.Parse(time.RFC3339, n.AIStarted); n.AIState == "running" && time.Since(t) < 30*time.Minute { // 30분 넘으면(재시작 등) 다시 허용
+		writeJSON(w, 409, map[string]string{"error": "AI 설명을 이미 작성하고 있습니다"})
+		return
+	}
+	n.AIState, n.AIStarted = "running", time.Now().UTC().Format(time.RFC3339)
 	if err := c.putNotice(n); err != nil {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, 200, n)
+	writeJSON(w, 202, n)
+	actor := w.Header().Get("X-User")
+	go func(n CustNotice) { // 응답은 바로 — 화면은 GET 으로 진행을 본다
+		s.runNoticeAI(&n, actor)
+		renderMails(s, &n)
+		n.AIState = "done"
+		_ = c.putNotice(&n)
+	}(*n)
 }
 
 // POST /api/custnotify/{id}/send {keys:[...]} — ⑤ 발송.
@@ -978,6 +991,10 @@ func (s *Server) apiCustNotifySend(w http.ResponseWriter, r *http.Request) {
 	n, ok := c.notice(r.PathValue("id"))
 	if !ok {
 		writeJSON(w, 404, map[string]string{"error": "통지 없음"})
+		return
+	}
+	if n.AIState == "running" {
+		writeJSON(w, 409, map[string]string{"error": "AI 설명을 작성하는 중입니다 — 끝난 뒤 보내세요"})
 		return
 	}
 	s.sendNotice(n, in.Keys, w.Header().Get("X-User"))

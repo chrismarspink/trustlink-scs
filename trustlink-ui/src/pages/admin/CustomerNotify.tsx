@@ -64,12 +64,25 @@ export default function CustomerNotify() {
     try { open(await adminCustNotifyCreate({ kind, repo: c.repo, vulnId: c.vulnId })); } catch (e) { setErr(String(e)); }
     setBusy('');
   };
+  // AI 설명은 서버가 뒤에서 만든다(로컬 LLM 은 언어당 1~3분) — 3초마다 상태를 읽어 진행을 보여 준다.
   const runAI = async () => {
     if (!n) return;
-    setBusy('ai'); setErr('');
+    setErr('');
     try { setN(await adminCustNotifyAI(n.id)); } catch (e) { setErr(String(e)); }
-    setBusy('');
   };
+  const aiRunning = n?.aiState === 'running';
+  useEffect(() => {
+    if (!n || n.aiState !== 'running') return;
+    const t = setTimeout(() => adminCustNotifyGet(n.id).then(setN).catch(() => {}), 3000);
+    return () => clearTimeout(t);
+  }, [n]);
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (!aiRunning) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [aiRunning]);
+  const aiSec = n?.aiStarted && now ? Math.max(0, Math.floor((now - new Date(n.aiStarted).getTime()) / 1000)) : 0;
   const send = async () => {
     if (!n || !sel.length || !confirm(`${sel.length}곳에 메일을 보낼까요?`)) return;
     setBusy('send'); setErr('');
@@ -79,11 +92,11 @@ export default function CustomerNotify() {
   const reset = () => { setN(null); setStage(1); setErr(''); };
 
   const sent = n && n.status !== 'draft';
-  const st = (i: number): StepState => (err && i === stage ? 'error' : (i === 3 && busy === 'ai') || (i === 2 && busy === 'plan') || (i === 5 && busy === 'send') ? 'active' : i < stage || (i === 5 && sent) ? 'done' : i === stage ? 'active' : 'todo');
+  const st = (i: number): StepState => (err && i === stage ? 'error' : (i === 3 && aiRunning) || (i === 2 && busy === 'plan') || (i === 5 && busy === 'send') ? 'active' : i < stage || (i === 5 && sent) ? 'done' : i === stage ? 'active' : 'todo');
   const steps = [
     { label: '취약점 선택', state: st(1) },
     { label: '영향 고객', state: st(2), note: n ? `대상 ${n.targets.length} · 제외 ${n.skipped.length}` : undefined },
-    { label: kind === 'patch' ? '패치 버전 찾기 + AI 설명' : '판정 근거 + AI 설명', state: st(3), ai: busy === 'ai' },
+    { label: kind === 'patch' ? '패치 버전 찾기 + AI 설명' : '판정 근거 + AI 설명', state: st(3), ai: aiRunning },
     { label: '미리보기', state: st(4) },
     { label: '발송', state: st(5) }
   ];
@@ -152,14 +165,22 @@ export default function CustomerNotify() {
           {n && stage === 3 && (
             <>
               {n.kind === 'patch' && <FixPanel n={n} />}
-              <SectionTitle><span className="inline-flex items-center gap-2"><AIIcon size={22} spin={busy === 'ai'} />AI 설명</span></SectionTitle>
+              <SectionTitle><span className="inline-flex items-center gap-2"><AIIcon size={22} spin={aiRunning} />AI 설명</span></SectionTitle>
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Button onClick={runAI} disabled={!!busy || !!sent} className="bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white hover:opacity-90">
-                  {busy === 'ai' ? 'AI 가 쓰는 중…' : 'AI 설명 만들기'}
+                <Button onClick={runAI} disabled={!!busy || !!sent || aiRunning} className="bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white hover:opacity-90">
+                  {aiRunning ? 'AI 가 쓰는 중…' : 'AI 설명 만들기'}
                 </Button>
                 <span className="text-xs text-muted-foreground">AI 는 아래 사실(ID)만 근거로 쓰고, 사실에 없는 버전을 쓰면 버리고 규칙 문구를 씁니다. 담당자 이메일은 AI 에 보내지 않습니다.</span>
               </div>
-              {n.aiError && <Alert tone="warn">{n.aiError}</Alert>}
+              {aiRunning && (
+                <div className="mb-3 rounded-lg border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 p-3 text-sm">
+                  <div className="mb-2 flex items-center gap-2"><AIBadge pulse label="작성 중" />
+                    <span>언어별로 차례로 씁니다({Object.keys(n.ai).join(' · ')}) · 경과 <b className="tabular-nums">{`${Math.floor(aiSec / 60)}:${String(aiSec % 60).padStart(2, '0')}`}</b></span></div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-violet-100"><div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500" /></div>
+                  <div className="mt-1 text-xs text-muted-foreground">서버 내부 LLM 은 언어당 1~3분 걸립니다. 자동 초안이 돌고 있으면 그 건만 끝내고 이 요청을 먼저 처리합니다. 이 화면을 떠나도 계속 진행됩니다.</div>
+                </div>
+              )}
+              {n.aiError && !aiRunning && <Alert tone="warn">{n.aiError}</Alert>}
               <div className="grid gap-3 md:grid-cols-2">{Object.entries(n.ai).map(([l, t]) => <AIText key={l} lang={l} t={t} />)}</div>
               <details className="mt-3 text-xs"><summary className="cursor-pointer text-muted-foreground">AI 에 준 사실 {n.facts.length}</summary>
                 <ul className="mt-1 space-y-0.5">{n.facts.map((f) => <li key={f.id}><b className="font-mono">[{f.id}]</b> {f.untrusted && <Badge variant="warn">외부 원문</Badge>} {f.text}</li>)}</ul>

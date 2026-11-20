@@ -451,6 +451,7 @@ func (s *Server) projectFindings(project string) ([]dtFindingFull, error) {
 
 // POST /api/ai/vex-draft {project, component, vulnerability, context, repo, tag}
 func (s *Server) apiAIVexDraft(w http.ResponseWriter, r *http.Request) {
+	defer aiInteractive()()
 	var in struct {
 		Project, Component, Vulnerability, Context, Repo, Tag string
 	}
@@ -642,6 +643,7 @@ func (s *Server) runVexBatch(b *vexBatch, picks []dtFindingFull, context string)
 		}
 		b.Current = f.Vulnerability.VulnID + " · " + f.Component.Name
 		vexBatchMu.Unlock()
+		aiYield(b) // 사람이 직접 요청한 AI 가 기다리면 먼저 보낸다
 		res, err := s.vexDraftFor(b.Actor, b.Repo, b.Tag, f, context)
 		key := f.Component.UUID + "|" + f.Vulnerability.UUID
 		vexBatchMu.Lock()

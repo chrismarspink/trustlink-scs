@@ -5,9 +5,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -56,11 +58,20 @@ func (s *Server) dtLookupProject(name, version string) (string, error) {
 }
 
 // SBOM 업로드(없으면 autoCreate) → 처리 토큰.
+// dtMultipartLimit: DT 는 JSON 본문의 문자열을 20MB 까지만 받는다 — 그보다 큰 SBOM 은 multipart 로 보낸다.
+var dtMultipartLimit = 16 << 20
+
 func (s *Server) dtUploadBOM(name, version, bomB64 string) (string, error) {
-	body, _ := json.Marshal(map[string]any{
-		"projectName": name, "projectVersion": version, "autoCreate": true, "bom": bomB64,
-	})
-	resp, err := s.dtReq("PUT", "/api/v1/bom", body)
+	var resp *http.Response
+	var err error
+	if len(bomB64) > dtMultipartLimit {
+		resp, err = s.dtUploadBOMMultipart(name, version, bomB64)
+	} else {
+		body, _ := json.Marshal(map[string]any{
+			"projectName": name, "projectVersion": version, "autoCreate": true, "bom": bomB64,
+		})
+		resp, err = s.dtReq("PUT", "/api/v1/bom", body)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -74,6 +85,30 @@ func (s *Server) dtUploadBOM(name, version, bomB64 string) (string, error) {
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&t)
 	return t.Token, nil
+}
+
+// dtUploadBOMMultipart: POST /api/v1/bom (multipart/form-data) — 큰 SBOM 용.
+func (s *Server) dtUploadBOMMultipart(name, version, bomB64 string) (*http.Response, error) {
+	raw, err := base64.StdEncoding.DecodeString(bomB64)
+	if err != nil {
+		return nil, fmt.Errorf("SBOM base64 해석 실패: %w", err)
+	}
+	var b bytes.Buffer
+	mw := multipart.NewWriter(&b)
+	_ = mw.WriteField("projectName", name)
+	_ = mw.WriteField("projectVersion", version)
+	_ = mw.WriteField("autoCreate", "true")
+	fw, _ := mw.CreateFormFile("bom", "bom.json")
+	_, _ = fw.Write(raw)
+	mw.Close()
+	req, err := http.NewRequest("POST", s.cfg.DTBaseURL+"/api/v1/bom", &b)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Api-Key", s.dtAPIKey())
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	return s.http.Do(req)
 }
 
 // 분석 처리중 여부 (false = 완료).

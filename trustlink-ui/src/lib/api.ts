@@ -758,6 +758,7 @@ export type CustTarget = {
 export type CustAIText = { summary: string; impact: string; action: string; citations: string[]; source: 'ai' | 'rule'; model?: string; warnings?: string[] };
 export type CustNotice = {
   id: string; kind: 'patch' | 'notaffected'; status: 'draft' | 'sent' | 'partial' | 'dropped' | 'failed'; created: string; createdBy: string;
+  aiState?: 'running' | 'done'; aiStarted?: string;
   sentAt?: string; sentBy?: string; repo: string; vulnId: string; severity: string; cvss?: number; kev: boolean; component: string; compVersion: string;
   fix: CustFix; facts: AIFact[]; ai: Record<string, CustAIText>; aiError?: string; targets: CustTarget[]; skipped: { customerId: string; customer: string; reason: string }[];
 };
