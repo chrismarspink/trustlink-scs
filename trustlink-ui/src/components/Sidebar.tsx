@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch
+  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion
 } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,7 @@ const PRODUCT: Item[] = [
     ]
   }
 ];
+const VEX_ITEM: Item = { to: '/vex', label: 'VEX 판단', icon: ShieldQuestion };
 // 관리 콘솔 섹션 — admins 일 때 노출. 성격별로 세 묶음:
 //   관리(운영 현황·계정·통보) / 규제·보고(문서 발행과 규제 관리) / 시스템(인프라·연결 설정).
 const ADMIN: Item[] = [
@@ -79,7 +80,7 @@ export function navTrail(pathname: string): string[] | null {
   const y = hit(SYSTEM);
   if (y) return ['시스템', ...y];
   if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
-  const p = hit(PRODUCT);
+  const p = hit([...PRODUCT, VEX_ITEM]);
   return p ? ['제품', ...p] : null;
 }
 
@@ -168,6 +169,8 @@ export function Sidebar() {
   }, []);
 
   const showAdmin = !!sess?.groups?.includes('admins');
+  // VEX 판단 대기열: 보안·개발·관리자(VEX 편집 권한)에게만
+  const product = sess?.canEditVex ? [PRODUCT[0], VEX_ITEM, ...PRODUCT.slice(1)] : PRODUCT;
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-sidebar">
@@ -182,7 +185,7 @@ export function Sidebar() {
       </Link>
       <nav className="flex-1 space-y-0.5 overflow-y-auto pb-3">
         <SectionLabel>제품</SectionLabel>
-        {render(PRODUCT)}
+        {render(product)}
         {showAdmin && (
           <>
             <SectionLabel>관리</SectionLabel>

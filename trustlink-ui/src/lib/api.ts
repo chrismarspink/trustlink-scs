@@ -541,6 +541,14 @@ export const aiVexBatchStart = (b: { project: string; repo: string; tag: string;
   aj<VexBatch>('/api/ai/vex-batch', jsonInit('POST', b));
 export const aiVexBatchCancel = (project: string) => aj<{ status: string }>('/api/ai/vex-batch', jsonInit('POST', { project, cancel: true }));
 export const aiVexBatch = (project: string) => aj<VexBatch>(`/api/ai/vex-batch?project=${encodeURIComponent(project)}`);
+// VEX 판단 대기열(전 제품·버전, 급한 순)
+export type VexQueueRow = {
+  repo: string; tag: string; project: string; total: number; analyzed: number; pending: number;
+  pendCritical: number; pendHigh: number; pendKev: number; affected: number;
+  batchState?: string; batchDone?: number; batchTotal?: number; batchDrafts?: number; batchAt?: string;
+};
+export type VexQueue = { dt: boolean; rows: VexQueueRow[]; summary?: Record<string, number>; ai?: boolean; generated?: string };
+export const vexQueue = (refresh = false) => aj<VexQueue>(`/api/vex/queue${refresh ? '?refresh=1' : ''}`);
 export const vexKev = (ids: string[]) => aj<KevInfo>(`/api/vex/kev?ids=${encodeURIComponent(ids.join(','))}`);
 
 // ---------- 규제 대응 검증 ----------

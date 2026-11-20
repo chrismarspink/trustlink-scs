@@ -1,0 +1,165 @@
+package main
+
+// vex_queue.go: VEX 판단 대기열 — 감시 중인 모든 제품·버전의 미판단 취약점을 한 화면에 모은다.
+// 보안·개발·관리자(vexEditors)용. 관리자가 아니면 읽기 권한이 있는 제품만 보인다.
+// 행마다 미판단 수(심각도별)·KEV·AI 일괄 판정 상태를 주고, 판단은 제품 화면(VexPanel)에서 한다.
+
+import (
+	"encoding/json"
+	"net/http"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+type vexQueueRow struct {
+	Repo        string `json:"repo"`
+	Tag         string `json:"tag"`
+	Project     string `json:"project"` // DT 프로젝트 UUID(AI 일괄 판정 키)
+	Total       int    `json:"total"`
+	Analyzed    int    `json:"analyzed"`
+	Pending     int    `json:"pending"`
+	PendCrit    int    `json:"pendCritical"`
+	PendHigh    int    `json:"pendHigh"`
+	PendKEV     int    `json:"pendKev"`
+	Affected    int    `json:"affected"` // 영향 있음(조치 필요)
+	BatchState  string `json:"batchState,omitempty"`
+	BatchDone   int    `json:"batchDone,omitempty"`
+	BatchTotal  int    `json:"batchTotal,omitempty"`
+	BatchDrafts int    `json:"batchDrafts,omitempty"` // 저장 대기 중인 AI 초안 수
+	BatchAt     string `json:"batchAt,omitempty"`
+}
+
+var vexQueueCache struct {
+	sync.Mutex
+	at   time.Time
+	rows []vexQueueRow
+}
+
+// vexQueueRows: 전 제품 집계(1분 캐시). 권한 필터는 호출 쪽에서.
+func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
+	vexQueueCache.Lock()
+	defer vexQueueCache.Unlock()
+	if !refresh && vexQueueCache.rows != nil && time.Since(vexQueueCache.at) < time.Minute {
+		return vexQueueCache.rows
+	}
+	n := s.notify
+	projects := map[string]string{}
+	if n != nil {
+		n.mu.Lock()
+		for k, v := range n.st.Projects {
+			projects[k] = v
+		}
+		n.mu.Unlock()
+	}
+	kev, _, _ := kevIndex()
+	rows := []vexQueueRow{}
+	for key, repo := range projects {
+		name, tag, ok := strings.Cut(key, "@")
+		if !ok {
+			continue
+		}
+		uuid, err := s.dtLookupProject(name, tag)
+		if err != nil || uuid == "" {
+			continue
+		}
+		row := vexQueueRow{Repo: repo, Tag: tag, Project: uuid}
+		var fs []dtFinding
+		if b, err := s.dtFindings(uuid); err == nil {
+			_ = json.Unmarshal(b, &fs)
+		}
+		for _, f := range fs {
+			if f.Analysis.IsSuppressed {
+				continue
+			}
+			row.Total++
+			if !pendingState(f.Analysis.State) {
+				row.Analyzed++
+				if strings.EqualFold(f.Analysis.State, "EXPLOITABLE") {
+					row.Affected++
+				}
+				continue
+			}
+			row.Pending++
+			switch strings.ToUpper(f.Vulnerability.Severity) {
+			case "CRITICAL":
+				row.PendCrit++
+			case "HIGH":
+				row.PendHigh++
+			}
+			if _, hit := kev[strings.ToUpper(f.Vulnerability.VulnID)]; hit {
+				row.PendKEV++
+			}
+		}
+		if b := vexBatchGet(uuid); b != nil {
+			row.BatchState, row.BatchDone, row.BatchTotal = b.State, b.Done, b.Total
+			row.BatchDrafts, row.BatchAt = len(b.Results), firstNonEmpty(b.Finished, b.Started)
+		}
+		rows = append(rows, row)
+	}
+	// 급한 순: KEV → 미판단 치명 → 높음 → 미판단 수
+	sort.Slice(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.PendKEV != b.PendKEV {
+			return a.PendKEV > b.PendKEV
+		}
+		if a.PendCrit != b.PendCrit {
+			return a.PendCrit > b.PendCrit
+		}
+		if a.PendHigh != b.PendHigh {
+			return a.PendHigh > b.PendHigh
+		}
+		if a.Pending != b.Pending {
+			return a.Pending > b.Pending
+		}
+		return a.Repo+a.Tag < b.Repo+b.Tag
+	})
+	vexQueueCache.rows, vexQueueCache.at = rows, time.Now()
+	return rows
+}
+
+// vexBatchGet: 진행 중이면 메모리, 아니면 마지막 결과 파일.
+func vexBatchGet(project string) *vexBatch {
+	vexBatchMu.Lock()
+	b := vexBatches[project]
+	vexBatchMu.Unlock()
+	if b != nil {
+		return b
+	}
+	var fb vexBatch
+	if readJSONFile(vexBatchPath(project), &fb) == nil {
+		return &fb
+	}
+	return nil
+}
+
+// GET /api/vex/queue[?refresh=1] — VEX 판단 대기열(보안·개발·관리자).
+func (s *Server) apiVexQueue(w http.ResponseWriter, r *http.Request) {
+	if !s.dtEnabled() {
+		writeJSON(w, 200, map[string]any{"dt": false, "rows": []vexQueueRow{}})
+		return
+	}
+	sess, _ := s.sessionOf(r)
+	all := s.vexQueueRows(r.URL.Query().Get("refresh") == "1")
+	rows := []vexQueueRow{}
+	for _, row := range all {
+		if contains(sess.Groups, "admins") || s.access == nil || s.access.allowed(sess.Username, sess.Groups, row.Repo, "read") {
+			rows = append(rows, row)
+		}
+	}
+	sum := map[string]int{}
+	for _, row := range rows {
+		sum["pending"] += row.Pending
+		sum["pendCritical"] += row.PendCrit
+		sum["pendHigh"] += row.PendHigh
+		sum["pendKev"] += row.PendKEV
+		sum["affected"] += row.Affected
+		sum["total"] += row.Total
+		sum["drafts"] += row.BatchDrafts
+		if row.BatchState == "running" {
+			sum["running"]++
+		}
+	}
+	writeJSON(w, 200, map[string]any{"dt": true, "rows": rows, "summary": sum, "ai": aiEnabled(), "generated": time.Now().UTC().Format(time.RFC3339)})
+}

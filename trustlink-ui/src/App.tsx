@@ -9,6 +9,7 @@ import GettingStarted from '@/pages/docs/GettingStarted';
 import ShareGuide from '@/pages/docs/ShareGuide';
 import Vuln from '@/pages/docs/Vuln';
 import Rbac from '@/pages/docs/Rbac';
+import VexQueue from '@/pages/VexQueue';
 
 // 관리 콘솔은 별도 청크로 분리(코드 스플릿) — /admin 진입 시에만 로드.
 const AdminApp = lazy(() => import('@/AdminApp'));
@@ -45,6 +46,7 @@ function ProductApp() {
         <Route path="/docs/rbac" element={<Rbac />} />
         <Route path="/artifact/:name/:tag" element={<ArtifactDetail />} />
         <Route path="/apikeys" element={<ApiKeys />} />
+        <Route path="/vex" element={<VexQueue />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
