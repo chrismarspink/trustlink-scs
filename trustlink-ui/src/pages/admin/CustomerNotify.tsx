@@ -41,6 +41,10 @@ export default function CustomerNotify() {
   const [tab, setTab] = useState<'flow' | 'history'>('flow');
   const [kind, setKind] = useState<CustNotice['kind']>('patch');
   const [cands, setCands] = useState<CustVulnCand[] | null>(null);
+  // 후보가 많을 때(수십~수백 건) 구성요소·심각도로 좁힌다. 기본: 치명·높음 + KEV
+  const [fComp, setFComp] = useState('');
+  const [fSev, setFSev] = useState<'top' | 'all'>('top');
+  const [fq, setFq] = useState('');
   const [candErr, setCandErr] = useState('');
   const [n, setN] = useState<CustNotice | null>(null);
   const [stage, setStage] = useState(1);
@@ -126,12 +130,32 @@ export default function CustomerNotify() {
                 ))}
               </div>
               {candErr && <Alert tone="warn">{candErr}</Alert>}
+              {cands && cands.length > 0 && (() => {
+                const comps: Record<string, number> = {};
+                cands.forEach((c) => { const k = c.component.split(' ')[0]; comps[k] = (comps[k] || 0) + 1; });
+                return (
+                  <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="text-muted-foreground">구성요소</span>
+                    {[['', `전체 ${cands.length}`], ...Object.entries(comps).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, `${k} ${v}`])].map(([k, l]) => (
+                      <button key={k} onClick={() => setFComp(k)} className={cn('rounded-full border px-2.5 py-1', fComp === k ? 'border-primary bg-primary/10 font-medium text-primary' : 'hover:bg-secondary')}>{l}</button>
+                    ))}
+                    <span className="ml-3 text-muted-foreground">심각도</span>
+                    {([['top', '치명·높음·KEV'], ['all', '전체']] as const).map(([k, l]) => (
+                      <button key={k} onClick={() => setFSev(k)} className={cn('rounded-full border px-2.5 py-1', fSev === k ? 'border-primary bg-primary/10 font-medium text-primary' : 'hover:bg-secondary')}>{l}</button>
+                    ))}
+                    <input value={fq} onChange={(e) => setFq(e.target.value)} placeholder="CVE 검색" className="ml-auto h-7 w-40 rounded-md border px-2" />
+                  </div>
+                );
+              })()}
               {!cands ? <Loading /> : (
                 <Table>
                   <thead><tr><Th>취약점</Th><Th>제품·버전</Th><Th>구성요소</Th><Th>고객</Th><Th>상태</Th><Th /></tr></thead>
                   <tbody>
                     {cands.length === 0 ? <tr><Td colSpan={6} className="text-center text-muted-foreground">
-                      {kind === 'patch' ? '등록된 고객 설치 버전에 걸린 취약점이 없습니다.' : '영향 없음(VEX)으로 판정된 취약점이 없습니다.'}</Td></tr> : cands.map((c) => (
+                      {kind === 'patch' ? '등록된 고객 설치 버전에 걸린 취약점이 없습니다.' : '영향 없음(VEX)으로 판정된 취약점이 없습니다.'}</Td></tr> : cands.filter((c) =>
+                      (!fComp || c.component.split(' ')[0] === fComp) &&
+                      (fSev === 'all' || c.kev || ['CRITICAL', 'HIGH'].includes((c.severity || '').toUpperCase())) &&
+                      (!fq || c.vulnId.toLowerCase().includes(fq.toLowerCase()))).map((c) => (
                       <tr key={c.repo + c.vulnId}>
                         <Td><div className="flex flex-wrap items-center gap-1"><b className="text-sm">{c.vulnId}</b><Sev s={c.severity} />{c.kev && <SourceBadge src="kev" />}</div></Td>
                         <Td className="text-xs">{base(c.repo)} · {c.tags.join(', ')}</Td>
