@@ -288,9 +288,10 @@ export async function getNotifications(): Promise<{ items: NoticeItem[]; unread:
 export const markNotificationsRead = (id = '') => zfetch('/api/notifications/read', jsonInit('POST', { id }));
 export type NoticeLog = {
   items: { id: string; time: string; kind: string; audience: string; repo: string; tag: string; title: string; to: string[]; mailed?: string[]; dropped?: string[]; noEmail?: string[]; mailError?: string }[];
+  total: number; page: number; size: number; days: number;
   lastSync: string; lastSyncMsg: string; quietUntil?: string; tracked: number; pending: number; initialized: boolean;
 };
-export const adminNotifyLog = () => aj<NoticeLog>('/api/notify/log');
+export const adminNotifyLog = (page = 1, size = 20, days = 0) => aj<NoticeLog>(`/api/notify/log?page=${page}&size=${size}&days=${days}`);
 export const adminNotifySync = () => aj<{ message: string }>('/api/notify/sync', jsonInit('POST', {}));
 export type VulnSources = { osv: string[]; ecosystems: string[]; github: boolean; githubTokenSet: boolean; quietUntil: string; waiting: string[] };
 export const adminVulnSources = () => aj<VulnSources>('/api/vulnsources');

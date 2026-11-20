@@ -189,3 +189,26 @@ func TestNotifyVexCustomerCapped(t *testing.T) {
 		t.Error("영향 있음이 맨 앞이어야 함")
 	}
 }
+
+func TestNoticePage(t *testing.T) {
+	now := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	var all []Notice
+	for i := 0; i < 45; i++ { // i 가 클수록 최신, i 일 전 = 44-i
+		all = append(all, Notice{ID: fmt.Sprint(i), Time: now.AddDate(0, 0, -(44 - i)).Format(time.RFC3339)})
+	}
+	items, total := noticePage(all, 1, 20, 0, now)
+	if total != 45 || len(items) != 20 || items[0].ID != "44" {
+		t.Fatalf("1쪽: total=%d len=%d first=%s", total, len(items), items[0].ID)
+	}
+	items, _ = noticePage(all, 3, 20, 0, now)
+	if len(items) != 5 || items[4].ID != "0" {
+		t.Fatalf("3쪽: len=%d", len(items))
+	}
+	items, total = noticePage(all, 1, 20, 7, now) // 최근 7일: 0~7일 전 = 8건
+	if total != 8 || len(items) != 8 {
+		t.Fatalf("7일: total=%d len=%d", total, len(items))
+	}
+	if items, _ = noticePage(all, 9, 20, 0, now); len(items) != 0 {
+		t.Fatalf("범위 밖 쪽은 비어야 함")
+	}
+}

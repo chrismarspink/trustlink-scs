@@ -642,19 +642,43 @@ func (s *Server) apiNotificationsRead(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"status": "ok"})
 }
 
-// GET /api/notify/log — 관리자: 전체 통보 기록(최근 200)과 동기화 상태.
+// GET /api/notify/log?page=1&size=20&days=0 — 관리자: 통보 기록(최신순, 쪽 나눔)과 동기화 상태.
+// days>0 이면 최근 그 일수 안의 기록만. size 는 10~100.
 func (s *Server) apiNotifyLog(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	page := max(atoiDefault(q.Get("page"), 1), 1)
+	size := min(max(atoiDefault(q.Get("size"), 20), 10), 100)
+	days := max(atoiDefault(q.Get("days"), 0), 0)
 	n := s.notify
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	items := []Notice{}
-	for i := len(n.st.Notices) - 1; i >= 0 && len(items) < 200; i-- {
-		nt := n.st.Notices[i]
-		nt.Read = nil
-		items = append(items, nt)
-	}
-	writeJSON(w, 200, map[string]any{"items": items, "lastSync": n.st.LastSync, "lastSyncMsg": n.st.LastSyncMsg, "quietUntil": n.st.QuietUntil,
+	items, total := noticePage(n.st.Notices, page, size, days, time.Now())
+	writeJSON(w, 200, map[string]any{"items": items, "total": total, "page": page, "size": size, "days": days,
+		"lastSync": n.st.LastSync, "lastSyncMsg": n.st.LastSyncMsg, "quietUntil": n.st.QuietUntil,
 		"tracked": len(n.st.SBOM), "pending": len(n.pending), "initialized": n.st.Initialized})
+}
+
+// noticePage: 최신순으로 (days 필터 후) page 쪽을 잘라 준다. total 은 필터 후 전체 건수.
+func noticePage(all []Notice, page, size, days int, now time.Time) ([]Notice, int) {
+	var cut time.Time
+	if days > 0 {
+		cut = now.Add(-time.Duration(days) * 24 * time.Hour)
+	}
+	items, total, skip := []Notice{}, 0, (page-1)*size
+	for i := len(all) - 1; i >= 0; i-- {
+		nt := all[i]
+		if days > 0 {
+			if t, err := time.Parse(time.RFC3339, nt.Time); err == nil && t.Before(cut) {
+				continue
+			}
+		}
+		total++
+		if total > skip && len(items) < size {
+			nt.Read = nil
+			items = append(items, nt)
+		}
+	}
+	return items, total
 }
 
 // POST /api/notify/sync — 관리자: 지금 동기화(+ 모아 둔 알림 즉시 발송).

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminNotifyLog, adminNotifySync, type NoticeLog } from '@/lib/api';
 import { Badge, Button } from '@/components/ui/primitives';
-import { PageHeader, StatCard, Alert, Loading, Table, Th, Td } from './_ui';
+import { PageHeader, StatCard, Alert, Loading, Table, Th, Td, selectCls } from './_ui';
 
 const fmt = (t: string) => (t ? new Date(t).toLocaleString('ko-KR') : '—');
 
@@ -11,8 +11,14 @@ export default function Notify() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const load = () => adminNotifyLog().then(setLog).catch((e) => setErr(String(e)));
-  useEffect(() => { load(); }, []);
+  // 쪽 나눔: 기간(최근 N일, 0=전체)·쪽 크기·쪽 번호는 서버가 잘라서 준다.
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(20);
+  const [days, setDays] = useState(0);
+  const load = () => adminNotifyLog(page, size, days).then(setLog).catch((e) => setErr(String(e)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [page, size, days]);
+  const pages = log ? Math.max(1, Math.ceil(log.total / log.size)) : 1;
 
   const sync = async () => {
     setBusy(true); setMsg('');
@@ -33,6 +39,19 @@ export default function Notify() {
             <StatCard label="마지막 동기화" value={<span className="text-base">{fmt(log.lastSync)}</span>} />
             <StatCard label="동기화 결과" value={<span className="text-base">{log.lastSyncMsg || '—'}</span>} />
             <StatCard label="모으는 중" value={log.pending} />
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+            <select className={selectCls} value={days} onChange={(e) => { setDays(+e.target.value); setPage(1); }} aria-label="기간">
+              <option value={0}>전체 기간</option>
+              <option value={1}>최근 1일</option>
+              <option value={7}>최근 7일</option>
+              <option value={30}>최근 30일</option>
+              <option value={90}>최근 90일</option>
+            </select>
+            <select className={selectCls} value={size} onChange={(e) => { setSize(+e.target.value); setPage(1); }} aria-label="쪽당 건수">
+              {[20, 50, 100].map((n) => <option key={n} value={n}>{n}건씩</option>)}
+            </select>
+            <span className="text-muted-foreground">총 {log.total}건</span>
           </div>
           <Table>
             <thead>
@@ -57,6 +76,15 @@ export default function Notify() {
               ))}
             </tbody>
           </Table>
+          {pages > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+              <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(1)}>처음</Button>
+              <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>이전</Button>
+              <span className="px-2 tabular-nums">{page} / {pages}</span>
+              <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage(page + 1)}>다음</Button>
+              <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage(pages)}>마지막</Button>
+            </div>
+          )}
         </>
       )}
     </>
