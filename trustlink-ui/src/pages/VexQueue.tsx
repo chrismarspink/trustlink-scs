@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldQuestion, RefreshCw, Sparkles, ListChecks, Flame } from 'lucide-react';
+import { ShieldQuestion, RefreshCw, ListChecks, Flame } from 'lucide-react';
+import { AIBadge, AIIcon } from '@/components/AIBadge';
 import { vexQueue, aiVexBatchStart, aiStatus, type VexQueue as Q, type VexQueueRow, type AIStatus } from '@/lib/api';
 import { Badge, Button, Card } from '@/components/ui/primitives';
 
@@ -58,7 +59,7 @@ export default function VexQueue() {
       </div>
 
       <div className={`mb-4 flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm ${aiOn ? 'border-violet-200 bg-violet-50/50' : 'border-dashed'}`}>
-        <Sparkles size={15} className="text-violet-600" />
+        <AIIcon size={22} />
         {aiOn ? (
           <span>AI 판단 초안 사용 가능 — <b>{ai?.model}</b>{ai?.mode === 'local' ? ' (서버 내부 LLM, 외부 전송 없음 · 건당 1~2분)' : ''}. 초안은 저장되지 않으며 제품 화면에서 확인 후 저장합니다.{s.drafts ? ` 저장 대기 초안 ${s.drafts}건.` : ''}</span>
         ) : (
@@ -100,12 +101,12 @@ export default function VexQueue() {
                   <td className="px-3 py-2 tabular-nums">{r.pending || '—'}</td>
                   <td className="px-3 py-2 tabular-nums">{r.affected ? <Badge variant="warn">{r.affected}</Badge> : '—'}</td>
                   <td className="px-3 py-2 text-xs">
-                    {r.batchState === 'running' ? <span className="text-violet-700">진행 {r.batchDone}/{r.batchTotal}</span>
+                    {r.batchState === 'running' ? <AIBadge pulse label={`진행 ${r.batchDone}/${r.batchTotal}`} />
                       : r.batchState ? <span className="text-muted-foreground" title={fmt(r.batchAt)}>초안 {r.batchDrafts ?? 0}건{r.batchState === 'cancelled' ? ' (중지)' : ''}</span> : '—'}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right">
                     {aiOn && r.pending > 0 && r.batchState !== 'running' && (
-                      <Button size="sm" variant="outline" className="mr-1 h-7" disabled={!!busy} onClick={() => batch(r)}>
+                      <Button size="sm" className="mr-1 h-7 bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white hover:opacity-90" disabled={!!busy} onClick={() => batch(r)}>
                         <ListChecks size={13} /> {busy === r.project ? '시작 중…' : 'AI 일괄'}
                       </Button>
                     )}

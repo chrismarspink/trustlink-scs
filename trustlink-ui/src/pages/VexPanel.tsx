@@ -6,6 +6,7 @@ import {
   aiVexBatch, aiVexBatchStart, aiVexBatchCancel,
   type Session, type Finding, type VexDraftResult, type KevInfo, type VexBatch, type VexRemedy
 } from '@/lib/api';
+import { AIBadge, AIIcon } from '@/components/AIBadge';
 
 // CycloneDX 분석 상태 어휘 (BFF가 DT enum 으로 매핑)
 const STATES = [
@@ -234,8 +235,8 @@ function FindingRow({ uuid, f, onSaved, repo, tag, ai, kev, draft }: {
         {kev?.exploit && <span className="text-xs text-red-700">공개 익스플로잇</span>}
         <div className="flex-1" />
         {draft && !aiOpen && (
-          <button onClick={() => setAiOpen(true)} className="rounded bg-violet-100 px-1.5 text-xs text-violet-800">
-            AI 초안: {labelOf(STATES, draft.draft.status).split(' (')[0]}{draft.remedy.targetVersion ? ` → ${draft.remedy.targetVersion}` : ''}
+          <button onClick={() => setAiOpen(true)} title="AI 판정 초안 보기">
+            <AIBadge label={`${labelOf(STATES, draft.draft.status).split(' (')[0]}${draft.remedy.targetVersion ? ` → ${draft.remedy.targetVersion}` : ''}`} />
           </button>
         )}
         {(ai || draft) && (
@@ -378,7 +379,7 @@ export default function VexPanel({ repo, tag }: { repo: string; tag: string }) {
               </Button>
               <span className="text-xs text-muted-foreground">DT 프로젝트: {project} @ {tag}</span>
               {data && <span className="text-xs text-muted-foreground">· 우선순위 순 정렬 {kev?.available ? `(KEV 사본 ${kev.asOf?.slice(0, 10)})` : '(KEV 사본 없음 — 미러 확인)'}</span>}
-              {ai && <span className="text-xs text-violet-700">· AI 초안 사용 가능</span>}
+              {ai && <AIBadge label="AI 판정 사용 가능" />}
             </div>
             {!ai && (
               <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-violet-300 bg-violet-50/30 p-2 text-xs text-violet-900">
@@ -390,29 +391,8 @@ export default function VexPanel({ repo, tag }: { repo: string; tag: string }) {
               </div>
             )}
             {data && ai && (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border border-violet-200 bg-violet-50/40 p-2 text-xs">
-                {batch?.state === 'running' ? (
-                  <>
-                    <span className="text-violet-800">AI 일괄 판정 중 {batch.done}/{batch.total}{batch.current ? ` — ${batch.current}` : ''}</span>
-                    <Button size="sm" variant="outline" onClick={() => aiVexBatchCancel(data.uuid).then(() => aiVexBatch(data.uuid)).then(setBatch)}>
-                      <Square size={13} /> 중지
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button size="sm" variant="outline" onClick={startBatch}><ListChecks size={14} /> AI 일괄 판정 (미분석 최대 20건)</Button>
-                    <span className="text-muted-foreground">우선순위 순으로 한 건씩 초안을 만듭니다(건당 1~2분). DT 에는 쓰지 않으며, 각 항목에서 확인 후 저장합니다.</span>
-                  </>
-                )}
-                {batch && batch.state !== 'none' && batch.state !== 'running' && (
-                  <span className="text-muted-foreground">
-                    · 마지막 일괄 판정 {batch.finished ? new Date(batch.finished).toLocaleString() : ''}: 초안 {Object.keys(batch.results || {}).length}건
-                    {batch.failed && Object.keys(batch.failed).length ? `, 실패 ${Object.keys(batch.failed).length}건` : ''}
-                    {batch.state === 'cancelled' ? ' (중지됨)' : ''}{batch.error ? ` — ${batch.error}` : ''}
-                  </span>
-                )}
-                {batchErr && <span className="text-red-700">{batchErr}</span>}
-              </div>
+              <BatchPanel batch={batch} findings={data.findings} err={batchErr} onStart={startBatch}
+                onCancel={() => aiVexBatchCancel(data.uuid).then(() => aiVexBatch(data.uuid)).then(setBatch)} />
             )}
             {pub && <div className="rounded bg-secondary p-2 text-xs">{pub}</div>}
             {err && <div className="rounded bg-red-100 p-2 text-xs text-red-700">{err}</div>}
@@ -426,5 +406,94 @@ export default function VexPanel({ repo, tag }: { repo: string; tag: string }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// AI 일괄 판정 진행 패널 — 지금 무엇을 하는지(단계), 얼마나 됐는지(진행률·경과·남은 시간), 끝난 항목의 결과를 보여 준다.
+const STATE_SHORT: Record<string, string> = { under_investigation: '조사중', not_affected: '영향 없음', affected: '영향 있음', fixed: '수정됨' };
+const STATE_TONE: Record<string, string> = { not_affected: 'bg-emerald-100 text-emerald-800', affected: 'bg-red-100 text-red-800', fixed: 'bg-sky-100 text-sky-800', under_investigation: 'bg-amber-100 text-amber-800' };
+const mmss = (ms: number) => { const t = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+
+function BatchPanel({ batch, findings, err, onStart, onCancel }: {
+  batch: VexBatch | null; findings: Finding[]; err: string; onStart: () => void; onCancel: () => void;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  const running = batch?.state === 'running';
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [running]);
+  const name = (key: string) => {
+    const [c, v] = key.split('|');
+    const f = findings.find((x) => x.component.uuid === c && x.vulnerability.uuid === v);
+    return f ? { id: f.vulnerability.vulnId, comp: f.component.name, sev: f.vulnerability.severity } : { id: v.slice(0, 8), comp: '', sev: '' };
+  };
+  const done = batch?.done ?? 0, total = batch?.total ?? 0;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const elapsed = batch?.started ? now - new Date(batch.started).getTime() : 0;
+  const avg = done ? elapsed / done : 0;
+  const eta = done && total > done ? avg * (total - done) : 0;
+  const results = Object.entries(batch?.results || {}).sort((a, b) => (a[1].at < b[1].at ? 1 : -1));
+  const failed = Object.entries(batch?.failed || {});
+  const [cur, curComp] = (batch?.current || '').split(' · ');
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50/40">
+      <div className="flex flex-wrap items-center gap-3 p-3">
+        <AIIcon size={30} spin={running} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-violet-950">
+            AI 일괄 판정 {running ? <span className="font-normal text-violet-700">진행 중 · {done}/{total}건 · {pct}%</span>
+              : batch && batch.state !== 'none' ? <span className="font-normal text-muted-foreground">마지막 실행 {batch.finished ? new Date(batch.finished).toLocaleString() : ''} · 초안 {results.length}건{failed.length ? ` · 실패 ${failed.length}건` : ''}{batch.state === 'cancelled' ? ' (중지됨)' : ''}</span> : null}
+          </div>
+          <div className="text-xs text-muted-foreground">미판단 항목을 우선순위(KEV → 치명 → 높음) 순으로 한 건씩 판단 초안으로 만듭니다. Dependency-Track 에는 쓰지 않고, 각 항목에서 사람이 확인 후 저장합니다.</div>
+        </div>
+        {running
+          ? <Button size="sm" variant="outline" onClick={onCancel}><Square size={13} /> 중지</Button>
+          : <Button size="sm" className="bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white hover:opacity-90" onClick={onStart}><ListChecks size={14} /> AI 일괄 판정 (미분석 최대 20건)</Button>}
+      </div>
+
+      {running && (
+        <div className="space-y-2 border-t border-violet-200/70 bg-white/60 p-3">
+          <div className="h-2.5 overflow-hidden rounded-full bg-violet-100">
+            <div className="h-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all duration-700" style={{ width: `${Math.max(pct, 3)}%` }} />
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>경과 <b className="tabular-nums text-foreground">{mmss(elapsed)}</b></span>
+            <span>건당 평균 <b className="tabular-nums text-foreground">{done ? mmss(avg) : '측정 중'}</b></span>
+            <span>남은 시간 약 <b className="tabular-nums text-foreground">{done ? mmss(eta) : '—'}</b></span>
+          </div>
+          {batch?.current && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-violet-200 bg-white p-2 text-xs">
+              <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-fuchsia-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-fuchsia-500" /></span>
+              <span className="font-mono font-semibold">{cur}</span>{curComp && <span className="text-muted-foreground">{curComp}</span>}
+              <span className="ml-auto flex items-center gap-1 text-[11px]">
+                {['근거 수집', 'AI 작성', '근거 검증'].map((st, i) => (
+                  <span key={st} className={`rounded-full px-2 py-0.5 ${i === 1 ? 'animate-pulse bg-violet-600 text-white' : 'bg-violet-100 text-violet-800'}`}>{i + 1}. {st}</span>
+                ))}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(results.length > 0 || failed.length > 0) && (
+        <div className="max-h-40 overflow-auto border-t border-violet-200/70 bg-white/40 px-3 py-2">
+          <div className="flex flex-wrap gap-1.5">
+            {results.map(([k, r]) => {
+              const n = name(k);
+              return (
+                <span key={k} className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${STATE_TONE[r.draft.status] || 'bg-slate-100'}`} title={`${n.comp} — ${(r.meta.elapsedMs / 1000).toFixed(0)}초`}>
+                  <span className="font-mono">{n.id}</span> {STATE_SHORT[r.draft.status] || r.draft.status}{r.remedy.targetVersion ? ` → ${r.remedy.targetVersion}` : ''}
+                </span>
+              );
+            })}
+            {failed.map(([k, e]) => <span key={k} className="rounded bg-red-50 px-1.5 py-0.5 text-[11px] text-red-700" title={e}>{name(k).id} 실패</span>)}
+          </div>
+        </div>
+      )}
+      {(err || batch?.error) && <div className="border-t border-violet-200/70 px-3 py-2 text-xs text-red-700">{err || batch?.error}</div>}
+    </div>
   );
 }
