@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Busy, DownloadLink } from '@/components/Progress';
 import { Link } from 'react-router-dom';
 import {
   Archive, FilePlus2, FileText, ClipboardCheck, BookMarked, Landmark, Scale, Globe2, Sparkles, ChevronDown, ChevronRight, RefreshCw, Search, Download, GitBranch
@@ -54,9 +55,9 @@ function LangLink({ r, lang }: { r?: RegReportItem; lang: 'ko' | 'en' }) {
       <FileText size={11} /> {lang === 'ko' ? '한글' : 'English'}{r.state === 'running' && ' …'}
     </a>
     {r.state !== 'running' && (
-      <a href={regReportPdfUrl(r.id)} title="서버에서 만든 PDF 내려받기(처음엔 수십 초)" className="ml-0.5 inline-flex items-center rounded px-1 py-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
+      <DownloadLink href={regReportPdfUrl(r.id)} title="서버에서 만든 PDF 내려받기(처음엔 수십 초)" className="ml-0.5 inline-flex items-center rounded px-1 py-0.5 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground">
         <Download size={11} />
-      </a>
+      </DownloadLink>
     )}
     </span>
   );
@@ -294,6 +295,7 @@ function NewReport({ onCreated }: { onCreated: () => void }) {
       {err && <Alert tone="crit">{err}</Alert>}
       {done && <Alert tone="ok">{done}</Alert>}
       <Button onClick={run} disabled={busy || !regions.length || !langs.length}><FilePlus2 size={15} /> {busy ? '만드는 중…' : '보고서 발행 (새 창 · PDF 저장)'}</Button>
+      <Busy active={busy} label="보고서 본문 만드는 중(제품 증거 수집 · 언어별 차례로)" hint="AI 요약은 보고서가 열린 뒤 채워집니다" />
     </div>
   );
 }

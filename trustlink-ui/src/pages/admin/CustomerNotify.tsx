@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Busy } from '@/components/Progress';
 import { Send, ShieldCheck, ShieldAlert, Wrench, Eye, History, ArrowRight, ArrowLeft, Trash2, CheckCircle2, XCircle, MinusCircle, Building2 } from 'lucide-react';
 import {
   adminCustNotifyVulns, adminCustNotifyCreate, adminCustNotifyAI, adminCustNotifySend, adminCustNotifyList, adminCustNotifyGet, adminCustNotifyDelete,
@@ -231,6 +232,7 @@ export default function CustomerNotify() {
                 {n.status === 'draft' && <Button size="sm" variant="ghost" onClick={async () => { if (confirm('초안을 지울까요?')) { await adminCustNotifyDelete(n.id).catch(() => {}); reset(); } }}><Trash2 size={13} />초안 삭제</Button>}
                 <span className="text-xs text-muted-foreground">이미 보낸 고객은 다시 보내지 않습니다. 결과는 감사 기록에 남습니다.</span>
               </div>
+              <Busy className="mt-2" active={busy === 'send'} label={`${sel.length}곳에 고객별 언어로 메일 보내는 중`} />
               <Nav back={() => setStage(4)} />
             </>
           )}

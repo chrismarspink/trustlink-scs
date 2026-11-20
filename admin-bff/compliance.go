@@ -873,6 +873,10 @@ type compReport struct {
 	AIError     string            `json:"aiError,omitempty"`
 	State       string            `json:"state"` // running | done | error
 	Progress    string            `json:"progress,omitempty"`
+	Steps       []string          `json:"steps,omitempty"` // 진행 중에만: 단계 이름·지금 단계·이 단계 완료/전체
+	Stage       int               `json:"stage,omitempty"`
+	Done        int               `json:"done,omitempty"`
+	Total       int               `json:"total,omitempty"`
 	SHA256      string            `json:"sha256,omitempty"`
 }
 
@@ -896,8 +900,20 @@ var (
 )
 
 func (s *Server) buildReport(rep *compReport, c *checklist, useAI bool) {
-	set := func(p string) { compMu.Lock(); rep.Progress = p; compMu.Unlock() }
-	set("산출물 증거 점검")
+	ai := useAI && aiEnabledFor("report") && !(aiConf().useMode("report") == "external" && !aiConf().SendChecklist)
+	compMu.Lock()
+	rep.Steps = []string{"산출물 증거 점검"}
+	if ai {
+		rep.Steps = append(rep.Steps, "AI 보완 설명", "AI 요약")
+	}
+	compMu.Unlock()
+	// set: 진행 문구 + 단계 번호(Steps 기준)·이 단계 완료/전체
+	set := func(stage, done, total int, p string) {
+		compMu.Lock()
+		rep.Progress, rep.Stage, rep.Done, rep.Total = p, stage, done, total
+		compMu.Unlock()
+	}
+	set(0, 0, 0, "산출물 증거 점검")
 	ev, info := s.releaseEvidence(rep.Repo, rep.Tag)
 	evm := map[string]evCheck{}
 	for _, e := range ev {
@@ -941,6 +957,7 @@ func (s *Server) buildReport(rep *compReport, c *checklist, useAI bool) {
 	}
 	compMu.Lock()
 	rep.State, rep.Progress = "done", ""
+	rep.Steps, rep.Stage, rep.Done, rep.Total = nil, 0, 0, 0
 	b, _ := json.Marshal(rep)
 	rep.SHA256 = sha256hex(b)
 	compMu.Unlock()
@@ -992,7 +1009,7 @@ var summarySchema = map[string]any{
 }
 
 // reportAI: 미충족 항목 설명(묶음당 4개) + 요약. 항목 판정 자체는 바꾸지 않는다.
-func (s *Server) reportAI(rep *compReport, c *checklist, set func(string)) error {
+func (s *Server) reportAI(rep *compReport, c *checklist, set func(stage, done, total int, p string)) error {
 	evFacts := []aiFact{}
 	for _, e := range rep.Evidence {
 		evFacts = append(evFacts, aiFact{ID: "E-" + e.ID, Text: fmt.Sprintf("%s: %s (%s)", e.Name, e.Value, map[string]string{"pass": "충족", "partial": "일부", "fail": "미충족", "na": "확인 불가"}[e.Result])})
@@ -1019,7 +1036,7 @@ func (s *Server) reportAI(rep *compReport, c *checklist, set func(string)) error
 		}
 	}()
 	for b := 0; b < len(gaps); b += 4 {
-		set(fmt.Sprintf("AI 보완 설명 작성 %d/%d", b, len(gaps)))
+		set(1, b, len(gaps), fmt.Sprintf("AI 보완 설명 작성 %d/%d", b, len(gaps)))
 		batch := gaps[b:min(b+4, len(gaps))]
 		facts := []aiFact{}
 		need := map[string]bool{}
@@ -1069,7 +1086,7 @@ func (s *Server) reportAI(rep *compReport, c *checklist, set func(string)) error
 			}
 		}
 	}
-	set("AI 요약 작성")
+	set(2, 0, 0, "AI 요약 작성")
 	facts := []aiFact{}
 	for _, g := range rep.Regs {
 		t := fmt.Sprintf("적용 규제: %s — 근거: %s", g.Name, g.Basis)

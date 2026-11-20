@@ -350,7 +350,7 @@ func upSet(rep *upReport, f func()) {
 // finishUp: 등급 집계 → (AI 요약) → 파일 저장 → 원장.
 func (s *Server) finishUp(rep *upReport, useAI bool) {
 	if useAI && rep.State == "running" {
-		upSet(rep, func() { rep.Progress = "AI 요약 작성 중" })
+		upSet(rep, func() { rep.Progress, rep.Stage, rep.Done, rep.Total = "AI 요약 작성 중", len(rep.Steps)-2, 0, 0 })
 		sum, meta, err := s.upstreamAI(rep)
 		upSet(rep, func() {
 			if err != nil {
@@ -360,6 +360,7 @@ func (s *Server) finishUp(rep *upReport, useAI bool) {
 			}
 		})
 	}
+	upSet(rep, func() { rep.Stage, rep.Done, rep.Total = len(rep.Steps)-1, 0, 0 })
 	upSet(rep, func() {
 		if rep.State == "running" {
 			rep.State = "done"
@@ -387,7 +388,7 @@ func (s *Server) runUpstreamProduct(rep *upReport, useAI bool) {
 		}
 	}()
 	cfg := loadUpConfig()
-	upSet(rep, func() { rep.Progress = "SBOM 읽는 중" })
+	upSet(rep, func() { rep.Progress, rep.Stage = "SBOM 읽는 중", 0 })
 	inputs, format := parseUpInputs(s.upstreamSBOM(rep.Repo, rep.Tag))
 	if format == "" {
 		upSet(rep, func() {
@@ -398,7 +399,16 @@ func (s *Server) runUpstreamProduct(rep *upReport, useAI bool) {
 	}
 	upSet(rep, func() { rep.SBOM = fmt.Sprintf("%s · 구성요소 %d개", format, len(inputs)) })
 	e := &upEngine{token: cfg.GitHubToken, maxRepos: cfg.maxRepos()}
-	comps, repos, notes := e.analyze(inputs, func(m string) { upSet(rep, func() { rep.Progress = m }) })
+	comps, repos, notes := e.analyze(inputs, func(phase string, done, total int) {
+		upSet(rep, func() {
+			rep.Done, rep.Total = done, total
+			if phase == "comps" {
+				rep.Stage, rep.Progress = 1, fmt.Sprintf("구성요소 %d/%d — 상류 저장소 찾는 중", done, total)
+			} else {
+				rep.Stage, rep.Progress = 2, fmt.Sprintf("저장소 %d/%d 점검 중", done, total)
+			}
+		})
+	})
 	rt := ghRateNow()
 	rt.Hit, rt.Auth = e.limitHit, cfg.GitHubToken != ""
 	upSet(rep, func() {
@@ -435,9 +445,9 @@ func (s *Server) runUpstreamRepo(rep *upReport, owner, name string, useAI bool) 
 	cfg := loadUpConfig()
 	e := &upEngine{token: cfg.GitHubToken, maxRepos: 1}
 	id := "github.com/" + owner + "/" + name
-	upSet(rep, func() { rep.Progress = "저장소 신호 조회 중" })
+	upSet(rep, func() { rep.Progress, rep.Stage = "저장소 신호 조회 중", 0 })
 	r := e.fetchRepo(id)
-	upSet(rep, func() { rep.Progress = "의존성 그래프 SBOM 받는 중" })
+	upSet(rep, func() { rep.Progress, rep.Stage = "의존성 그래프 SBOM 받는 중", 1 })
 	var dg *upDepGraph
 	if r.GitHub == "ok" {
 		dg = ghDepGraph(cfg.GitHubToken, owner, name)
@@ -460,6 +470,14 @@ func (s *Server) runUpstreamRepo(rep *upReport, owner, name string, useAI bool) 
 	s.finishUp(rep, useAI)
 }
 
+// upSteps: 화면 진행 표시용 단계 이름 — 끝에 (AI 요약)·저장을 붙인다.
+func upSteps(ai bool, base ...string) []string {
+	if ai {
+		base = append(base, "AI 요약")
+	}
+	return append(base, "저장")
+}
+
 // POST /api/upstream/run {repo, tag, ai}
 func (s *Server) apiUpstreamRun(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -472,13 +490,14 @@ func (s *Server) apiUpstreamRun(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "repo, tag 필수"})
 		return
 	}
-	rep := &upReport{ID: newUpID(), Kind: "product", Repo: in.Repo, Tag: in.Tag, Created: time.Now().UTC().Format(time.RFC3339),
+	useAI := in.AI && aiEnabledFor("report")
+	rep := &upReport{Steps: upSteps(useAI, "SBOM 읽기", "상류 저장소 찾기", "저장소 점검"), ID: newUpID(), Kind: "product", Repo: in.Repo, Tag: in.Tag, Created: time.Now().UTC().Format(time.RFC3339),
 		CreatedBy: w.Header().Get("X-User"), State: "running", Progress: "시작", Comps: []upComp{}, Repos: map[string]*upRepo{}, Disclaimer: upDisclaimer}
 	if err := startUp(rep); err != nil {
 		writeJSON(w, 409, map[string]string{"error": err.Error()})
 		return
 	}
-	go s.runUpstreamProduct(rep, in.AI && aiEnabledFor("report"))
+	go s.runUpstreamProduct(rep, useAI)
 	writeJSON(w, 202, map[string]string{"id": rep.ID})
 }
 
@@ -497,13 +516,14 @@ func (s *Server) apiUpstreamRepo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "GitHub 저장소 주소를 넣으세요 (예: https://github.com/owner/repo)"})
 		return
 	}
-	rep := &upReport{ID: newUpID(), Kind: "repo", Target: "https://github.com/" + owner + "/" + name, Created: time.Now().UTC().Format(time.RFC3339),
+	useAI := in.AI && aiEnabledFor("report")
+	rep := &upReport{Steps: upSteps(useAI, "저장소 신호", "의존성 그래프"), ID: newUpID(), Kind: "repo", Target: "https://github.com/" + owner + "/" + name, Created: time.Now().UTC().Format(time.RFC3339),
 		CreatedBy: w.Header().Get("X-User"), State: "running", Progress: "시작", Comps: []upComp{}, Repos: map[string]*upRepo{}, Disclaimer: upDisclaimer}
 	if err := startUp(rep); err != nil {
 		writeJSON(w, 409, map[string]string{"error": err.Error()})
 		return
 	}
-	go s.runUpstreamRepo(rep, owner, name, in.AI && aiEnabledFor("report"))
+	go s.runUpstreamRepo(rep, owner, name, useAI)
 	writeJSON(w, 202, map[string]string{"id": rep.ID})
 }
 

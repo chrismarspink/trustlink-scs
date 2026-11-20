@@ -135,6 +135,10 @@ type upReport struct {
 	Finished   string             `json:"finished,omitempty"`
 	State      string             `json:"state"` // running / done / error
 	Progress   string             `json:"progress,omitempty"`
+	Steps      []string           `json:"steps,omitempty"` // 진행 단계 이름(화면 진행 표시)
+	Stage      int                `json:"stage"`           // 지금 단계(Steps 의 번호)
+	Done       int                `json:"done,omitempty"`  // 이 단계에서 끝난 수
+	Total      int                `json:"total,omitempty"` // 이 단계의 전체 수(0 이면 수를 모름)
 	Error      string             `json:"error,omitempty"`
 	SBOM       string             `json:"sbom,omitempty"`
 	Comps      []upComp           `json:"comps"`
@@ -946,8 +950,8 @@ func parallel(n, w int, f func(i int)) {
 	wg.Wait()
 }
 
-// analyze: 구성요소 목록 → 보고서 본문. progress 는 진행 상황 기록.
-func (e *upEngine) analyze(inputs []upInput, progress func(string)) (comps []upComp, repos map[string]*upRepo, notes []string) {
+// analyze: 구성요소 목록 → 보고서 본문. progress(phase, done, total) 는 진행 상황 기록 — phase 는 comps(저장소 찾기)·repos(저장소 점검).
+func (e *upEngine) analyze(inputs []upInput, progress func(phase string, done, total int)) (comps []upComp, repos map[string]*upRepo, notes []string) {
 	inputs = dedupInputs(inputs)
 	if len(inputs) > upMaxComps {
 		notes = append(notes, fmt.Sprintf("구성요소 %d개 중 앞 %d개만 분석했습니다(실행당 상한).", len(inputs), upMaxComps))
@@ -962,9 +966,7 @@ func (e *upEngine) analyze(inputs []upInput, progress func(string)) (comps []upC
 		done++
 		d := done
 		mu.Unlock()
-		if d%10 == 0 || d == len(inputs) {
-			progress(fmt.Sprintf("구성요소 %d/%d — 상류 저장소 찾는 중", d, len(inputs)))
-		}
+		progress("comps", d, len(inputs))
 	})
 	// 저장소: 쓰는 구성요소가 많은 순(GitHub 조회 상한 안에서 중요한 것부터)
 	use := map[string]int{}
@@ -1004,7 +1006,7 @@ func (e *upEngine) analyze(inputs []upInput, progress func(string)) (comps []upC
 		done++
 		d := done
 		mu.Unlock()
-		progress(fmt.Sprintf("저장소 %d/%d 점검 중 (캐시 %d)", d, len(pending), len(ids)-len(pending)))
+		progress("repos", d, len(pending))
 	})
 	for i, id := range ids {
 		repos[id] = list[i]

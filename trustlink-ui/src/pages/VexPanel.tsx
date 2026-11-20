@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Busy } from '@/components/Progress';
 import { ShieldQuestion, RefreshCw, UploadCloud, Lock, ChevronDown, ChevronRight, Sparkles, ListChecks, Square } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, Badge, Input } from '@/components/ui/primitives';
 import {
@@ -145,6 +146,7 @@ function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
           <Sparkles size={14} /> {busy ? '작성 중… (CPU, 1~2분)' : res ? 'AI 초안 다시 요청' : 'AI 초안 요청'}
         </Button>
       </div>
+      <Busy active={busy} label="AI 가 근거(취약점 DB·구성요소·사용 맥락)를 읽고 초안 작성 중" hint="로컬 CPU 면 1~2분" />
       {err && <div className="rounded bg-red-100 p-2 text-red-700">{err}</div>}
       {res && (
         <div className="space-y-2">
@@ -426,7 +428,8 @@ export default function VexPanel({ repo, tag }: { repo: string; tag: string }) {
               <BatchPanel batch={batch} findings={data.findings} err={batchErr} onStart={startBatch}
                 onCancel={() => aiVexBatchCancel(data.uuid).then(() => aiVexBatch(data.uuid)).then(setBatch)} />
             )}
-            {pub && <div className="rounded bg-secondary p-2 text-xs">{pub}</div>}
+            <Busy active={pub === '발행 중…'} label="Dependency-Track 에서 VEX 내보내기 → 서명·레지스트리에 첨부 중" />
+            {pub && pub !== '발행 중…' && <div className="rounded bg-secondary p-2 text-xs">{pub}</div>}
             {err && <div className="rounded bg-red-100 p-2 text-xs text-red-700">{err}</div>}
             {data && (
               data.findings.length === 0

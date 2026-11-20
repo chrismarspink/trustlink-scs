@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Busy } from '@/components/Progress';
 import { adminVulnSources, adminVulnSourcesSave, adminVulnReanalyze, type VulnSources as VS } from '@/lib/api';
 import { Button, Input } from '@/components/ui/primitives';
 import { SectionTitle, Alert, Loading } from './_ui';
@@ -94,6 +95,7 @@ export default function VulnSources() {
             <Button onClick={save} disabled={busy || !dirty}>{busy ? '처리 중…' : '저장'}</Button>
             <Button variant="outline" onClick={reanalyze} disabled={busy} title="감시 중인 모든 버전을 지금 다시 대조">지금 재분석</Button>
           </div>
+          <Busy active={busy} label="처리 중 — 감시 중인 버전마다 Dependency-Track 에 다시 대조를 요청합니다" hint="버전 수에 따라 수십 초" />
         </div>
       )}
       {res && <div className="mt-3"><Alert tone={res.tone}>{res.text}</Alert></div>}

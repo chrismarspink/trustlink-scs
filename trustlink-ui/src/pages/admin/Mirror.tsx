@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Busy } from '@/components/Progress';
 import {
   adminMirror, adminMirrorPolicy, adminMirrorSync, adminMirrorDT,
   type MirrorInfo, type MirrorPolicy, type MirrorSource
@@ -124,10 +125,14 @@ export default function Mirror() {
   const setSrc = (id: string, v: Partial<{ enabled: boolean; intervalH: number }>) =>
     setDraft({ ...draft, sources: { ...draft.sources, [id]: { ...draft.sources[id], ...v } } });
   const groups = Array.from(new Set(st.sources.map((s) => s.group)));
+  const run = st.running ? st.sources.find((s) => s.id === st.running) : undefined;
+  const queued = st.sources.filter((s) => s.status === 'running' && s.id !== st.running).length;
 
   return (
     <>
       {head}
+      {run && <Busy className="mb-4" active since={run.lastAttempt} label={`${run.name} 받는 중`}
+        hint={`${queued ? `대기 ${queued}종 · ` : ''}바뀐 파일만 받습니다 — 큰 DB(OSV·NVD 등)는 수 분~수십 분`} />}
 
       {/* 지금 상태: 로컬/외부 접속 경계 */}
       <div className="mb-6 rounded-lg border bg-card p-4">

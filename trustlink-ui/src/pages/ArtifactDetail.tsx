@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Busy } from '@/components/Progress';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, ShieldAlert, ChevronsUpDown, Search, Check, Download, Copy, ChevronDown, ScanSearch } from 'lucide-react';
 import VexPanel from './VexPanel';
@@ -304,6 +305,7 @@ function SbomGenerate({ repo, tag, onDone }: { repo: string; tag: string; onDone
       <ScanSearch size={16} className="text-muted-foreground" />
       <span className="text-muted-foreground">이 버전에는 CycloneDX SBOM 이 없어 취약점 분석을 할 수 없습니다. 바이너리를 syft 로 스캔해 SBOM 을 만들 수 있습니다.</span>
       <Button size="sm" variant="outline" className="ml-auto" onClick={run} disabled={busy}>{busy ? '스캔 중…' : 'SBOM 생성 (syft)'}</Button>
+      <Busy className="w-full" active={busy} label="바이너리 받아 syft 로 스캔 중 → SBOM 첨부" hint="파일 크기에 따라 1~3분" />
       {msg && <div className="w-full text-xs text-muted-foreground">{msg}</div>}
     </div>
   );

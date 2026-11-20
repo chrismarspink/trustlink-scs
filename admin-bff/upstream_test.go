@@ -273,7 +273,7 @@ func TestUpstreamAnalyze(t *testing.T) {
 	upTestEnv(t)
 	m := newUpMocks(t)
 	e := &upEngine{maxRepos: 10}
-	comps, repos, notes := e.analyze(upTestInputs, func(string) {})
+	comps, repos, notes := e.analyze(upTestInputs, func(string, int, int) {})
 	if len(comps) != 5 || len(repos) != 3 || len(notes) != 0 {
 		t.Fatalf("구성요소 %d 저장소 %d 알림 %v", len(comps), len(repos), notes)
 	}
@@ -308,7 +308,7 @@ func TestUpstreamAnalyze(t *testing.T) {
 	}
 	// 두 번째 실행은 캐시 — 외부 호출 없음
 	dd, gh := m.ddCalls.Load(), m.ghCalls.Load()
-	comps2, repos2, _ := (&upEngine{maxRepos: 10}).analyze(upTestInputs, func(string) {})
+	comps2, repos2, _ := (&upEngine{maxRepos: 10}).analyze(upTestInputs, func(string, int, int) {})
 	if m.ddCalls.Load() != dd || m.ghCalls.Load() != gh {
 		t.Fatalf("캐시를 쓰지 않음: deps.dev %d→%d GitHub %d→%d", dd, m.ddCalls.Load(), gh, m.ghCalls.Load())
 	}
@@ -322,7 +322,7 @@ func TestUpstreamRateLimit(t *testing.T) {
 	m := newUpMocks(t)
 	m.ghLimit.Store(true)
 	e := &upEngine{maxRepos: 10}
-	_, repos, notes := e.analyze(upTestInputs, func(string) {})
+	_, repos, notes := e.analyze(upTestInputs, func(string, int, int) {})
 	limited := 0
 	for _, r := range repos {
 		if r.GitHub == "rate-limited" {
@@ -351,7 +351,7 @@ func TestUpstreamMaxReposCap(t *testing.T) {
 	upTestEnv(t)
 	newUpMocks(t)
 	e := &upEngine{maxRepos: 1}
-	_, repos, notes := e.analyze(upTestInputs, func(string) {})
+	_, repos, notes := e.analyze(upTestInputs, func(string, int, int) {})
 	skipped := 0
 	for _, r := range repos {
 		if r.GitHub == "skipped" {

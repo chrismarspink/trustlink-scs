@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Busy } from '@/components/Progress';
 import { adminNotifyLog, adminNotifySync, type NoticeLog } from '@/lib/api';
 import { Badge, Button } from '@/components/ui/primitives';
 import { PageHeader, StatCard, Alert, Loading, Table, Th, Td, selectCls } from './_ui';
@@ -31,6 +32,7 @@ export default function Notify() {
       <PageHeader title="취약점 통보" description="새 취약점은 그 제품 업로드 권한자와 관리자에게, VEX 판단 결과는 그 제품을 받는 고객에게 통보합니다."
         actions={<Button variant="outline" onClick={sync} disabled={busy}>{busy ? '동기화 중…' : '지금 동기화'}</Button>} />
       {err && <Alert tone="crit">오류: {err}</Alert>}
+      <Busy className="mb-4" active={busy} label="동기화 중 — 제품·버전마다 SBOM 변경을 확인해 Dependency-Track 에 올리고, 모아 둔 통보를 보냅니다" hint="제품 수에 따라 수십 초~수 분" />
       {msg && <div className="mb-4"><Alert tone="ok">동기화: {msg}</Alert></div>}
       {!log ? <Loading /> : (
         <>

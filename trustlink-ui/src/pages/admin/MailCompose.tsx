@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Busy, DownloadLink } from '@/components/Progress';
 import { Sparkles, Paperclip, Eye, Send, X } from 'lucide-react';
 import {
   adminMailOptions, adminMailPreview, adminMailSuggest, adminMailTest, regReportPdfUrl,
@@ -91,6 +92,7 @@ export default function MailCompose({ allowlist }: { allowlist: string[] }) {
           <Button variant="outline" onClick={suggest} disabled={!!busy}>{busy === 'suggest' ? '추천 중…' : '추천 받기'}</Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">역할(관리자·개발/보안·영업)과 현재 취약점·규제 일정·보고서를 보고 고릅니다. 고객사 계정은 후보에서 뺍니다. 외부 AI 에는 메일 주소·계정 이름 대신 번호와 그룹만 보냅니다.</p>
+        <Busy className="mt-2" active={busy === 'suggest'} label={useAI && o.ai ? '받는 사람 후보를 모으고 AI 가 고르는 중' : '받는 사람 후보를 모으는 중'} hint={useAI && o.ai ? '로컬 AI 면 1분 안팎' : undefined} />
         {sg && (
           <div className="mt-3 text-xs">
             <Badge variant={sg.by === 'ai' ? 'default' : 'muted'}>{sg.by === 'ai' ? `AI 추천 · ${sg.aiMeta?.model || ''}` : '규칙 추천'}</Badge>
@@ -166,7 +168,7 @@ export default function MailCompose({ allowlist }: { allowlist: string[] }) {
                   <input type="checkbox" disabled={!o.pdf || (!reps.includes(r.id) && reps.length >= 4)} checked={reps.includes(r.id)} onChange={() => toggle(reps, r.id, setReps)} />
                   <Badge variant="outline">{r.audienceKo}</Badge><Badge variant="muted">{LANG[r.lang] || r.lang}</Badge>
                   <span className="truncate text-xs">{r.docNo} · {r.created.slice(0, 10)}{r.repo ? ` · ${r.repo}:${r.tag}` : ''}</span>
-                  {r.pdf && <a className="ml-auto text-xs text-primary hover:underline" href={regReportPdfUrl(r.id)} onClick={(e) => e.stopPropagation()}>PDF</a>}
+                  {r.pdf && <DownloadLink className="ml-auto text-xs text-primary hover:underline" href={regReportPdfUrl(r.id)}>PDF</DownloadLink>}
                 </label>
               ))}
             </div>
@@ -182,6 +184,7 @@ export default function MailCompose({ allowlist }: { allowlist: string[] }) {
           <Button onClick={send} disabled={!!busy || rc.length === 0 || !o.configured}><Send size={14} className="mr-1" />{busy === 'send' ? (reps.length ? 'PDF 만들고 보내는 중…' : '보내는 중…') : '보내기'}</Button>
           <span className="text-xs text-muted-foreground">항목·첨부·인사말을 모두 비우면 짧은 시험 메일이 갑니다.</span>
         </div>
+        <Busy className="mt-2" active={busy === 'send'} label={reps.length ? `첨부 PDF ${reps.length}개 만들고 보내는 중` : '보내는 중'} hint={reps.length ? '처음 만드는 PDF 는 하나에 수십 초' : undefined} />
         {res && <div className="mt-3"><Alert tone={res.tone}>{res.text}</Alert></div>}
       </div>
 

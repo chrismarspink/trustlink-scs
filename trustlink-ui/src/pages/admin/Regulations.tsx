@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Busy } from '@/components/Progress';
 import { useNavigate } from 'react-router-dom';
 import {
   BookMarked, Search, Plus, Pencil, Trash2, CheckCircle2, CircleDashed, ChevronDown, ChevronRight, Radar, FileText,
@@ -282,6 +283,8 @@ function LawPanel({ id, a, lawOC, onChanged }: { id: string; a?: RegAnalysis; la
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => { if (confirm('작업본 분석을 지우고 내장 분석으로 되돌릴까요?')) review('reset'); }}><RotateCcw size={13} /> 내장 분석으로</Button>
         )}
       </div>
+      <Busy className="mb-2" active={busy} label="처리 중 — 조문은 국가법령정보센터에서 한 조씩 가져옵니다" />
+      <Busy className="mb-2" active={!!a?.running} label="AI 가 조문·규제 정보를 읽고 분석 초안 작성 중" hint="로컬 AI 면 2~5분 — 끝나면 아래에 초안이 나타납니다" />
       {msg && <p className="mb-2 text-xs text-amber-800">{msg}</p>}
       {a?.aiError && <p className="mb-2 text-xs text-red-700">AI 초안 실패: {a.aiError}</p>}
       {a?.builtinNewer && <p className="mb-2 text-xs text-amber-800">새 버전 내장 분석이 있습니다 — '내장 분석으로'를 누르면 반영됩니다(확인 표시는 해제).</p>}

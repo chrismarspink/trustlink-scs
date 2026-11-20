@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Busy } from '@/components/Progress';
 import { Building2, Plus, Trash2, Pencil, Users, Package, CalendarClock, AlertTriangle, Mail, Phone, RefreshCw, Save, X } from 'lucide-react';
 import {
   adminCustomers, adminCustomerSave, adminCustomerDelete, adminCustomerProduct, adminCustomerSettings, adminCustomerExpiring, adminCustomerExpiryCheck,
@@ -424,6 +425,7 @@ function ExpiringPanel({ settings, onSettings }: { settings: CustSettings; onSet
         <Button size="sm" variant="outline" onClick={check} disabled={busy}><RefreshCw size={13} className={busy ? 'animate-spin' : undefined} />{busy ? '점검 중…' : '지금 점검'}</Button>
         <label className="inline-flex items-center gap-1.5 text-sm"><input type="checkbox" checked={settings.expiryToCustomer} onChange={(e) => toggle(e.target.checked)} />고객 구매(계약)·EOS 담당에게도 보내기</label>
       </div>
+      <Busy active={busy} label="만료·EOS 임계값을 점검하고 알림 메일 보내는 중" />
       {msg && <Alert tone="ok">{msg}</Alert>}
       <Table>
         <thead><tr><Th>남은 기간</Th><Th>고객</Th><Th>항목</Th><Th>날짜</Th><Th>보낸 알림</Th></tr></thead>

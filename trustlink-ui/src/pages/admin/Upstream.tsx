@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { JobProgress, Busy } from '@/components/Progress';
 import { Play, Search, Sparkles, KeyRound, Printer, ExternalLink } from 'lucide-react';
 import {
   adminRepos, adminUpstreamConfig, adminUpstreamConfigSave, adminUpstreamRun, adminUpstreamRepo, adminUpstreamReports, adminUpstreamReport,
@@ -75,7 +76,7 @@ function SettingsCard({ cfg, rate, rateErr, onSaved }: { cfg: UpConfig; rate?: U
         토큰: {cfg.hasToken ? <Badge variant="success">등록됨 {cfg.tokenHint}</Badge> : <Badge variant="muted">없음 — 시간당 60회</Badge>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Input type="password" autoComplete="off" placeholder={cfg.hasToken ? '새 토큰(비우면 유지)' : 'GitHub 토큰(공개 저장소 읽기 권한이면 충분)'}
+        <Input type="password" autoComplete="new-password" name="gh-token" data-lpignore="true" placeholder={cfg.hasToken ? '새 토큰(비우면 유지)' : 'GitHub 토큰(공개 저장소 읽기 권한이면 충분)'}
           value={token} onChange={(e) => setToken(e.target.value)} className="h-8 w-72" />
         <label className="inline-flex items-center gap-1.5 text-xs">
           실행당 GitHub 조회 상한
@@ -361,7 +362,7 @@ export default function Upstream() {
           <p className="text-xs text-muted-foreground">이 버전에 첨부된 최신 SBOM(CycloneDX·SPDX)의 purl 로 저장소를 찾습니다. 구성요소가 많으면 수 분 걸립니다.</p>
           <div className="border-t pt-3 font-semibold">공개 GitHub 저장소 단건 점검</div>
           <div className="flex flex-wrap items-center gap-2">
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/owner/repo" className="h-8 w-72"
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" name="gh-repo-url" inputMode="url" placeholder="https://github.com/owner/repo" className="h-8 w-72"
               onKeyDown={(e) => { if (e.key === 'Enter' && url.trim() && !running) start('repo'); }} />
             <Button size="sm" variant="outline" onClick={() => start('repo')} disabled={!url.trim() || running}><Search size={14} /> 저장소 점검</Button>
           </div>
@@ -369,7 +370,9 @@ export default function Upstream() {
             <input type="checkbox" checked={useAI && cfg.ai} disabled={!cfg.ai} onChange={(e) => setUseAI(e.target.checked)} />
             AI 요약 작성 {cfg.ai ? '(보고서 용도 AI 연결 사용)' : '— AI 연결(보고서 용도)이 꺼져 있습니다'}
           </label>
-          {running && <div className="text-xs text-muted-foreground">진행 중: {rep?.progress}</div>}
+          {running && rep && (rep.steps?.length
+            ? <JobProgress steps={rep.steps} stage={rep.stage || 0} done={rep.done} total={rep.total} started={rep.created} text={rep.progress} aiSteps={['AI 요약']} />
+            : <Busy active label={`진행 중: ${rep.progress || ''}`} />)}
           {msg && <div className="text-xs text-red-700">{msg}</div>}
         </Card>
         <SettingsCard cfg={cfg.config} rate={cfg.rate} rateErr={cfg.rateError} onSaved={loadCfg} />

@@ -284,11 +284,12 @@ func main() {
 	mux.HandleFunc("POST /api/custnotify", s.guard(s.apiCustNotifyCreate)) // ②③ 영향 고객 + 규칙 패치 버전
 	mux.HandleFunc("GET /api/custnotify/{id}", s.guard(s.apiCustNotifyGet))
 	mux.HandleFunc("DELETE /api/custnotify/{id}", s.guard(s.apiCustNotifyDelete))
-	mux.HandleFunc("POST /api/custnotify/{id}/ai", s.guard(s.apiCustNotifyAI))     // ③ AI 설명
-	mux.HandleFunc("POST /api/custnotify/{id}/send", s.guard(s.apiCustNotifySend)) // ⑤ 발송
-	mux.HandleFunc("GET /api/my/products", s.guardSession(s.apiMyProducts))        // 고객 전용: 내 고객사 제품만
-	go s.custExpiryLoop()                                                          // 만료·EOS 알림(하루 1회)
-	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts))   // 제품별 읽기/쓰기 대상
+	mux.HandleFunc("POST /api/custnotify/{id}/ai", s.guard(s.apiCustNotifyAI))                   // ③ AI 설명
+	mux.HandleFunc("POST /api/custnotify/{id}/send", s.guard(s.apiCustNotifySend))               // ⑤ 발송
+	mux.HandleFunc("GET /api/my/products", s.guardSession(s.apiMyProducts))                      // 고객 전용: 내 고객사 제품만
+	go s.custExpiryLoop()                                                                        // 만료·EOS 알림(하루 1회)
+	go func() { time.Sleep(20 * time.Second); s.dashboardCached(false); s.statsCached(false) }() // 대시보드·통계 미리 계산(첫 화면 대기 없앰)
+	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts))                     // 제품별 읽기/쓰기 대상
 	mux.HandleFunc("PUT /api/access/products", s.guard(s.apiAccessProductPut))
 	mux.HandleFunc("DELETE /api/access/products", s.guard(s.apiAccessProductDelete))
 	mux.HandleFunc("GET /api/access/principals", s.guard(s.apiAccessPrincipals))
@@ -303,10 +304,10 @@ func main() {
 	mux.HandleFunc("GET /api/health", s.guard(s.apiHealth))
 	mux.HandleFunc("GET /api/mail", s.guard(s.apiMailStatus))                              // 통보 메일 설정 상태
 	mux.HandleFunc("POST /api/mail/test", s.guard(s.apiMailTest))                          // 시험 메일 발송
-	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))   // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
-	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))  // 본문 미리보기
-	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))  // 받는 사람·항목·첨부 추천(규칙 + AI)
-	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF)) // 규제 보고서 PDF(Gotenberg)
+	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))                     // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
+	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                    // 본문 미리보기
+	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                    // 받는 사람·항목·첨부 추천(규칙 + AI)
+	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF))            // 규제 보고서 PDF(Gotenberg)
 	mux.HandleFunc("GET /api/notifications", s.guardSession(s.apiNotifications))           // 내 통보
 	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead)) // 읽음 표시
 	mux.HandleFunc("GET /api/notify/log", s.guard(s.apiNotifyLog))                         // 전체 통보 기록
@@ -340,7 +341,7 @@ func main() {
 	mux.HandleFunc("GET /api/vex/export", vexEdit(s.apiVexExport))
 	mux.HandleFunc("POST /api/vex/publish", vexEdit(s.apiVexPublish))     // DT VEX → OCI 새 referrer 발행
 	mux.HandleFunc("POST /api/sbom/generate", vexEdit(s.apiSBOMGenerate)) // syft SBOM 생성·부착(제품 쓰기 권한, self 는 admins)
-	mux.HandleFunc("GET /api/vex/queue", vexEdit(s.apiVexQueue))         // VEX 판단 대기열(전 제품)
+	mux.HandleFunc("GET /api/vex/queue", vexEdit(s.apiVexQueue))          // VEX 판단 대기열(전 제품)
 	mux.HandleFunc("GET /api/vex/kev", vexEdit(s.apiVexKEV))              // KEV 등재 여부(미러 사본) — 우선순위 정렬용
 	mux.HandleFunc("POST /api/ai/vex-draft", vexEdit(s.apiAIVexDraft))    // AI VEX 판정·대응 초안(저장은 사람이)
 	mux.HandleFunc("POST /api/ai/vex-batch", vexEdit(s.apiAIVexBatch))    // 미분석 항목 일괄 초안(비동기)·취소

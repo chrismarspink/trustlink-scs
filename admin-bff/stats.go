@@ -16,6 +16,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 func (s *Server) zotGetSvc(p, accept string) (*http.Response, error) {
@@ -331,12 +333,59 @@ type productStat struct {
 // GET /api/stats — 제품별 버전 추이.
 func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 	products := []productStat{}
-	for _, repo := range s.svcCatalog() {
-		if !s.canAccess(r, repo, "read") {
-			continue
+	for _, p := range s.statsCached(r.URL.Query().Get("refresh") == "1") {
+		if s.canAccess(r, p.Repo, "read") {
+			products = append(products, p)
 		}
-		versions := []versionStat{}
-		for idx, tag := range sortedVersions(s.svcTags(repo)) {
+	}
+	writeJSON(w, 200, map[string]any{"products": products})
+}
+
+// statsCache: 전 제품 통계(권한 필터 전). 대시보드와 같이 오래되면 이전 값을 주고 뒤에서 다시 만든다.
+var statsCache struct {
+	sync.Mutex
+	at       time.Time
+	data     []productStat
+	building chan struct{}
+}
+
+func (s *Server) statsCached(refresh bool) []productStat {
+	statsCache.Lock()
+	data, fresh := statsCache.data, time.Since(statsCache.at) <= dashCacheTTL
+	if data != nil && fresh && !refresh {
+		statsCache.Unlock()
+		return data
+	}
+	ch := statsCache.building
+	if ch == nil {
+		ch = make(chan struct{})
+		statsCache.building = ch
+		go func() {
+			d := s.buildStats()
+			statsCache.Lock()
+			statsCache.data, statsCache.at, statsCache.building = d, time.Now(), nil
+			statsCache.Unlock()
+			close(ch)
+		}()
+	}
+	statsCache.Unlock()
+	if data != nil && !refresh {
+		return data
+	}
+	<-ch
+	statsCache.Lock()
+	defer statsCache.Unlock()
+	return statsCache.data
+}
+
+// buildStats: 제품·버전마다 구성요소·취약점·VEX 수. 버전마다의 조회는 동시에 한다.
+func (s *Server) buildStats() []productStat {
+	products := []productStat{}
+	for _, repo := range s.svcCatalog() {
+		tags := sortedVersions(s.svcTags(repo))
+		versions := make([]versionStat, len(tags))
+		parallel(len(tags), dashDTWorkers, func(idx int) {
+			tag := tags[idx]
 			comp, byStatus := s.referrerStats(repo, tag)
 			vs := versionStat{Tag: tag, Components: comp}
 			// 취약점 수: DT(SBOM 분석) 우선 → zot Trivy(컨테이너 이미지) → 더미.
@@ -366,11 +415,11 @@ func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 				vs.Vex = synthVex(repo, tag, idx)
 				vs.Synthetic = true
 			}
-			versions = append(versions, vs)
-		}
+			versions[idx] = vs
+		})
 		if len(versions) > 0 {
 			products = append(products, productStat{Repo: repo, Versions: versions})
 		}
 	}
-	writeJSON(w, 200, map[string]any{"products": products})
+	return products
 }

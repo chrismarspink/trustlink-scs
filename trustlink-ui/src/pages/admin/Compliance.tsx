@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { JobProgress, Busy } from '@/components/Progress';
 import { Upload, Play, Download, Sparkles } from 'lucide-react';
 import {
   adminCompliance, adminComplianceUpload, adminComplianceRun, adminComplianceReport, complianceMdUrl,
@@ -291,9 +292,11 @@ export default function Compliance() {
           <Button size="sm" onClick={run} disabled={!info.checklist || !repo || !tag || rep?.state === 'running'}>
             <Play size={14} /> 검증 실행
           </Button>
-          {rep?.state === 'running' && <span className="text-xs text-muted-foreground">진행 중: {rep.progress}</span>}
           {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
         </div>
+        {rep?.state === 'running' && (rep.steps?.length
+          ? <JobProgress steps={rep.steps} stage={rep.stage || 0} done={rep.done} total={rep.total} started={rep.createdAt} text={rep.progress} aiSteps={['AI 보완 설명', 'AI 요약']} />
+          : <Busy active label={`진행 중: ${rep.progress || ''}`} />)}
       </Card>
 
       {rep && rep.state !== 'running' && (

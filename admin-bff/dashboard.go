@@ -26,6 +26,7 @@ import (
 
 const (
 	dashCacheTTL    = 5 * time.Minute
+	dashDTWorkers   = 8  // DT·zot 동시 조회 수
 	dashDays        = 30 // 추이·집계 기간
 	dashTagsPerRepo = 50 // 제품마다 최근 버전만 훑는다(개발 빌드가 많은 저장소 대비)
 	dashAgingDays   = 7  // 이 기간 넘게 판단되지 않은 취약점은 할 일에 올린다
@@ -136,8 +137,9 @@ type Dashboard struct {
 
 var dashCache struct {
 	sync.Mutex
-	at   time.Time
-	data *Dashboard
+	at       time.Time
+	data     *Dashboard
+	building chan struct{} // 다시 만드는 중이면 닫힐 때까지 기다릴 수 있는 채널
 }
 
 func (s *Server) apiDashboard(w http.ResponseWriter, r *http.Request) {
@@ -145,12 +147,34 @@ func (s *Server) apiDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 // dashboardCached: 집계 캐시(메일 요약도 같은 값을 쓴다).
+// 캐시가 오래됐으면 이전 값을 바로 돌려주고 뒤에서 다시 만든다. 처음(값 없음)과 refresh 만 기다린다.
+// 같은 때 여러 요청이 와도 집계는 한 번만 돈다.
 func (s *Server) dashboardCached(refresh bool) *Dashboard {
 	dashCache.Lock()
-	defer dashCache.Unlock()
-	if dashCache.data == nil || time.Since(dashCache.at) > dashCacheTTL || refresh {
-		dashCache.data, dashCache.at = s.buildDashboard(time.Now()), time.Now()
+	data, fresh := dashCache.data, time.Since(dashCache.at) <= dashCacheTTL
+	if data != nil && fresh && !refresh {
+		dashCache.Unlock()
+		return data
 	}
+	ch := dashCache.building
+	if ch == nil {
+		ch = make(chan struct{})
+		dashCache.building = ch
+		go func() {
+			d := s.buildDashboard(time.Now())
+			dashCache.Lock()
+			dashCache.data, dashCache.at, dashCache.building = d, time.Now(), nil
+			dashCache.Unlock()
+			close(ch)
+		}()
+	}
+	dashCache.Unlock()
+	if data != nil && !refresh {
+		return data // 오래된 값(뒤에서 새로 만드는 중)
+	}
+	<-ch
+	dashCache.Lock()
+	defer dashCache.Unlock()
 	return dashCache.data
 }
 
@@ -159,9 +183,13 @@ func (s *Server) buildDashboard(now time.Time) *Dashboard {
 	d.Security.Pending = map[string]int{}
 	since := now.AddDate(0, 0, -dashDays)
 
-	latest := s.dashInventory(d)
+	// 레지스트리 훑기(zot)와 DT 집계는 서로 다른 칸을 채우므로 동시에 돈다.
+	var latest map[string]string
+	invDone := make(chan struct{})
+	go func() { latest = s.dashInventory(d); close(invDone) }()
 	s.dashSecurity(d, now)
 	orgOf, orgTodo := s.dashOrgs()
+	<-invDone
 	s.dashLog(d, now, since, latest, orgOf)
 	s.dashNotices(d, now, since)
 	d.Todo = append(d.Todo, orgTodo...)
@@ -184,6 +212,8 @@ func (s *Server) buildDashboard(now time.Time) *Dashboard {
 func (s *Server) dashInventory(d *Dashboard) map[string]string {
 	caller := s.svcCaller()
 	latest := map[string]string{}
+	type rt struct{ repo, tag string }
+	var jobs []rt
 	for _, repo := range s.svcCatalog() {
 		tags := sortedVersions(s.svcTags(repo))
 		if len(tags) == 0 {
@@ -194,34 +224,46 @@ func (s *Server) dashInventory(d *Dashboard) map[string]string {
 			tags = tags[len(tags)-dashTagsPerRepo:]
 		}
 		for _, tag := range tags {
-			_, subj, err := s.fetchManifest(caller, repo, tag)
-			if err != nil {
-				continue
-			}
-			d.Quality.Versions++
-			hasSBOM, syft, hasVEX := false, false, false
-			for _, ref := range s.fetchReferrers(caller, repo, subj) {
-				switch {
-				case isSBOM(ref.ArtifactType):
-					hasSBOM = true
-					if ref.Annotations["com.trustlink.sbom.provenance"] == "trustlink-analyzed" {
-						syft = true
-					}
-				case strings.Contains(ref.ArtifactType, "vex"):
-					hasVEX = true
+			jobs = append(jobs, rt{repo, tag})
+		}
+	}
+	// 버전마다 매니페스트·참조 목록 조회는 동시에, 집계는 차례로.
+	type inv struct{ ok, sbom, syft, vex bool }
+	res := make([]inv, len(jobs))
+	parallel(len(jobs), dashDTWorkers, func(i int) {
+		_, subj, err := s.fetchManifest(caller, jobs[i].repo, jobs[i].tag)
+		if err != nil {
+			return
+		}
+		r := inv{ok: true}
+		for _, ref := range s.fetchReferrers(caller, jobs[i].repo, subj) {
+			switch {
+			case isSBOM(ref.ArtifactType):
+				r.sbom = true
+				if ref.Annotations["com.trustlink.sbom.provenance"] == "trustlink-analyzed" {
+					r.syft = true
 				}
+			case strings.Contains(ref.ArtifactType, "vex"):
+				r.vex = true
 			}
-			if hasSBOM {
-				d.Quality.WithSBOM++
-				if syft {
-					d.Quality.SBOMSyft++
-				} else {
-					d.Quality.SBOMSupplier++
-				}
+		}
+		res[i] = r
+	})
+	for _, r := range res {
+		if !r.ok {
+			continue
+		}
+		d.Quality.Versions++
+		if r.sbom {
+			d.Quality.WithSBOM++
+			if r.syft {
+				d.Quality.SBOMSyft++
+			} else {
+				d.Quality.SBOMSupplier++
 			}
-			if hasVEX {
-				d.Quality.WithVEX++
-			}
+		}
+		if r.vex {
+			d.Quality.WithVEX++
 		}
 	}
 	return latest
@@ -311,20 +353,40 @@ func (s *Server) dashSecurity(d *Dashboard, now time.Time) {
 		vulns    int
 	}
 	comps := map[string]*compAgg{}
-	for key, repo := range projects {
-		name, tag, ok := strings.Cut(key, "@")
+	// DT 조회(프로젝트마다 lookup·findings·components)는 동시에 받고, 집계는 아래에서 차례로 한다.
+	type dtFetched struct {
+		repo, tag string
+		ok        bool
+		fs        []dtFinding
+		cs        []dtComponent
+	}
+	keys := make([]string, 0, len(projects))
+	for k := range projects {
+		keys = append(keys, k)
+	}
+	fetched := make([]dtFetched, len(keys))
+	parallel(len(keys), dashDTWorkers, func(i int) {
+		name, tag, ok := strings.Cut(keys[i], "@")
 		if !ok {
-			continue
+			return
 		}
 		uuid, err := s.dtLookupProject(name, tag)
 		if err != nil || uuid == "" {
+			return
+		}
+		r := dtFetched{repo: projects[keys[i]], tag: tag, ok: true}
+		if b, err := s.dtFindings(uuid); err == nil {
+			_ = json.Unmarshal(b, &r.fs)
+		}
+		r.cs = s.dtComponents(uuid)
+		fetched[i] = r
+	})
+	for _, r := range fetched {
+		if !r.ok {
 			continue
 		}
+		repo, tag, fs := r.repo, r.tag, r.fs
 		pv := dashProductVuln{Repo: repo, Tag: tag}
-		var fs []dtFinding
-		if b, err := s.dtFindings(uuid); err == nil {
-			_ = json.Unmarshal(b, &fs)
-		}
 		vulnsByComp := map[string]int{}
 		for _, f := range fs {
 			if f.Analysis.IsSuppressed {
@@ -354,7 +416,7 @@ func (s *Server) dashSecurity(d *Dashboard, now time.Time) {
 		if pv.Total > 0 {
 			d.Security.Products = append(d.Security.Products, pv)
 		}
-		for _, c := range s.dtComponents(uuid) {
+		for _, c := range r.cs {
 			d.Quality.Components++
 			if c.Version == "" {
 				d.Quality.NoVersion++

@@ -564,6 +564,7 @@ export type CompReport = {
   id: string; repo: string; tag: string; createdAt: string; createdBy: string; checklist: string; checklistSha256: string;
   profile: { markets: string[] }; regs: CompRegs[]; evidence: CompCheck[]; info: Record<string, string>;
   items: CompItem[]; counts: Record<string, number>; state: 'running' | 'done' | 'error'; progress?: string;
+  steps?: string[]; stage?: number; done?: number; total?: number;
   summary?: { summary: string; risks: { title: string; detail: string; citations: string[] }[]; actions: { priority: string; action: string; citations: string[] }[] };
   ai?: { model: string; modelSha256?: string; dbSnapshot?: string; elapsedMs: number }; aiError?: string; sha256?: string;
 };
@@ -669,6 +670,7 @@ export type UpFlag = { name: string; version?: string; repo?: string; rating: Up
 export type UpReport = {
   id: string; kind: 'product' | 'repo'; repo?: string; tag?: string; target?: string; created: string; createdBy: string; finished?: string;
   state: 'running' | 'done' | 'error'; progress?: string; error?: string; sbom?: string;
+  steps?: string[]; stage?: number; done?: number; total?: number;
   comps: UpComp[]; repos: Record<string, UpRepo>; counts?: Record<UpRating, number>; top?: UpFlag[]; replace?: UpFlag[];
   rate?: UpRate; notes?: string[]; depGraph?: { packages: number; ecosystems?: Record<string, number>; sample?: string[]; error?: string };
   summary?: { headline: string; points: string[]; actions: string[]; citations: string[] };
