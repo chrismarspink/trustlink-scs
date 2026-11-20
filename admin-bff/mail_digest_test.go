@@ -60,7 +60,7 @@ func TestBuildMessageRich(t *testing.T) {
 
 func fakeDash() {
 	d := &Dashboard{Todo: []dashTodo{{Kind: "vuln", Tone: "crit", Text: "긴급 취약점 판단 필요", Count: 2}}}
-	d.Security.Pending = map[string]int{"critical": 2, "high": 3}
+	d.Security.Pending = map[string]int{"CRITICAL": 2, "HIGH": 3} // 대시보드와 같은 대문자 키
 	d.Security.Products = []dashProductVuln{{Repo: "products/innopouch", Tag: "10.0", Critical: 2, High: 3, Total: 9, Pending: 5}}
 	d.Security.Recent = []dashRecent{{Time: "2026-11-18T01:00:00Z", Repo: "products/innopouch", Tag: "10.0", Title: "CVE-2026-0001 <script>"}}
 	d.Quality.Versions, d.Quality.WithSBOM, d.Quality.WithVEX = 10, 8, 5

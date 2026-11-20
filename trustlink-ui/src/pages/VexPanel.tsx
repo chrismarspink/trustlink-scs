@@ -4,9 +4,10 @@ import { Button, Card, CardContent, CardHeader, Badge, Input } from '@/component
 import {
   getSession, vexEnabled, vexFindings, putAnalysis, publishVex, bffLogin, aiStatus, aiVexDraft, vexKev,
   aiVexBatch, aiVexBatchStart, aiVexBatchCancel,
-  type Session, type Finding, type VexDraftResult, type KevInfo, type VexBatch, type VexRemedy
+  type Session, type Finding, type VexDraftResult, type KevInfo, type VexRemedy, type VexBatchAuto, type VexDraftResultAuto
 } from '@/lib/api';
 import { AIBadge, AIIcon } from '@/components/AIBadge';
+import { SourceBadge, Steps } from '@/components/SourceBadge';
 
 // CycloneDX 분석 상태 어휘 (BFF가 DT enum 으로 매핑)
 const STATES = [
@@ -60,6 +61,22 @@ const PRIO_LABEL: Record<number, string> = { 1: 'P1 실제 악용(KEV)', 2: 'P2 
 const CONF_LABEL = { low: '근거 부족', medium: '근거 일부', high: '근거 충분' };
 const labelOf = (list: { v: string; label: string }[], v: string) => list.find((x) => x.v === v)?.label || v;
 
+// DT 취약점 출처(vulnerability.source) → 출처 배지 키
+const vulnSrc = (src?: string) => {
+  const u = (src || '').toUpperCase();
+  return u === 'NVD' ? 'nvd' : u === 'OSV' ? 'osv' : u === 'GITHUB' || u === 'GHSA' ? 'ghsa' : u.toLowerCase();
+};
+// AI 초안의 근거 사실 ID → 어디서 온 사실인지(서버 vexFacts 의 ID 규칙)
+function factSrc(id: string, f: Finding): { src: string; label: string } {
+  if (id.startsWith('V')) return { src: vulnSrc(f.vulnerability.source) || 'nvd', label: id };
+  if (id === 'X1') return { src: 'epss', label: id };
+  if (id === 'X2') return { src: 'kev', label: id };
+  if (id === 'X3') return { src: 'exploit', label: id };
+  if (id === 'R1') return { src: 'osv', label: id };
+  return { src: id.startsWith('U') ? '담당자' : 'SBOM', label: id }; // C1 구성요소·A1 분석 상태·U1 사용 맥락
+}
+const AutoMark = () => <AIBadge label="자동 초안" className="from-fuchsia-600 to-rose-500" />;
+
 type Applied = { status: string; just: string; response: string; details: string; comment: string };
 
 // 규칙 계산 결과(AI 아님): 목표 버전·KEV 기한·공개 익스플로잇·OSV 영향 범위
@@ -72,14 +89,17 @@ function RemedyFacts({ r, version }: { r: VexRemedy; version?: string }) {
   ].filter(Boolean);
   return (
     <div className="grid gap-1 rounded bg-background/70 p-2 sm:grid-cols-2">
+      <div className="flex flex-wrap items-center gap-1 sm:col-span-2 text-[11px] text-muted-foreground">
+        <SourceBadge src="mirror" /> 규칙·취약점 DB 로 계산한 사실(AI 아님)
+      </div>
       <div>
-        <b>목표 버전</b>: {r.targetVersion
+        {r.osvId && <SourceBadge src="osv" className="mr-1" />}<b>목표 버전</b>: {r.targetVersion
           ? <span className="font-mono text-emerald-700">{version} → {r.targetVersion}</span>
           : <span className="text-muted-foreground">{r.osvNote || (r.inRange === 'no' ? 'OSV 영향 범위 밖' : '수정 버전 미공개')}</span>}
         {r.osvId && <span className="text-muted-foreground"> ({r.osvId})</span>}
       </div>
-      <div><b>조치 기한</b>: {r.dueBy ? <span className="text-red-700">KEV 기한 {r.dueBy}</span> : <span className="text-muted-foreground">정책 기준</span>}</div>
-      <div><b>공개 익스플로잇</b>: {exParts.length ? <span className="text-red-700">{exParts.join(' · ')}</span> : <span className="text-muted-foreground">{ex.checked ? '찾지 못함' : '사본 없음'}</span>}</div>
+      <div>{r.dueBy && <SourceBadge src="kev" className="mr-1" />}<b>조치 기한</b>: {r.dueBy ? <span className="text-red-700">KEV 기한 {r.dueBy}</span> : <span className="text-muted-foreground">정책 기준</span>}</div>
+      <div>{exParts.length > 0 && <SourceBadge src="exploit" className="mr-1" />}<b>공개 익스플로잇</b>: {exParts.length ? <span className="text-red-700">{exParts.join(' · ')}</span> : <span className="text-muted-foreground">{ex.checked ? '찾지 못함' : '사본 없음'}</span>}</div>
       {r.ranges && r.ranges.length > 0 && <div><b>영향 범위</b>: <span className="font-mono">{r.ranges.join(' / ')}</span></div>}
     </div>
   );
@@ -87,14 +107,14 @@ function RemedyFacts({ r, version }: { r: VexRemedy; version?: string }) {
 
 // AI 초안 상자: 사용 맥락(선택)을 적고 요청 → 판정·대응 초안·근거·경고 표시 → "초안 적용"은 입력칸만 채운다(저장은 사람이).
 function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
-  uuid: string; f: Finding; repo: string; tag: string; initial?: VexDraftResult;
+  uuid: string; f: Finding; repo: string; tag: string; initial?: VexDraftResultAuto;
   onApply: (a: Applied) => void;
 }) {
   const [ctx, setCtx] = useState('');
   const [busy, setBusy] = useState(false);
   const [asked, setAsked] = useState<VexDraftResult | null>(null);
   const [err, setErr] = useState('');
-  const res = asked || initial || null; // 직접 요청한 초안이 일괄 판정 결과보다 우선
+  const res: VexDraftResultAuto | null = asked || initial || null; // 직접 요청한 초안이 일괄 판정 결과보다 우선
   async function ask() {
     setBusy(true); setErr('');
     try {
@@ -130,6 +150,8 @@ function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
         <div className="space-y-2">
           <RemedyFacts r={res.remedy} version={f.component.version} />
           <div className="flex flex-wrap items-center gap-2">
+            <AIBadge label="AI 작성" />
+            {res.auto && !asked && <AutoMark />}
             <Badge variant={res.draft.status === 'affected' ? 'danger' : res.draft.status === 'not_affected' ? 'muted' : 'warn'}>
               {labelOf(STATES, res.draft.status)}
             </Badge>
@@ -140,6 +162,7 @@ function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
               {res.at ? ` · ${new Date(res.at).toLocaleString()}` : ''}
             </span>
           </div>
+          {res.auto && !asked && <div className="text-[11px] text-fuchsia-800">새 취약점 통보 직후 KEV·치명 항목에 자동으로 만든 초안입니다. 확인 후 저장해야 기록됩니다.</div>}
           <p className="leading-relaxed">{res.draft.detail}</p>
           {res.draft.plan.length > 0 && (
             <div>
@@ -148,11 +171,12 @@ function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
             </div>
           )}
           {res.draft.workaround && <div><b>임시 완화</b>: {res.draft.workaround}</div>}
-          <div className="flex flex-wrap gap-1">
-            <span className="text-muted-foreground">근거:</span>
-            {res.draft.citations.map((c) => (
-              <span key={c} title={factText(c)} className="cursor-help rounded bg-secondary px-1.5 font-mono">{c}</span>
-            ))}
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-muted-foreground">근거(입력 사실 — 마우스를 올리면 원문):</span>
+            {res.draft.citations.map((c) => {
+              const fs = factSrc(c, f);
+              return <SourceBadge key={c} src={fs.src} label={`${c} ${fs.src === 'SBOM' || fs.src === '담당자' ? fs.src : ''}`.trim()} title={factText(c)} className="cursor-help font-mono" />;
+            })}
           </div>
           {res.draft.missing.length > 0 && (
             <ul className="list-disc pl-5 text-muted-foreground">
@@ -195,7 +219,7 @@ function VulnDetail({ v, analyzer }: { v: Finding['vulnerability']; analyzer?: s
 }
 
 function FindingRow({ uuid, f, onSaved, repo, tag, ai, kev, draft }: {
-  uuid: string; f: Finding; onSaved: () => void; repo: string; tag: string; ai: boolean; kev?: Kev; draft?: VexDraftResult;
+  uuid: string; f: Finding; onSaved: () => void; repo: string; tag: string; ai: boolean; kev?: Kev; draft?: VexDraftResultAuto;
 }) {
   const [status, setStatus] = useState('');
   const [just, setJust] = useState('');
@@ -229,11 +253,19 @@ function FindingRow({ uuid, f, onSaved, repo, tag, ai, kev, draft }: {
         <Badge variant={pr <= 2 ? 'danger' : pr === 3 ? 'warn' : 'muted'}>{PRIO_LABEL[pr]}</Badge>
         <Badge variant={sevVariant(f.vulnerability.severity)}>{f.vulnerability.severity || '?'}</Badge>
         <span className="font-mono text-sm font-medium">{f.vulnerability.vulnId}</span>
+        {f.vulnerability.source && <SourceBadge src={vulnSrc(f.vulnerability.source)} label={vulnSrc(f.vulnerability.source) === 'ghsa' ? 'GHSA' : undefined} />}
         <span className="text-xs text-muted-foreground">{f.component.name}{f.component.version ? ` @ ${f.component.version}` : ''}</span>
         {f.analysis?.state && <Badge variant="muted">현재: {f.analysis.state}</Badge>}
-        {kev?.kev && <span className="text-xs text-red-700">KEV 등재 {kev.kevAdded}{kev.kevDue ? ` · 기한 ${kev.kevDue}` : ''}{kev.ransomware ? ' · 랜섬웨어 사용' : ''}</span>}
-        {kev?.exploit && <span className="text-xs text-red-700">공개 익스플로잇</span>}
+        {kev?.kev && (
+          <SourceBadge src="kev" label={`KEV${kev.kevDue ? ` 기한 ${kev.kevDue}` : ''}${kev.ransomware ? ' · 랜섬웨어' : ''}`}
+            title={`CISA KEV 등재 ${kev.kevAdded || ''} — 실제 악용이 확인된 취약점${kev.kevDue ? ` · 조치 기한 ${kev.kevDue}` : ''}`} />
+        )}
+        {(f.vulnerability.epssScore ?? 0) >= 0.1 && (
+          <SourceBadge src="epss" label={`EPSS ${((f.vulnerability.epssScore ?? 0) * 100).toFixed(0)}%`} />
+        )}
+        {kev?.exploit && <SourceBadge src="exploit" />}
         <div className="flex-1" />
+        {draft?.auto && <AutoMark />}
         {draft && !aiOpen && (
           <button onClick={() => setAiOpen(true)} title="AI 판정 초안 보기">
             <AIBadge label={`${labelOf(STATES, draft.draft.status).split(' (')[0]}${draft.remedy.targetVersion ? ` → ${draft.remedy.targetVersion}` : ''}`} />
@@ -294,7 +326,7 @@ export default function VexPanel({ repo, tag }: { repo: string; tag: string }) {
   const [pub, setPub] = useState('');
   const [ai, setAi] = useState(false);
   const [kev, setKev] = useState<KevInfo | null>(null);
-  const [batch, setBatch] = useState<VexBatch | null>(null);
+  const [batch, setBatch] = useState<VexBatchAuto | null>(null);
   const [batchErr, setBatchErr] = useState('');
 
   // 일괄 판정 진행 중이면 3초마다 갱신
@@ -415,7 +447,7 @@ const STATE_TONE: Record<string, string> = { not_affected: 'bg-emerald-100 text-
 const mmss = (ms: number) => { const t = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 
 function BatchPanel({ batch, findings, err, onStart, onCancel }: {
-  batch: VexBatch | null; findings: Finding[]; err: string; onStart: () => void; onCancel: () => void;
+  batch: VexBatchAuto | null; findings: Finding[]; err: string; onStart: () => void; onCancel: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const running = batch?.state === 'running';
@@ -437,6 +469,7 @@ function BatchPanel({ batch, findings, err, onStart, onCancel }: {
   const results = Object.entries(batch?.results || {}).sort((a, b) => (a[1].at < b[1].at ? 1 : -1));
   const failed = Object.entries(batch?.failed || {});
   const [cur, curComp] = (batch?.current || '').split(' · ');
+  const auto = batch?.trigger === 'auto';
 
   return (
     <div className="overflow-hidden rounded-lg border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50/40">
@@ -444,10 +477,21 @@ function BatchPanel({ batch, findings, err, onStart, onCancel }: {
         <AIIcon size={30} spin={running} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-violet-950">
-            AI 일괄 판정 {running ? <span className="font-normal text-violet-700">진행 중 · {done}/{total}건 · {pct}%</span>
+            AI 일괄 판정 {auto && <AutoMark />} {running ? <span className="font-normal text-violet-700">진행 중 · {done}/{total}건 · {pct}%</span>
               : batch && batch.state !== 'none' ? <span className="font-normal text-muted-foreground">마지막 실행 {batch.finished ? new Date(batch.finished).toLocaleString() : ''} · 초안 {results.length}건{failed.length ? ` · 실패 ${failed.length}건` : ''}{batch.state === 'cancelled' ? ' (중지됨)' : ''}</span> : null}
           </div>
-          <div className="text-xs text-muted-foreground">미판단 항목을 우선순위(KEV → 치명 → 높음) 순으로 한 건씩 판단 초안으로 만듭니다. Dependency-Track 에는 쓰지 않고, 각 항목에서 사람이 확인 후 저장합니다.</div>
+          <div className="text-xs text-muted-foreground">
+            {auto ? '새 취약점 통보 직후 실제 악용(KEV)·치명 항목만 골라 자동으로 시작한 판정입니다. ' : ''}
+            미판단 항목을 우선순위(KEV → 치명 → 높음) 순으로 한 건씩 판단 초안으로 만듭니다. Dependency-Track 에는 쓰지 않고, 각 항목에서 사람이 확인 후 저장합니다.
+          </div>
+          {auto && (
+            <Steps className="mt-1.5" steps={[
+              { label: '새 취약점 통보', state: 'done' },
+              { label: 'AI 자동 초안', state: running ? 'active' : batch?.state === 'error' ? 'error' : 'done', ai: true },
+              { label: '사람 확인·저장', state: running ? 'todo' : 'active' },
+              { label: 'VEX 발행', state: 'todo' }
+            ]} />
+          )}
         </div>
         {running
           ? <Button size="sm" variant="outline" onClick={onCancel}><Square size={13} /> 중지</Button>
@@ -484,7 +528,8 @@ function BatchPanel({ batch, findings, err, onStart, onCancel }: {
             {results.map(([k, r]) => {
               const n = name(k);
               return (
-                <span key={k} className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${STATE_TONE[r.draft.status] || 'bg-slate-100'}`} title={`${n.comp} — ${(r.meta.elapsedMs / 1000).toFixed(0)}초`}>
+                <span key={k} className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${STATE_TONE[r.draft.status] || 'bg-slate-100'}`} title={`${n.comp} — ${(r.meta.elapsedMs / 1000).toFixed(0)}초${r.auto ? ' · 자동 초안' : ''}`}>
+                  {r.kev && <SourceBadge src="kev" className="px-1" />}
                   <span className="font-mono">{n.id}</span> {STATE_SHORT[r.draft.status] || r.draft.status}{r.remedy.targetVersion ? ` → ${r.remedy.targetVersion}` : ''}
                 </span>
               );

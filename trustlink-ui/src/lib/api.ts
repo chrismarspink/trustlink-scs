@@ -709,3 +709,73 @@ export const adminRegLawFetch = (id: string) => aj<LawFetchResult>(`/api/regs/${
 export const adminRegLawAnalyze = (id: string) => aj<{ status: string }>(`/api/regs/${encodeURIComponent(id)}/law-analyze`, { method: 'POST' });
 export const adminRegLawReview = (id: string, action: 'verify' | 'unverify' | 'adopt' | 'discard' | 'reset') =>
   aj<{ status: string }>(`/api/regs/${encodeURIComponent(id)}/law-review`, jsonInit('POST', { action }));
+// KEV·치명 자동 초안(BFF vex_autodraft.go) — 새 취약점 통보 뒤 자동으로 건 일괄 판정은 trigger='auto', 그 초안은 auto=true.
+export type VexDraftResultAuto = VexDraftResult & { auto?: boolean };
+export type VexBatchAuto = VexBatch & { trigger?: string; results?: Record<string, VexDraftResultAuto> };
+export type VexQueueRowAuto = VexQueueRow & { batchAuto?: number };
+
+// ---------- 고객 등록부 · 고객 통지(패치 권고) ----------
+export type CustNotifyKind = 'vuln' | 'vex' | 'incident' | 'patch' | 'eos' | 'contract';
+export type CustContact = { name: string; role: 'security' | 'itops' | 'purchase' | 'other'; email: string; phone?: string; notify: CustNotifyKind[]; lang?: '' | 'ko' | 'en' };
+export type CustInstall = { tag: string; env: '운영' | 'DR' | '검증' | '개발'; qty: number };
+export type CustUsage = {
+  id?: string; repo: string; installs: CustInstall[]; contractNo?: string; licenseType?: '' | 'perpetual' | 'subscription' | 'term';
+  useStart?: string; licenseExpiry?: string; maintStart?: string; maintExpiry?: string; supportTier?: string;
+  notifyLevel: 'critical_kev' | 'high' | 'all'; notifyContacts?: string[]; memo?: string;
+};
+export type Customer = {
+  id: string; name: string; industry: '공공' | '금융' | '일반' | '해외'; country?: string; lang: 'ko' | 'en'; orgGroup?: string;
+  salesOwner?: string; supportOwner?: string; memo?: string; contacts: CustContact[]; usages: CustUsage[]; updated?: string; updatedBy?: string;
+};
+export type CustExpiry = { customerId: string; customer: string; usageId: string; repo: string; kind: 'license' | 'maint' | 'eos'; tag?: string; date: string; days: number };
+export type CustMismatch = { repo: string; estimated: string; at: string; user: string; installed: string[] };
+export type CustomerView = Customer & { expiry: CustExpiry[]; mismatch: CustMismatch[] };
+export type VerPolicy = { tag: string; released?: string; eos?: string; upgrade?: string };
+export type CustSettings = { expiryToCustomer: boolean };
+export const adminCustomers = () =>
+  aj<{ customers: CustomerView[]; products: Record<string, VerPolicy[]>; settings: CustSettings }>('/api/customers');
+export const adminCustomerSave = (c: Customer, isNew: boolean) =>
+  aj<Customer>(isNew ? '/api/customers' : `/api/customers/${encodeURIComponent(c.id)}`, jsonInit(isNew ? 'POST' : 'PUT', c));
+export const adminCustomerDelete = (id: string) => aj<{ deleted: string }>(`/api/customers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const adminCustomerProduct = (repo: string, versions: VerPolicy[]) => aj<unknown>('/api/customer-products', jsonInit('PUT', { repo, versions }));
+export const adminCustomerSettings = (s: CustSettings) => aj<CustSettings>('/api/customer-settings', jsonInit('PUT', s));
+export type ExpiryRec = { time: string; customerId: string; customer: string; audience: 'internal' | 'customer'; items: string[]; sent?: string[]; dropped?: string[]; error?: string };
+export const adminCustomerExpiring = (days = 90) =>
+  aj<{ items: (CustExpiry & { sent: number[] })[]; log: ExpiryRec[]; thresholds: number[]; settings: CustSettings }>(`/api/customer-expiring?days=${days}`);
+export const adminCustomerExpiryCheck = () => aj<{ mails: number }>('/api/customer-expiring/check', { method: 'POST' });
+
+export type CustVulnCand = { vulnId: string; repo: string; severity: string; kev: boolean; component: string; tags: string[]; states: string[]; customers: string[]; notified?: string };
+export type FixStep = { tag: string; status: 'fixed' | 'affected' | 'present' | 'unknown'; compVersion?: string; note?: string };
+export type CustFix = {
+  found: boolean; tag?: string; compVersion?: string; note?: string; from?: string; steps: FixStep[];
+  osv?: { id: string; target?: string; fixed?: string[]; ranges?: string[] }; osvNote?: string; message?: string;
+};
+export type CustSendResult = { at: string; sent?: string[]; dropped?: string[]; error?: string };
+export type CustTarget = {
+  key: string; customerId: string; customer: string; usageId: string; lang: 'ko' | 'en'; tags: string[]; recommend?: string; recComp?: string;
+  notes?: string[]; internal?: string[]; contacts: string[]; to: string[]; cc?: string[]; subject: string; text: string; html: string; result?: CustSendResult;
+};
+export type CustAIText = { summary: string; impact: string; action: string; citations: string[]; source: 'ai' | 'rule'; model?: string; warnings?: string[] };
+export type CustNotice = {
+  id: string; kind: 'patch' | 'notaffected'; status: 'draft' | 'sent' | 'partial' | 'dropped' | 'failed'; created: string; createdBy: string;
+  sentAt?: string; sentBy?: string; repo: string; vulnId: string; severity: string; cvss?: number; kev: boolean; component: string; compVersion: string;
+  fix: CustFix; facts: AIFact[]; ai: Record<string, CustAIText>; aiError?: string; targets: CustTarget[]; skipped: { customerId: string; customer: string; reason: string }[];
+};
+export type CustNoticeRow = {
+  id: string; kind: CustNotice['kind']; status: CustNotice['status']; created: string; createdBy: string; sentAt?: string; repo: string; vulnId: string;
+  severity: string; kev: boolean; recommend?: string; targets: number; sent: number; dropped: number; failed: number;
+};
+export const adminCustNotifyVulns = (kind: CustNotice['kind']) => aj<{ items: CustVulnCand[]; error?: string }>(`/api/custnotify/vulns?kind=${kind}`);
+export const adminCustNotifyCreate = (b: { kind: CustNotice['kind']; repo: string; vulnId: string }) => aj<CustNotice>('/api/custnotify', jsonInit('POST', b));
+export const adminCustNotifyAI = (id: string) => aj<CustNotice>(`/api/custnotify/${encodeURIComponent(id)}/ai`, { method: 'POST' });
+export const adminCustNotifySend = (id: string, keys: string[]) => aj<CustNotice>(`/api/custnotify/${encodeURIComponent(id)}/send`, jsonInit('POST', { keys }));
+export const adminCustNotifyList = () => aj<CustNoticeRow[]>('/api/custnotify');
+export const adminCustNotifyGet = (id: string) => aj<CustNotice>(`/api/custnotify/${encodeURIComponent(id)}`);
+export const adminCustNotifyDelete = (id: string) => aj<{ deleted: string }>(`/api/custnotify/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+// 고객 전용: 로그인 사용자의 고객사 그룹에 연결된 고객만
+export type MyVuln = { vulnId: string; severity: string; state: string; kev: boolean; component: string; recommend?: string };
+export type MyInstall = { tag: string; env: string; qty: number; eos?: string; eosDays?: number; upgrade?: string; analyzed: boolean; vulns: MyVuln[] };
+export type MyUsage = { repo: string; licenseType?: string; licenseExpiry?: string; maintExpiry?: string; supportTier?: string; installs: MyInstall[] };
+export type MyNotice = { id: string; kind: string; repo: string; vulnId: string; severity: string; sentAt: string; subject: string; text: string; recommend?: string };
+export const myProducts = () => aj<{ customers: { name: string; usages: MyUsage[]; notices: MyNotice[] }[]; user: string }>('/api/my/products');

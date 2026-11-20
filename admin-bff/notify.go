@@ -381,6 +381,7 @@ func (s *Server) sendVulnNotice(b *notifyBatch) {
 	fmt.Fprintf(&body, "\n판단 화면: %s\n", s.artifactURL(b.repo, b.tag))
 	s.deliver(Notice{Kind: "vuln-new", Audience: "internal", Repo: b.repo, Tag: b.tag, Title: title, Body: body.String()},
 		s.recipients(b.repo, false), nil)
+	s.maybeAutoDraft(b.repo, b.tag) // KEV·치명 자동 초안(vex_autodraft.go)
 }
 
 // ---------- ③ VEX 발행 → 고객 통보 ----------

@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion
+  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck
 } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,7 @@ const PRODUCT: Item[] = [
   }
 ];
 const VEX_ITEM: Item = { to: '/vex', label: 'VEX 판단', icon: ShieldQuestion };
+const MY_ITEM: Item = { to: '/my', label: '내 제품', icon: PackageCheck };
 // 관리 콘솔 섹션 — admins 일 때 노출. 성격별로 세 묶음:
 //   관리(운영 현황·계정·통보) / 규제·보고(문서 발행과 규제 관리) / 시스템(인프라·연결 설정).
 const ADMIN: Item[] = [
@@ -42,6 +43,8 @@ const ADMIN: Item[] = [
       { to: '/admin/acl', label: '권한 매트릭스', icon: KeyRound }
     ]
   },
+  { to: '/admin/customers', label: '고객 등록부', icon: Contact },
+  { to: '/admin/customer-notify', label: '고객 통지', icon: Megaphone },
   { to: '/admin/notify', label: '취약점 통보', icon: Bell },
   { to: '/admin/logs', label: '로그', icon: ScrollText }
 ];
@@ -80,7 +83,7 @@ export function navTrail(pathname: string): string[] | null {
   const y = hit(SYSTEM);
   if (y) return ['시스템', ...y];
   if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
-  const p = hit([...PRODUCT, VEX_ITEM]);
+  const p = hit([...PRODUCT, VEX_ITEM, MY_ITEM]);
   return p ? ['제품', ...p] : null;
 }
 
@@ -170,7 +173,8 @@ export function Sidebar() {
 
   const showAdmin = !!sess?.groups?.includes('admins');
   // VEX 판단 대기열: 보안·개발·관리자(VEX 편집 권한)에게만
-  const product = sess?.canEditVex ? [PRODUCT[0], VEX_ITEM, ...PRODUCT.slice(1)] : PRODUCT;
+  // 내 제품: 고객사 사용자용(로그인 사용자 모두에게 보이되 서버가 본인 고객사로 제한)
+  const product = [PRODUCT[0], ...(sess?.canEditVex ? [VEX_ITEM] : []), ...(sess ? [MY_ITEM] : []), ...PRODUCT.slice(1)];
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-sidebar">

@@ -270,6 +270,24 @@ func main() {
 	mux.HandleFunc("POST /api/orgs", s.guard(s.apiOrgCreate))
 	mux.HandleFunc("DELETE /api/orgs/{name}", s.guard(s.apiOrgDelete))
 	mux.HandleFunc("PUT /api/orgs/{name}/contacts", s.guard(s.apiOrgContacts)) // 고객사 보안 담당 통보 주소
+	// 고객 등록부·고객 통지
+	mux.HandleFunc("GET /api/customers", s.guard(s.apiCustomers))
+	mux.HandleFunc("POST /api/customers", s.guard(s.apiCustomerSave))
+	mux.HandleFunc("PUT /api/customers/{id}", s.guard(s.apiCustomerSave))
+	mux.HandleFunc("DELETE /api/customers/{id}", s.guard(s.apiCustomerDelete))
+	mux.HandleFunc("PUT /api/customer-products", s.guard(s.apiCustomerProductPut)) // 제품 버전 정책(출시·EOS·권장 업그레이드)
+	mux.HandleFunc("PUT /api/customer-settings", s.guard(s.apiCustomerSettings))
+	mux.HandleFunc("GET /api/customer-expiring", s.guard(s.apiCustomerExpiring)) // 만료·EOS 예정
+	mux.HandleFunc("POST /api/customer-expiring/check", s.guard(s.apiCustomerExpiryCheck))
+	mux.HandleFunc("GET /api/custnotify/vulns", s.guard(s.apiCustNotifyVulns)) // 고객 통지 ① 취약점 후보
+	mux.HandleFunc("GET /api/custnotify", s.guard(s.apiCustNotifyList))
+	mux.HandleFunc("POST /api/custnotify", s.guard(s.apiCustNotifyCreate)) // ②③ 영향 고객 + 규칙 패치 버전
+	mux.HandleFunc("GET /api/custnotify/{id}", s.guard(s.apiCustNotifyGet))
+	mux.HandleFunc("DELETE /api/custnotify/{id}", s.guard(s.apiCustNotifyDelete))
+	mux.HandleFunc("POST /api/custnotify/{id}/ai", s.guard(s.apiCustNotifyAI))     // ③ AI 설명
+	mux.HandleFunc("POST /api/custnotify/{id}/send", s.guard(s.apiCustNotifySend)) // ⑤ 발송
+	mux.HandleFunc("GET /api/my/products", s.guardSession(s.apiMyProducts))        // 고객 전용: 내 고객사 제품만
+	go s.custExpiryLoop()                                                          // 만료·EOS 알림(하루 1회)
 	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts))   // 제품별 읽기/쓰기 대상
 	mux.HandleFunc("PUT /api/access/products", s.guard(s.apiAccessProductPut))
 	mux.HandleFunc("DELETE /api/access/products", s.guard(s.apiAccessProductDelete))

@@ -4,6 +4,10 @@
 버전이 올라갈수록 알려진 취약 라이브러리를 수정 버전으로 올리고 구성요소를 늘려,
 TrustLink 대시보드에서 "구성요소 증가 · 취약점 감소" 추이가 보이게 한다.
 사용: python3 demo_innopouch_gen.py <출력 폴더> [버전 수=10]
+
+웹 스택 시연(docs/DEMO-INNOPOUCH-WEB.md): 11.0 은 취약한 nginx·PHP·Node.js, 11.1 은 수정 버전.
+사용: python3 demo_innopouch_gen.py <출력 폴더> --web [11.0|11.1 …]   (생략하면 둘 다)
+1.0~10.0 의 데이터는 바뀌지 않는다(--web 은 별도 경로).
 """
 import io
 import json
@@ -35,6 +39,20 @@ LIBS = [
     ("zlib", "pkg:generic/zlib@{v}", "cpe:2.3:a:zlib:zlib:{v}:*:*:*:*:*:*:*",
      {1: "1.2.11", 7: "1.2.13"}),
 ]
+# 웹 관리 콘솔 번들(11.x) — Dependency-Track 이 NVD CPE 로 매칭한다(pkg:generic 은 OSV·GitHub 대상이 아님).
+# CPE 제품명은 NVD 가 실제로 쓰는 것: nginx 는 2025년 이후 CVE 가 f5:nginx_open_source 로 등록된다.
+# 버전 근거(2026-11-20 확인): nginx.org 보안 권고·NVD, php.net ChangeLog-8·NVD·CISA KEV, nodejs.org 보안 릴리스·NVD.
+WEB_STACK = [
+    # (이름, purl, cpe, {11.0 취약 버전, 11.1 수정 버전})
+    ("nginx", "pkg:generic/nginx@{v}", "cpe:2.3:a:f5:nginx_open_source:{v}:*:*:*:*:*:*:*",
+     {"11.0": "1.28.0", "11.1": "1.30.7"}),    # 1.30.7 = 2026-11-18 stable(CVE-2026-123007 등 수정)
+    ("php", "pkg:generic/php@{v}", "cpe:2.3:a:php:php:{v}:*:*:*:*:*:*:*",
+     {"11.0": "8.3.7", "11.1": "8.3.37"}),     # 8.3.7: CVE-2024-4577·CVE-2026-109618/109619(KEV) 영향, 8.3.37 = 2026-11-19
+    ("node", "pkg:generic/node@{v}", "cpe:2.3:a:nodejs:node.js:{v}:*:*:*:*:*:*:*",
+     {"11.0": "22.12.0", "11.1": "22.23.5"}),  # 22.12.0: CVE-2026-111497(KEV, Brotli) 등, 22.23.5 = 2026-11-11 보안 릴리스
+]
+WEB_VERSIONS = ["11.0", "11.1"]
+
 # 버전마다 늘어나는 자체 모듈(취약점 없음) — 구성요소 수 추이용
 INTERNAL = ["core", "agent", "policy", "crypto", "ui", "updater", "report", "sync", "audit", "plugin"]
 
@@ -55,17 +73,76 @@ def sbom(n: int) -> dict:
         p = f"pkg:generic/innotium/innopouch-{mod}@{ver}"
         comps.append({"type": "library", "bom-ref": p, "name": f"innopouch-{mod}", "version": ver, "purl": p,
                       "supplier": {"name": "Innotium"}})
+    return bom_doc(ver, comps, "2026-10-27T00:00:00Z", "TrustLink 시연용 가상 제품(알려진 취약 OSS 를 버전별로 수정)")
+
+
+def bom_doc(ver: str, comps: list, timestamp: str, desc: str) -> dict:
     return {
         "bomFormat": "CycloneDX", "specVersion": "1.5", "serialNumber": f"urn:uuid:{uuid.uuid4()}", "version": 1,
         "metadata": {
-            "timestamp": "2026-10-27T00:00:00Z",
+            "timestamp": timestamp,
             "tools": [{"vendor": "Innotium", "name": "XScan (demo)", "version": "1.0"}],
             "component": {"type": "application", "bom-ref": f"pkg:generic/innotium/innopouch@{ver}",
                           "name": "innoPouch", "version": ver, "publisher": "Innotium",
-                          "description": "TrustLink 시연용 가상 제품(알려진 취약 OSS 를 버전별로 수정)"},
+                          "description": desc},
         },
         "components": comps,
     }
+
+
+def web_components(ver: str) -> list:
+    """11.x 구성요소: 웹 콘솔 번들(nginx·PHP·Node.js) + 자체 모듈. 데모 초점을 흐리지 않게 1~10.0 의 OSS 라이브러리는 넣지 않는다."""
+    comps = []
+    for name, purl, cpe, vers in WEB_STACK:
+        v = vers[ver]
+        p = purl.format(v=v)
+        comps.append({"type": "application", "bom-ref": p, "name": name, "version": v, "purl": p, "cpe": cpe.format(v=v)})
+    for mod in INTERNAL + ["webconsole"]:
+        p = f"pkg:generic/innotium/innopouch-{mod}@{ver}"
+        comps.append({"type": "library", "bom-ref": p, "name": f"innopouch-{mod}", "version": ver, "purl": p,
+                      "supplier": {"name": "Innotium"}})
+    return comps
+
+
+def web_sbom(ver: str) -> dict:
+    ts = {"11.0": "2026-11-20T00:00:00Z", "11.1": "2026-11-20T01:00:00Z"}[ver]
+    desc = "TrustLink 시연용 가상 제품 — 웹 관리 콘솔(nginx·PHP·Node.js) " + ("취약 버전 번들" if ver == "11.0" else "보안 패치 번들")
+    doc = bom_doc(ver, web_components(ver), ts, desc)
+    doc["serialNumber"] = f"urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, 'innopouch-web/' + ver)}"  # 다시 만들어도 같은 SBOM
+    return doc
+
+
+def web_guide(ver: str) -> str:
+    rows = "\n".join(f"| {name} | {vers[ver]} |" for name, _, _, vers in WEB_STACK)
+    if ver == "11.0":
+        change = "- 웹 관리 콘솔 추가(nginx 리버스 프록시 + PHP-FPM 관리 화면 + Node.js 알림 서버)"
+    else:
+        prev = {name: vers["11.0"] for name, _, _, vers in WEB_STACK}
+        change = "- 보안 패치: " + ", ".join(f"{name} {prev[name]} → {vers['11.1']}" for name, _, _, vers in WEB_STACK)
+    return f"""# innoPouch {ver} 설치 가이드
+
+## 1. 구성
+- innopouch-{ver}-linux-amd64.tar.gz : 실행 파일·설정 예시
+- SBOM(CycloneDX) : 구성요소 {len(web_components(ver))}개
+- 이 문서
+
+| 번들 구성요소 | 버전 |
+|---|---|
+{rows}
+
+## 2. 설치
+```bash
+tar xzf innopouch-{ver}-linux-amd64.tar.gz
+sudo ./innopouch/install.sh
+innopouch --version   # {ver}
+```
+
+## 3. 이번 버전 변경
+{change}
+
+## 4. 문의
+Innotium 기술지원 (TrustLink 시연용 가상 제품)
+"""
 
 
 def guide(n: int) -> str:
@@ -93,8 +170,8 @@ Innotium 기술지원 (TrustLink 시연용 가상 제품)
 """
 
 
-def binary(n: int) -> bytes:
-    ver = f"{n}.0"
+def binary(n) -> bytes:
+    ver = n if isinstance(n, str) else f"{n}.0"
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tf:
         for name, data in {
@@ -109,7 +186,24 @@ def binary(n: int) -> bytes:
     return buf.getvalue()
 
 
+def write_web(out: Path, versions: list) -> None:
+    for ver in versions:
+        d = out / ver
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"innopouch-{ver}-linux-amd64.tar.gz").write_bytes(binary(ver))
+        (d / f"innopouch-{ver}.cdx.json").write_text(json.dumps(web_sbom(ver), indent=2, ensure_ascii=False))
+        (d / f"innopouch-{ver}-install-guide.md").write_text(web_guide(ver))
+    print(f"웹 스택 버전 생성({', '.join(versions)}): {out}")
+
+
 def main():
+    if len(sys.argv) > 2 and sys.argv[2] == "--web":
+        versions = sys.argv[3:] or WEB_VERSIONS
+        bad = [v for v in versions if v not in WEB_VERSIONS]
+        if bad:
+            sys.exit(f"알 수 없는 웹 스택 버전: {bad} (가능: {WEB_VERSIONS})")
+        write_web(Path(sys.argv[1]), versions)
+        return
     out = Path(sys.argv[1])
     count = int(sys.argv[2]) if len(sys.argv) > 2 else 10
     for n in range(1, count + 1):

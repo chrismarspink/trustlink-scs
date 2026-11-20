@@ -346,7 +346,7 @@ func (s *Server) composeMail(in mailComposeIn, actor string, reps []mailReport, 
 		hb.WriteString(`<div style="font-size:13px;color:#334155;margin-bottom:8px">판단 대기 `)
 		tx.WriteString("판단 대기:")
 		for _, x := range sevs {
-			n := d.Security.Pending[x.k]
+			n := d.Security.Pending[strings.ToUpper(x.k)]
 			hb.WriteString(pill(x.ko+" "+itoa(n), x.c, x.bg) + " ")
 			fmt.Fprintf(&tx, " %s %d", x.ko, n)
 		}

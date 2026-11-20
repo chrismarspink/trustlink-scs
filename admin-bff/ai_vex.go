@@ -11,6 +11,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -411,6 +412,7 @@ type vexDraftResult struct {
 	Facts         []aiFact  `json:"facts"`
 	Warnings      []string  `json:"warnings"`
 	KEV           bool      `json:"kev"`
+	Auto          bool      `json:"auto,omitempty"` // 자동 초안(새 취약점 통보 뒤 KEV·치명)
 	Meta          aiMeta    `json:"meta"`
 	At            string    `json:"at"`
 }
@@ -486,7 +488,8 @@ type vexBatch struct {
 	Repo     string                     `json:"repo"`
 	Tag      string                     `json:"tag"`
 	Actor    string                     `json:"actor"`
-	State    string                     `json:"state"` // running / done / cancelled / error
+	Trigger  string                     `json:"trigger,omitempty"` // "auto": 새 취약점 통보 뒤 자동 초안(KEV·치명)
+	State    string                     `json:"state"`             // running / done / cancelled / error
 	Total    int                        `json:"total"`
 	Done     int                        `json:"done"`
 	Current  string                     `json:"current,omitempty"`
@@ -600,18 +603,33 @@ func (s *Server) apiAIVexBatch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"state": "done", "total": 0, "message": "미분석 항목이 없습니다"})
 		return
 	}
-	b := &vexBatch{Project: in.Project, Repo: in.Repo, Tag: in.Tag, Actor: w.Header().Get("X-User"), State: "running",
-		Total: len(picks), Started: time.Now().UTC().Format(time.RFC3339), Results: map[string]*vexDraftResult{}, Failed: map[string]string{}}
-	vexBatchMu.Lock()
-	if cur := vexBatches[in.Project]; cur != nil && cur.State == "running" { // 경쟁 재확인
-		vexBatchMu.Unlock()
-		writeJSON(w, 409, map[string]string{"error": "이미 일괄 판정이 진행 중입니다"})
+	b, err := s.startVexBatch(in.Project, in.Repo, in.Tag, w.Header().Get("X-User"), "", in.Context, picks, nil)
+	if err != nil {
+		writeJSON(w, 409, map[string]string{"error": err.Error()})
 		return
 	}
-	vexBatches[in.Project] = b
-	vexBatchMu.Unlock()
-	go s.runVexBatch(b, picks, in.Context)
 	writeJSON(w, 202, map[string]any{"state": "running", "total": b.Total})
+}
+
+var errVexBatchRunning = errors.New("이미 일괄 판정이 진행 중입니다")
+
+// startVexBatch: 일괄 판정 시작(화면 요청·자동 초안 공용). trigger: "" 사람 요청, "auto" 새 취약점 통보 뒤 자동.
+// keep: 새 결과에 이어 붙일 이전 초안(자동 초안용, 사람 요청은 nil). 이미 진행 중이면 errVexBatchRunning. picks 는 비어 있지 않아야 한다.
+func (s *Server) startVexBatch(project, repo, tag, actor, trigger, context string, picks []dtFindingFull, keep map[string]*vexDraftResult) (*vexBatch, error) {
+	b := &vexBatch{Project: project, Repo: repo, Tag: tag, Actor: actor, Trigger: trigger, State: "running",
+		Total: len(picks), Started: time.Now().UTC().Format(time.RFC3339), Results: map[string]*vexDraftResult{}, Failed: map[string]string{}}
+	vexBatchMu.Lock()
+	if cur := vexBatches[project]; cur != nil && cur.State == "running" { // 경쟁 재확인
+		vexBatchMu.Unlock()
+		return nil, errVexBatchRunning
+	}
+	for k, v := range keep {
+		b.Results[k] = v
+	}
+	vexBatches[project] = b
+	vexBatchMu.Unlock()
+	go s.runVexBatch(b, picks, context)
+	return b, nil
 }
 
 func (s *Server) runVexBatch(b *vexBatch, picks []dtFindingFull, context string) {
@@ -630,6 +648,7 @@ func (s *Server) runVexBatch(b *vexBatch, picks []dtFindingFull, context string)
 		if err != nil {
 			b.Failed[key] = f.Vulnerability.VulnID + ": " + err.Error()
 		} else {
+			res.Auto = b.Trigger == "auto"
 			b.Results[key] = res
 		}
 		b.Done++

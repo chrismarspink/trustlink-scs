@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldQuestion, RefreshCw, ListChecks, Flame } from 'lucide-react';
+import { ShieldQuestion, RefreshCw, ListChecks } from 'lucide-react';
 import { AIBadge, AIIcon } from '@/components/AIBadge';
-import { vexQueue, aiVexBatchStart, aiStatus, type VexQueue as Q, type VexQueueRow, type AIStatus } from '@/lib/api';
+import { vexQueue, aiVexBatchStart, aiStatus, type VexQueue as Q, type VexQueueRow, type VexQueueRowAuto, type AIStatus } from '@/lib/api';
+import { SourceBadge } from '@/components/SourceBadge';
 import { Badge, Button, Card } from '@/components/ui/primitives';
 
 const fmt = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR') : '');
@@ -81,12 +82,11 @@ export default function VexQueue() {
           </thead>
           <tbody>
             {!q && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">집계 중… (제품 수에 따라 수십 초)</td></tr>}
-            {q?.rows.map((r) => {
+            {q?.rows.map((r: VexQueueRowAuto) => {
               const pct = r.total ? Math.round((r.analyzed / r.total) * 100) : 100;
               return (
                 <tr key={r.project} className="border-t align-middle hover:bg-secondary/30">
                   <td className="px-3 py-2 font-medium">
-                    {r.pendKev > 0 && <Flame size={13} className="mr-1 inline text-red-600" />}
                     {r.repo}:<span className="text-muted-foreground">{r.tag}</span>
                   </td>
                   <td className="px-3 py-2">
@@ -95,14 +95,17 @@ export default function VexQueue() {
                       <span className="text-xs tabular-nums text-muted-foreground">{r.analyzed}/{r.total}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2 tabular-nums">{r.pendKev ? <Badge variant="danger">{r.pendKev}</Badge> : '—'}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.pendKev ? <SourceBadge src="kev" label={`KEV ${r.pendKev}`} title="실제 악용(CISA KEV) 미판단 건수" /> : '—'}</td>
                   <td className="px-3 py-2 tabular-nums text-red-600">{r.pendCritical || '—'}</td>
                   <td className="px-3 py-2 tabular-nums text-orange-600">{r.pendHigh || '—'}</td>
                   <td className="px-3 py-2 tabular-nums">{r.pending || '—'}</td>
                   <td className="px-3 py-2 tabular-nums">{r.affected ? <Badge variant="warn">{r.affected}</Badge> : '—'}</td>
                   <td className="px-3 py-2 text-xs">
-                    {r.batchState === 'running' ? <AIBadge pulse label={`진행 ${r.batchDone}/${r.batchTotal}`} />
-                      : r.batchState ? <span className="text-muted-foreground" title={fmt(r.batchAt)}>초안 {r.batchDrafts ?? 0}건{r.batchState === 'cancelled' ? ' (중지)' : ''}</span> : '—'}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {r.batchState === 'running' ? <AIBadge pulse label={`진행 ${r.batchDone}/${r.batchTotal}`} />
+                        : r.batchState ? <span className="text-muted-foreground" title={fmt(r.batchAt)}>초안 {r.batchDrafts ?? 0}건{r.batchState === 'cancelled' ? ' (중지)' : ''}</span> : '—'}
+                      {!!r.batchAuto && <span title="새 취약점 통보 직후 KEV·치명 항목에 자동으로 만든 초안(확인·저장 대기)"><AIBadge label={`자동 초안 ${r.batchAuto}`} className="from-fuchsia-600 to-rose-500" /></span>}
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right">
                     {aiOn && r.pending > 0 && r.batchState !== 'running' && (

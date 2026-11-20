@@ -144,7 +144,7 @@ func (s *Server) aiSuggest(base mailSuggestion, users []mailUser, reps []mailRep
 	if d != nil {
 		pend := []string{}
 		for _, k := range []string{"critical", "high", "medium", "low"} {
-			pend = append(pend, k+" "+itoa(d.Security.Pending[k]))
+			pend = append(pend, k+" "+itoa(d.Security.Pending[strings.ToUpper(k)]))
 		}
 		facts = append(facts, aiFact{ID: "S1", Text: "판단 대기 취약점: " + strings.Join(pend, ", ") + "; 최근 새 취약점 " + itoa(len(d.Security.Recent)) + "건"})
 		facts = append(facts, aiFact{ID: "S2", Text: fmt.Sprintf("버전 %d개 중 SBOM %d · VEX %d 첨부", d.Quality.Versions, d.Quality.WithSBOM, d.Quality.WithVEX)})

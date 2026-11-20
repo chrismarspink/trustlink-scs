@@ -29,6 +29,7 @@ type vexQueueRow struct {
 	BatchTotal  int    `json:"batchTotal,omitempty"`
 	BatchDrafts int    `json:"batchDrafts,omitempty"` // 저장 대기 중인 AI 초안 수
 	BatchAt     string `json:"batchAt,omitempty"`
+	BatchAuto   int    `json:"batchAuto,omitempty"` // 그중 자동 초안(KEV·치명) 수
 }
 
 var vexQueueCache struct {
@@ -95,6 +96,13 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 		if b := vexBatchGet(uuid); b != nil {
 			row.BatchState, row.BatchDone, row.BatchTotal = b.State, b.Done, b.Total
 			row.BatchDrafts, row.BatchAt = len(b.Results), firstNonEmpty(b.Finished, b.Started)
+			vexBatchMu.Lock() // 진행 중인 일괄 판정이 Results 에 쓰는 중일 수 있다
+			for _, r := range b.Results {
+				if r != nil && r.Auto {
+					row.BatchAuto++
+				}
+			}
+			vexBatchMu.Unlock()
 		}
 		rows = append(rows, row)
 	}
