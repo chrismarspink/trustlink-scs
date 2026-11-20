@@ -479,14 +479,37 @@ func custMismatches(c Customer, est map[string]dlEst) []custMismatch {
 	return out
 }
 
+// estCache: 접근 로그는 수백 MB 라 매번 읽으면 목록이 수 초 걸린다 — 연결 그룹 구성이 같으면 5분간 재사용.
+var estCache struct {
+	sync.Mutex
+	key string
+	at  time.Time
+	v   map[string]map[string]dlEst
+}
+
 // estimatesFor: 고객사 그룹 구성원(Keycloak) + 접근 로그. 조회 실패 시 빈 결과(화면은 그대로 동작).
 func (s *Server) estimatesFor(cs []Customer) map[string]map[string]dlEst {
 	linked := map[string]bool{}
+	keys := []string{}
 	for _, c := range cs {
-		if c.OrgGroup != "" {
+		if c.OrgGroup != "" && !linked[c.OrgGroup] {
 			linked[c.OrgGroup] = true
+			keys = append(keys, c.OrgGroup)
 		}
 	}
+	sort.Strings(keys)
+	key := strings.Join(keys, ",")
+	estCache.Lock()
+	defer estCache.Unlock()
+	if estCache.key == key && estCache.v != nil && time.Since(estCache.at) < 5*time.Minute {
+		return estCache.v
+	}
+	v := s.estimatesUncached(linked)
+	estCache.key, estCache.at, estCache.v = key, time.Now(), v
+	return v
+}
+
+func (s *Server) estimatesUncached(linked map[string]bool) map[string]map[string]dlEst {
 	lp := s.cust().logPath
 	if len(linked) == 0 || lp == "" {
 		return nil

@@ -287,8 +287,8 @@ type custAIText struct {
 
 type CustNotice struct {
 	ID          string                 `json:"id"`
-	Kind        string                 `json:"kind"`   // patch | notaffected
-	Status      string                 `json:"status"` // draft | sent | partial | dropped | failed
+	Kind        string                 `json:"kind"`                // patch | notaffected
+	Status      string                 `json:"status"`              // draft | sent | partial | dropped | failed
 	AIState     string                 `json:"aiState,omitempty"`   // running | done — AI 설명은 뒤에서 만든다(로컬 LLM 은 수 분)
 	AIStarted   string                 `json:"aiStarted,omitempty"` // 진행 표시용
 	Created     string                 `json:"created"`
@@ -642,6 +642,25 @@ func guardCustAI(t *custAIText, facts []aiFact) error {
 	return nil
 }
 
+// fixCustFields: AI 가 칸을 엉뚱하게 채운 경우(너무 짧음·식별자 모양·한글판인데 한글 없음) 그 칸만 규칙 문구로 바꾼다.
+var identLike = regexp.MustCompile(`^[A-Za-z0-9_.\-]+$`)
+
+func fixCustFields(t, rule *custAIText, lang string) {
+	bad := func(v string) bool {
+		v = strings.TrimSpace(v)
+		return len([]rune(v)) < 12 || identLike.MatchString(v) || (lang != "en" && !hangulRe.MatchString(v))
+	}
+	for _, f := range []struct {
+		name     string
+		val, alt *string
+	}{{"요약", &t.Summary, &rule.Summary}, {"영향", &t.Impact, &rule.Impact}, {"조치", &t.Action, &rule.Action}} {
+		if bad(*f.val) {
+			t.Warnings = append(t.Warnings, f.name+" 칸은 AI 출력이 올바르지 않아 규칙 문구로 바꿈")
+			*f.val = *f.alt
+		}
+	}
+}
+
 // runNoticeAI: 대상 언어별로 AI 설명을 만든다. 실패·꺼짐이면 규칙 문구를 유지하고 사유를 남긴다.
 func (s *Server) runNoticeAI(n *CustNotice, actor string) {
 	defer aiInteractive()()
@@ -668,6 +687,7 @@ func (s *Server) runNoticeAI(n *CustNotice, actor string) {
 			n.AI[l].Warnings = []string{"AI 초안을 쓰지 않음: " + err.Error()}
 			continue
 		}
+		fixCustFields(&out, ruleText(n, l), l)
 		out.Source, out.Model = "ai", meta.Model
 		n.AI[l] = &out
 		b, _ := json.Marshal(out)
