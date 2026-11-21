@@ -4,6 +4,7 @@ import { Package, Search, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { searchRepos, type Repo } from '@/lib/api';
 import { Card, CardContent, Input, Badge } from '@/components/ui/primitives';
 import { fmtBytes } from '@/lib/utils';
+import { IntroCard } from '@/components/IntroCard';
 
 export default function Artifacts() {
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -22,6 +23,7 @@ export default function Artifacts() {
 
   return (
     <div>
+      <IntroCard />
       <h1 className="mb-1 text-2xl font-bold">아티팩트</h1>
       <p className="mb-5 text-sm text-muted-foreground">공급망 산출물(바이너리 + SBOM/VEX/서명) 레지스트리</p>
 
