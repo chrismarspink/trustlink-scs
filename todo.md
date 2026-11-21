@@ -7,6 +7,16 @@
 > TrustLink 는 이제 코어(레지스트리·SBOM·VEX·취약점·대시보드·RBAC)에 집중. CA/파일서명이 필요하면 별도 어플라이언스(bigfoot)로 분리 운영.
 > 아래 CA/CMS 관련 완료·backlog 항목은 **역사적 기록**(현재는 미해당).
 
+## 배포 대기 — v2.13.0 (2026-11-21)
+- [ ] **218 서버에 v2.13.0 배포**: 초기 화면 상단 제품 소개(막대 인형 장면, `trustlink-ui/public/intro.html` + `IntroCard.tsx`). 소스·태그는 GitHub 반영 완료, 서버만 미반영.
+  - 막힌 이유: 2026-11-21 집 회선에서 SSH 가 키 교환 단계에서 끊김(`Connection reset by peer`). 재시도가 겹쳐 접속 제한(fail2ban/ufw limit)에 걸린 것으로 추정.
+  - 출근 후: `cd deploy/zot-keycloak && sshpass -e bash scripts/deploy-remote.sh` **한 번만** 실행(실패해도 연달아 재시도하지 말 것).
+  - 그래도 끊기면 서버 콘솔에서 `sudo fail2ban-client status sshd` 로 차단 IP 확인 → `sudo fail2ban-client set sshd unbanip <IP>`.
+  - 확인: `https://trustlink.innotium.com/intro.html` 제목이 "TrustLink 소개", 초기 화면(아티팩트) 위에 "TrustLink 소개" 카드.
+  - 바뀐 것은 화면 파일뿐 — DB·계정 영향 없음.
+
+---
+
 ## (b) 인증/세션 통합 — BFF 인증 게이트웨이 [우선]
 **배경:** 현재 제품 페이지(zot 세션)와 관리 콘솔(BFF 세션 `tl_admin_sid`)이 **이중 세션**이다.
 → 이중 로그인, 로그인 콜백 버그("failed to get state"), 역할 기반 메뉴 노출이 제품 페이지에서 불완전(BFF 세션 없으면 그룹 판별 불가).
