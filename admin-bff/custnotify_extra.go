@@ -84,7 +84,7 @@ func (s *Server) custExpiryCheck() int {
 	d := c.snapshot()
 	now := c.now()
 	mails := 0
-	for _, cu := range d.Customers {
+	for _, cu := range activeCustomers(d.Customers) { // 중지된 회사는 만료 알림 없음
 		due := expiryDueItems(custExpiries(cu, d.Products, now), d.ExpirySent)
 		if len(due) == 0 {
 			continue
@@ -190,7 +190,7 @@ func (s *Server) apiCustomerExpiring(w http.ResponseWriter, r *http.Request) {
 		Sent []int `json:"sent"` // 이미 알린 임계값
 	}
 	out := []row{}
-	for _, cu := range d.Customers {
+	for _, cu := range activeCustomers(d.Customers) {
 		for _, e := range custExpiries(cu, d.Products, c.now()) {
 			if e.Days > days {
 				continue
@@ -264,6 +264,7 @@ type myNotice struct {
 
 type myCustomer struct {
 	Name    string     `json:"name"`
+	Logo    string     `json:"logo,omitempty"`
 	Usages  []myUsage  `json:"usages"`
 	Notices []myNotice `json:"notices"`
 }
@@ -276,11 +277,11 @@ func (s *Server) apiMyProducts(w http.ResponseWriter, r *http.Request) {
 	now := c.now()
 	out := []myCustomer{}
 	views := map[string]*dtRepoView{}
-	for _, cu := range d.Customers {
+	for _, cu := range activeCustomers(d.Customers) { // 중지(계약 해지 등)된 회사는 내 제품에서 빠짐
 		if cu.OrgGroup == "" || !contains(sess.Groups, cu.OrgGroup) {
 			continue
 		}
-		mc := myCustomer{Name: cu.Name, Usages: []myUsage{}, Notices: []myNotice{}}
+		mc := myCustomer{Name: cu.Name, Logo: cu.Logo, Usages: []myUsage{}, Notices: []myNotice{}}
 		for _, u := range cu.Usages {
 			v := views[u.Repo]
 			if v == nil {

@@ -742,7 +742,17 @@ export type CustUsage = {
 export type Customer = {
   id: string; name: string; industry: '공공' | '금융' | '일반' | '해외'; country?: string; lang: 'ko' | 'en'; orgGroup?: string;
   salesOwner?: string; supportOwner?: string; memo?: string; contacts: CustContact[]; usages: CustUsage[]; updated?: string; updatedBy?: string;
+  // 사용/중지(폐업·관계 종료·계약 해지)와 로고 — 전용 API 로만 바뀐다
+  disabled?: boolean; disabledReason?: CustDisableReason; disabledNote?: string; disabledAt?: string; disabledBy?: string; logo?: string;
 };
+export type CustDisableReason = 'closed' | 'ended' | 'terminated' | 'other';
+export const CUST_DISABLE_REASONS: Record<CustDisableReason, string> = { closed: '폐업', ended: '관계 종료', terminated: '계약 해지', other: '기타' };
+export const customerLogoUrl = (logo?: string) => (logo ? `/api/customer-logo/${logo}` : '');
+export const adminCustomerStatus = (id: string, enabled: boolean, reason?: CustDisableReason, note?: string) =>
+  aj<Customer>(`/api/customers/${encodeURIComponent(id)}/status`, jsonInit('PUT', { enabled, reason, note }));
+export const adminCustomerLogo = (id: string, file: Blob) =>
+  aj<Customer>(`/api/customers/${encodeURIComponent(id)}/logo`, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+export const adminCustomerLogoDelete = (id: string) => aj<Customer>(`/api/customers/${encodeURIComponent(id)}/logo`, { method: 'DELETE' });
 export type CustExpiry = { customerId: string; customer: string; usageId: string; repo: string; kind: 'license' | 'maint' | 'eos'; tag?: string; date: string; days: number };
 export type CustMismatch = { repo: string; estimated: string; at: string; user: string; installed: string[] };
 export type CustomerView = Customer & { expiry: CustExpiry[]; mismatch: CustMismatch[] };
@@ -795,7 +805,7 @@ export type MyVuln = { vulnId: string; severity: string; state: string; kev: boo
 export type MyInstall = { tag: string; env: string; qty: number; eos?: string; eosDays?: number; upgrade?: string; analyzed: boolean; vulns: MyVuln[] };
 export type MyUsage = { repo: string; licenseType?: string; licenseExpiry?: string; maintExpiry?: string; supportTier?: string; installs: MyInstall[] };
 export type MyNotice = { id: string; kind: string; repo: string; vulnId: string; severity: string; sentAt: string; subject: string; text: string; recommend?: string };
-export const myProducts = () => aj<{ customers: { name: string; usages: MyUsage[]; notices: MyNotice[] }[]; user: string }>('/api/my/products');
+export const myProducts = () => aj<{ customers: { name: string; logo?: string; usages: MyUsage[]; notices: MyNotice[] }[]; user: string }>('/api/my/products');
 
 // ---------- AI 성능·자원 (대시보드 › AI 탭) ----------
 export type AIPerfCall = {

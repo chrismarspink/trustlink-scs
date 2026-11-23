@@ -275,6 +275,10 @@ func main() {
 	mux.HandleFunc("POST /api/customers", s.guard(s.apiCustomerSave))
 	mux.HandleFunc("PUT /api/customers/{id}", s.guard(s.apiCustomerSave))
 	mux.HandleFunc("DELETE /api/customers/{id}", s.guard(s.apiCustomerDelete))
+	mux.HandleFunc("PUT /api/customers/{id}/status", s.guard(s.apiCustomerStatus)) // 사용/중지(폐업·관계 종료·계약 해지)
+	mux.HandleFunc("PUT /api/customers/{id}/logo", s.guard(s.apiCustomerLogoPut))  // 회사 로고(서버 데이터에만)
+	mux.HandleFunc("DELETE /api/customers/{id}/logo", s.guard(s.apiCustomerLogoDelete))
+	mux.HandleFunc("GET /api/customer-logo/{file}", s.guardSession(s.apiCustomerLogoGet))
 	mux.HandleFunc("PUT /api/customer-products", s.guard(s.apiCustomerProductPut)) // 제품 버전 정책(출시·EOS·권장 업그레이드)
 	mux.HandleFunc("PUT /api/customer-settings", s.guard(s.apiCustomerSettings))
 	mux.HandleFunc("GET /api/customer-expiring", s.guard(s.apiCustomerExpiring)) // 만료·EOS 예정

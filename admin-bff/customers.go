@@ -81,6 +81,14 @@ type Customer struct {
 	Usages       []CustUsage   `json:"usages"`
 	Updated      string        `json:"updated,omitempty"`
 	UpdatedBy    string        `json:"updatedBy,omitempty"`
+	// 사용/중지: 폐업·관계 종료·계약 해지 등으로 더는 거래하지 않는 회사. 지우지 않고 중지해 기록을 남긴다.
+	// 중지된 회사는 고객 통지·만료 알림·내 제품에서 빠지고, 목록에서 기본으로 숨는다. (PUT /api/customers/{id}/status 로만 바꾼다)
+	Disabled       bool   `json:"disabled,omitempty"`
+	DisabledReason string `json:"disabledReason,omitempty"` // closed(폐업) / ended(관계 종료) / terminated(계약 해지) / other
+	DisabledNote   string `json:"disabledNote,omitempty"`
+	DisabledAt     string `json:"disabledAt,omitempty"`
+	DisabledBy     string `json:"disabledBy,omitempty"`
+	Logo           string `json:"logo,omitempty"` // 서버 데이터의 로고 파일 이름(+?v=) — PUT /api/customers/{id}/logo 로만 바꾼다
 }
 
 // VerPolicy: 제품 버전 정책 한 줄.
@@ -594,8 +602,11 @@ func (s *Server) apiCustomerSave(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 404, map[string]string{"error": "고객 없음"})
 		return
 	case idx >= 0:
+		old := c.d.Customers[idx] // 상태·로고는 전용 API 로만 바뀐다(편집 화면 저장이 지우지 않게)
+		in.Disabled, in.DisabledReason, in.DisabledNote, in.DisabledAt, in.DisabledBy, in.Logo = old.Disabled, old.DisabledReason, old.DisabledNote, old.DisabledAt, old.DisabledBy, old.Logo
 		c.d.Customers[idx] = in
 	default:
+		in.Disabled, in.DisabledReason, in.DisabledNote, in.DisabledAt, in.DisabledBy, in.Logo = false, "", "", "", "", ""
 		c.d.Customers = append(c.d.Customers, in)
 	}
 	err := c.saveLocked()

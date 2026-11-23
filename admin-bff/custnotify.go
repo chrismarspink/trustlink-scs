@@ -366,7 +366,7 @@ func (s *Server) buildNotice(kind, repo, vulnID, actor string) (*CustNotice, err
 	}
 	var hits []hit
 	minTag := ""
-	for _, cu := range d.Customers {
+	for _, cu := range activeCustomers(d.Customers) { // 중지된 회사는 통지 대상 아님
 		for _, u := range cu.Usages {
 			if u.Repo != repo {
 				continue
@@ -891,7 +891,7 @@ func (s *Server) apiCustNotifyVulns(w http.ResponseWriter, r *http.Request) {
 	d := s.cust().snapshot()
 	byKey := map[string]*custVulnCand{}
 	views := map[string]*dtRepoView{}
-	for _, c := range d.Customers {
+	for _, c := range activeCustomers(d.Customers) {
 		for _, u := range c.Usages {
 			v := views[u.Repo]
 			if v == nil {

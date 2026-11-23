@@ -3,13 +3,15 @@ import { Busy } from '@/components/Progress';
 import { Building2, Plus, Trash2, Pencil, Users, Package, CalendarClock, AlertTriangle, Mail, Phone, RefreshCw, Save, X } from 'lucide-react';
 import {
   adminCustomers, adminCustomerSave, adminCustomerDelete, adminCustomerProduct, adminCustomerSettings, adminCustomerExpiring, adminCustomerExpiryCheck,
-  adminOrgs, adminUsers, searchRepos,
+  adminOrgs, adminUsers, searchRepos, adminCustomerStatus, adminCustomerLogo, adminCustomerLogoDelete, CUST_DISABLE_REASONS,
+  type CustDisableReason,
   type Customer, type CustomerView, type CustContact, type CustUsage, type CustExpiry, type VerPolicy, type CustSettings, type ExpiryRec, type CustNotifyKind
 } from '@/lib/api';
 import { Button, Input, Badge, Card, CardContent, Label } from '@/components/ui/primitives';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from '@/components/ui/sheet';
 import { PageHeader, SectionTitle, Loading, Alert, Table, Th, Td, selectCls } from './_ui';
 import { cn } from '@/lib/utils';
+import { CompanyLogo } from '@/components/CompanyLogo';
 
 // 관리 › 고객 등록부: 고객(CRM 카드) — 담당자 · 제품 사용(설치 버전·계약·유지보수·통지 정책) · 우리 쪽 담당.
 // 만료 D-day 와 "다운로드 기록 추정 버전 ≠ 등록 버전(확인 필요)"을 한눈에 보여 준다. 고객사 그룹(Keycloak)은 이름으로만 연결.
@@ -47,10 +49,12 @@ export default function Customers() {
   const [sel, setSel] = useState('');
   const [form, setForm] = useState<{ c: Customer; isNew: boolean } | null>(null);
   const [q, setQ] = useState('');
+  const [showOff, setShowOff] = useState(false); // 중지된 회사도 보기
   const load = () => adminCustomers().then((d) => { setData(d); setErr(''); }).catch((e) => setErr(String(e)));
   useEffect(() => { load(); }, []);
 
-  const list = useMemo(() => (data?.customers || []).filter((c) => !q || (c.name + c.id + c.orgGroup + c.usages.map((u) => u.repo).join(' ')).toLowerCase().includes(q.toLowerCase())), [data, q]);
+  const offCount = (data?.customers || []).filter((c) => c.disabled).length;
+  const list = useMemo(() => (data?.customers || []).filter((c) => (showOff || !c.disabled)).filter((c) => !q || (c.name + c.id + c.orgGroup + c.usages.map((u) => u.repo).join(' ')).toLowerCase().includes(q.toLowerCase())), [data, q, showOff]);
   const cur = data?.customers.find((c) => c.id === sel);
 
   const del = async (c: Customer) => {
@@ -75,18 +79,31 @@ export default function Customers() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <div>
-            <Input className="mb-2" placeholder="고객·제품·그룹 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="mb-2 flex items-center gap-2">
+              <Input placeholder="고객·제품·그룹 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+              {offCount > 0 && (
+                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" title="폐업·관계 종료·계약 해지로 중지한 회사">
+                  <input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />중지된 회사 {offCount}곳 보기
+                </label>
+              )}
+            </div>
             <Table>
               <thead><tr><Th>고객</Th><Th>제품</Th><Th>만료·확인</Th></tr></thead>
               <tbody>
                 {list.length === 0 ? <tr><Td colSpan={3} className="text-center text-muted-foreground">등록된 고객이 없습니다.</Td></tr> : list.map((c) => {
                   const soon = c.expiry.filter((e) => e.days <= 90).slice(0, 2);
                   return (
-                    <tr key={c.id} onClick={() => setSel(c.id)} className={cn('cursor-pointer hover:bg-secondary/60', sel === c.id && 'bg-secondary')}>
+                    <tr key={c.id} onClick={() => setSel(c.id)} className={cn('cursor-pointer hover:bg-secondary/60', sel === c.id && 'bg-secondary', c.disabled && 'text-muted-foreground')}>
                       <Td>
-                        <div className="font-medium">{c.name}</div>
-                        <div className="mt-0.5 flex flex-wrap gap-1 text-xs text-muted-foreground">
-                          <Badge variant="muted">{c.industry}</Badge>{c.lang === 'en' && <Badge variant="outline">EN</Badge>}{c.orgGroup && <span>{c.orgGroup}</span>}
+                        <div className="flex items-center gap-2.5">
+                          <CompanyLogo logo={c.logo} disabled={c.disabled} size={30} />
+                          <div className="min-w-0">
+                            <div className="font-medium">{c.name}</div>
+                            <div className="mt-0.5 flex flex-wrap gap-1 text-xs text-muted-foreground">
+                              {c.disabled && <Badge variant="outline">중지 · {CUST_DISABLE_REASONS[c.disabledReason || 'other']}</Badge>}
+                              <Badge variant="muted">{c.industry}</Badge>{c.lang === 'en' && <Badge variant="outline">EN</Badge>}{c.orgGroup && <span>{c.orgGroup}</span>}
+                            </div>
+                          </div>
                         </div>
                       </Td>
                       <Td className="text-xs">{c.usages.map((u) => base(u.repo)).join(', ') || '—'}</Td>
@@ -103,7 +120,7 @@ export default function Customers() {
               </tbody>
             </Table>
           </div>
-          <div>{cur ? <CustomerCard c={cur} products={data.products} onEdit={() => setForm({ c: structuredClone(cur), isNew: false })} onDelete={() => del(cur)} />
+          <div>{cur ? <CustomerCard c={cur} products={data.products} onEdit={() => setForm({ c: structuredClone(cur), isNew: false })} onDelete={() => del(cur)} onChanged={load} />
             : <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">왼쪽에서 고객을 고르세요.</CardContent></Card>}</div>
         </div>
       )}
@@ -118,13 +135,61 @@ function Field({ k, v }: { k: string; v?: ReactNode }) {
   return <div className="flex gap-2 text-sm"><span className="w-24 shrink-0 text-muted-foreground">{k}</span><span className="min-w-0 break-words">{v || '—'}</span></div>;
 }
 
-function CustomerCard({ c, products, onEdit, onDelete }: { c: CustomerView; products: Record<string, VerPolicy[]>; onEdit: () => void; onDelete: () => void }) {
+// 회사 사용/중지 + 로고
+function StatusLogo({ c, onChanged }: { c: CustomerView; onChanged: () => void }) {
+  const [off, setOff] = useState(false); // 중지 입력 열림
+  const [reason, setReason] = useState<CustDisableReason>('terminated');
+  const [note, setNote] = useState('');
+  const [err, setErr] = useState('');
+  const run = async (f: () => Promise<unknown>) => { setErr(''); try { await f(); setOff(false); onChanged(); } catch (e) { setErr(String(e)); } };
+  return (
+    <div className="space-y-2">
+      {c.disabled ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-300 bg-slate-50 p-3 text-sm">
+          <span className="font-medium">중지됨 · {CUST_DISABLE_REASONS[c.disabledReason || 'other']}</span>
+          <span className="text-xs text-muted-foreground">{fmt(c.disabledAt)} · {c.disabledBy}{c.disabledNote ? ` · ${c.disabledNote}` : ''}</span>
+          <span className="flex-1" />
+          <Button size="sm" variant="outline" onClick={() => run(() => adminCustomerStatus(c.id, true))}>다시 사용</Button>
+          <p className="w-full text-xs text-muted-foreground">고객 통지·만료 알림·고객 전용 "내 제품" 화면에서 빠졌습니다. 소속 계정과 제품 권한은 그대로이니 필요하면 계정 및 권한에서 따로 정리하세요.</p>
+        </div>
+      ) : off ? (
+        <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+          <div className="font-medium">이 회사를 중지합니다 — 지우지 않고 기록은 남깁니다</div>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(CUST_DISABLE_REASONS) as CustDisableReason[]).map((k) => (
+              <label key={k} className="flex items-center gap-1"><input type="radio" checked={reason === k} onChange={() => setReason(k)} />{CUST_DISABLE_REASONS[k]}</label>
+            ))}
+          </div>
+          <Input placeholder="메모(선택) — 예: 2026-11 계약 해지 통보" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => run(() => adminCustomerStatus(c.id, false, reason, note))}>중지</Button>
+            <Button size="sm" variant="ghost" onClick={() => setOff(false)}>취소</Button>
+          </div>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="cursor-pointer rounded-md border px-2 py-1 hover:bg-secondary">
+          로고 {c.logo ? '바꾸기' : '올리기'}
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) run(() => adminCustomerLogo(c.id, f)); e.target.value = ''; }} />
+        </label>
+        {c.logo && <button className="rounded-md border px-2 py-1 hover:bg-secondary" onClick={() => run(() => adminCustomerLogoDelete(c.id))}>로고 지우기</button>}
+        <span className="text-muted-foreground">PNG·JPEG·WebP·GIF, 512KB 이하 · 서버에만 저장</span>
+        <span className="flex-1" />
+        {!c.disabled && !off && <Button size="sm" variant="ghost" onClick={() => setOff(true)} title="폐업·관계 종료·계약 해지">사용 중지…</Button>}
+      </div>
+      {err && <Alert tone="crit">{err}</Alert>}
+    </div>
+  );
+}
+
+function CustomerCard({ c, products, onEdit, onDelete, onChanged }: { c: CustomerView; products: Record<string, VerPolicy[]>; onEdit: () => void; onDelete: () => void; onChanged: () => void }) {
   return (
     <Card>
       <CardContent className="space-y-5 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary"><Building2 size={20} /></span>
+            <CompanyLogo logo={c.logo} disabled={c.disabled} size={44} />
             <div>
               <div className="text-lg font-semibold">{c.name}</div>
               <div className="flex flex-wrap gap-1 text-xs text-muted-foreground"><Badge variant="muted">{c.industry}</Badge>{c.country && <span>{c.country}</span>}<span>· {c.lang === 'en' ? '영어' : '한국어'} 통지</span><span>· ID {c.id}</span></div>
@@ -135,6 +200,7 @@ function CustomerCard({ c, products, onEdit, onDelete }: { c: CustomerView; prod
             <Button size="sm" variant="ghost" onClick={onDelete} title="삭제"><Trash2 size={13} /></Button>
           </div>
         </div>
+        <StatusLogo c={c} onChanged={onChanged} />
         <div className="grid gap-1 sm:grid-cols-2">
           <Field k="고객사 그룹" v={c.orgGroup ? <span>{c.orgGroup} <span className="text-xs text-muted-foreground">(고객 전용 화면 범위)</span></span> : '연결 안 됨'} />
           <Field k="영업 담당" v={c.salesOwner} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Building2, Plus, Trash2, X, Mail } from 'lucide-react';
-import { adminOrgs, adminCreateOrg, adminDeleteOrg, adminSetOrgContacts, type Org } from '@/lib/api';
+import { Plus, Trash2, X, Mail } from 'lucide-react';
+import { adminOrgs, adminCreateOrg, adminDeleteOrg, adminSetOrgContacts, adminCustomers, CUST_DISABLE_REASONS, type Org, type Customer } from '@/lib/api';
+import { CompanyLogo } from '@/components/CompanyLogo';
 import { Button, Input, Badge } from '@/components/ui/primitives';
 import { PageTitle, SectionTitle, Loading, Alert, Table, Th, Td } from './_ui';
 
@@ -37,11 +38,15 @@ export default function Orgs() {
   const [orgs, setOrgs] = useState<Org[] | null>(null);
   const [err, setErr] = useState('');
   const [name, setName] = useState('');
+  const [custOf, setCustOf] = useState<Record<string, Customer>>({}); // org-* → 고객 등록부(이름·로고·사용/중지)
+  const [showOff, setShowOff] = useState(false);
 
   async function load() {
     setErr('');
     try {
-      setOrgs((await adminOrgs()).sort((a, b) => a.name.localeCompare(b.name)));
+      const [os, cs] = await Promise.all([adminOrgs(), adminCustomers().catch(() => ({ customers: [] as Customer[] }))]);
+      setCustOf(Object.fromEntries(cs.customers.filter((c) => c.orgGroup).map((c) => [c.orgGroup!, c])));
+      setOrgs(os.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {
       setErr(String(e));
     }
@@ -75,6 +80,8 @@ export default function Orgs() {
 
   if (err) return (<><PageTitle>고객사</PageTitle><Alert tone="crit">오류: {err}</Alert></>);
   if (!orgs) return (<><PageTitle>고객사</PageTitle><Loading /></>);
+  const offN = orgs.filter((o) => custOf[o.group]?.disabled).length;
+  const shown = orgs.filter((o) => showOff || !custOf[o.group]?.disabled);
 
   return (
     <>
@@ -95,17 +102,33 @@ export default function Orgs() {
         </span>
       </div>
 
+      {offN > 0 && (
+        <label className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />중지된 회사(폐업·관계 종료·계약 해지) {offN}곳 보기
+        </label>
+      )}
       <Table>
         <thead>
           <tr><Th>고객사</Th><Th>소속 사용자</Th><Th>보안 통보 주소</Th><Th>다운로드 가능 제품</Th><Th>관리</Th></tr>
         </thead>
         <tbody>
-          {orgs.map((o) => (
-            <tr key={o.name}>
+          {shown.map((o) => {
+            const cu = custOf[o.group];
+            return (
+            <tr key={o.name} className={cu?.disabled ? 'text-muted-foreground' : ''}>
               <Td>
                 <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Building2 size={16} /></span>
-                  <span className="font-medium">{o.name}</span>
+                  <CompanyLogo logo={cu?.logo} disabled={cu?.disabled} size={34} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{cu?.name || o.name}</div>
+                    <div className="text-xs text-muted-foreground">ID {o.name}{!cu && ' · 고객 등록부에 연결 안 됨'}</div>
+                    {cu?.disabled && (
+                      <div className="mt-0.5 text-xs">
+                        <span className="rounded bg-slate-200 px-1.5 py-px text-slate-700">중지 · {CUST_DISABLE_REASONS[cu.disabledReason || 'other']}</span>
+                        {(o.products.length > 0 || o.members.length > 0) && <div className="mt-0.5 text-amber-700">계정 {o.members.length}명·제품 권한 {o.products.length}개가 남아 있음</div>}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Td>
               <Td>
@@ -135,7 +158,8 @@ export default function Orgs() {
               </Td>
               <Td><Button size="sm" variant="outline" onClick={() => remove(o)} title="삭제"><Trash2 size={14} /></Button></Td>
             </tr>
-          ))}
+            );
+          })}
           {orgs.length === 0 && <tr><Td className="text-muted-foreground">고객사 없음</Td><Td> </Td><Td> </Td><Td> </Td><Td> </Td></tr>}
         </tbody>
       </Table>

@@ -1,3 +1,4 @@
+import { CompanyLogo } from '@/components/CompanyLogo';
 import { useEffect, useState } from 'react';
 import { Package, ShieldCheck, ShieldAlert, CalendarClock, Mail, ArrowUpCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { myProducts, type MyInstall, type MyNotice, type MyUsage } from '@/lib/api';
@@ -124,7 +125,7 @@ export default function MyProducts() {
         <p className="text-muted-foreground">이 계정에 연결된 고객 정보가 없습니다. 담당 영업·지원 담당에게 문의해 주십시오.</p>
       ) : d.customers.map((c) => (
         <section key={c.name} className="mb-8 space-y-3">
-          {d.customers.length > 1 && <h2 className="text-lg font-semibold">{c.name}</h2>}
+          <h2 className="flex items-center gap-2.5 text-lg font-semibold"><CompanyLogo logo={c.logo} size={36} />{c.name}</h2>
           {c.usages.map((u) => <Usage key={u.repo} u={u} />)}
           <h3 className="pt-2 text-sm font-semibold">최근 보안 통지</h3>
           {c.notices.length === 0 ? <p className="text-sm text-muted-foreground">받은 통지가 없습니다.</p> : <div className="space-y-2">{c.notices.map((n) => <Notice key={n.id} n={n} />)}</div>}

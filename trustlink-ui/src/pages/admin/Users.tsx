@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { UserPlus, Search, ChevronLeft, ChevronRight, KeyRound, MoreHorizontal, Pencil, Ban, CircleCheck, Trash2, Check } from 'lucide-react';
 import {
   adminUsers, adminOrgs, adminCreateUser, adminUpdateUser, adminDeleteUser, adminResetPassword, adminCICredential,
-  ROLES, ORG_PREFIX, type AdminUser
+  ROLES, ORG_PREFIX, type AdminUser, adminCustomers, type Customer
 } from '@/lib/api';
-import { Button, Input, Badge, Label, StatusDot } from '@/components/ui/primitives';
+import { Button, Input, Label, StatusDot } from '@/components/ui/primitives';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from '@/components/ui/sheet';
 import { PageHeader, PageTitle, Loading, Alert, Table, Th, Td, selectCls } from './_ui';
+import { CompanyLogo } from '@/components/CompanyLogo';
+import { cn } from '@/lib/utils';
 import CredentialDialog, { type CredentialInfo } from './CredentialDialog';
 
 const PER_PAGE = 10;
@@ -64,10 +66,16 @@ export default function Users() {
   // 자격 전달 창(발급 직후 1회 표시)
   const [cred, setCred] = useState<CredentialInfo | null>(null);
 
+  const [custOf, setCustOf] = useState<Record<string, Customer>>({}); // 고객사 ID → 고객 등록부(이름·로고·사용/중지)
+  const [showOff, setShowOff] = useState(false);
+  // 소속 고객사가 모두 중지(폐업·계약 해지 등)된 외부 사용자
+  const offUser = (u: AdminUser) => { const os = orgsOf(u); return os.length > 0 && os.every((o) => custOf[o]?.disabled); };
+
   async function load() {
     setErr('');
     try {
-      const [us, os] = await Promise.all([adminUsers(), adminOrgs()]);
+      const [us, os, cs] = await Promise.all([adminUsers(), adminOrgs(), adminCustomers().catch(() => ({ customers: [] as Customer[] }))]);
+      setCustOf(Object.fromEntries(cs.customers.filter((c) => c.orgGroup).map((c) => [c.orgGroup!.slice(ORG_PREFIX.length), c])));
       setUsers(us);
       setOrgs(os.map((o) => o.name).sort());
     } catch (e) {
@@ -81,9 +89,10 @@ export default function Users() {
     return (users || [])
       .slice()
       .sort((a, b) => a.username.localeCompare(b.username))
+      .filter((u) => showOff || !offUser(u))
       .filter((u) => !roleFilter || roleOf(u) === roleFilter)
       .filter((u) => !k || u.username.toLowerCase().includes(k) || (u.email || '').toLowerCase().includes(k) || (u.groups || []).some((g) => g.toLowerCase().includes(k)));
-  }, [users, q, roleFilter]);
+  }, [users, q, roleFilter, showOff, custOf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const cur = Math.min(page, totalPages - 1);
@@ -185,6 +194,11 @@ export default function Users() {
           <option value="">모든 역할</option>
           {ROLES.map((r) => <option key={r} value={r}>{ROLE_META[r].label}</option>)}
         </select>
+        {(users || []).some(offUser) && (
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title="소속 고객사가 모두 중지(폐업·관계 종료·계약 해지)된 사용자">
+            <input type="checkbox" checked={showOff} onChange={(e) => { setShowOff(e.target.checked); setPage(0); }} />중지된 회사 사용자 {(users || []).filter(offUser).length}명 보기
+          </label>
+        )}
         <span className="ml-auto text-sm text-muted-foreground">{filtered.length}명</span>
       </div>
 
@@ -218,7 +232,14 @@ export default function Users() {
                 </Td>
                 <Td>
                   {os.length > 0
-                    ? <div className="flex flex-wrap gap-1">{os.map((o) => <Badge key={o} variant="outline">{o}</Badge>)}</div>
+                    ? <div className="flex flex-wrap gap-1.5">{os.map((o) => {
+                      const cu = custOf[o];
+                      return (
+                        <span key={o} className={cn('inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs', cu?.disabled && 'text-muted-foreground line-through decoration-slate-400')} title={`고객사 ID ${o}${cu?.disabled ? ' · 중지된 회사' : ''}`}>
+                          <CompanyLogo logo={cu?.logo} disabled={cu?.disabled} size={18} className="rounded border-0" />{cu?.name || o}
+                        </span>
+                      );
+                    })}</div>
                     : role === 'users'
                       ? <span className="text-xs text-amber-600" title="고객사가 없으면 아무 제품도 볼 수 없습니다">미지정</span>
                       : <span className="text-zinc-300">—</span>}
