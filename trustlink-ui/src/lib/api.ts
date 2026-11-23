@@ -744,6 +744,7 @@ export type Customer = {
   salesOwner?: string; supportOwner?: string; memo?: string; contacts: CustContact[]; usages: CustUsage[]; updated?: string; updatedBy?: string;
   // 사용/중지(폐업·관계 종료·계약 해지)와 로고 — 전용 API 로만 바뀐다
   disabled?: boolean; disabledReason?: CustDisableReason; disabledNote?: string; disabledAt?: string; disabledBy?: string; logo?: string;
+  deleted?: boolean; deletedAt?: string; deletedBy?: string; // 휴지통
 };
 export type CustDisableReason = 'closed' | 'ended' | 'terminated' | 'other';
 export const CUST_DISABLE_REASONS: Record<CustDisableReason, string> = { closed: '폐업', ended: '관계 종료', terminated: '계약 해지', other: '기타' };
@@ -752,6 +753,10 @@ export const adminCustomerStatus = (id: string, enabled: boolean, reason?: CustD
   aj<Customer>(`/api/customers/${encodeURIComponent(id)}/status`, jsonInit('PUT', { enabled, reason, note }));
 export const adminCustomerLogo = (id: string, file: Blob) =>
   aj<Customer>(`/api/customers/${encodeURIComponent(id)}/logo`, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+export const adminCustomerUndelete = (id: string) => aj<Customer>(`/api/customers/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+export const adminCustomerPurge = (id: string, confirm: string) => aj<{ purged: string }>(`/api/customers/${encodeURIComponent(id)}/purge`, jsonInit('DELETE', { confirm }));
+export const adminCustomersRestore = (file: Blob) =>
+  aj<{ customers: number; logos: number; previousCopy: string }>('/api/customers-restore', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: file });
 export const adminCustomerLogoDelete = (id: string) => aj<Customer>(`/api/customers/${encodeURIComponent(id)}/logo`, { method: 'DELETE' });
 export type CustExpiry = { customerId: string; customer: string; usageId: string; repo: string; kind: 'license' | 'maint' | 'eos'; tag?: string; date: string; days: number };
 export type CustMismatch = { repo: string; estimated: string; at: string; user: string; installed: string[] };

@@ -20,11 +20,11 @@ import (
 
 var custDisableReasons = map[string]string{"closed": "폐업", "ended": "관계 종료", "terminated": "계약 해지", "other": "기타"}
 
-// activeCustomers: 사용 중인 회사만.
+// activeCustomers: 사용 중인 회사만(중지·휴지통 제외).
 func activeCustomers(cs []Customer) []Customer {
 	out := make([]Customer, 0, len(cs))
 	for _, c := range cs {
-		if !c.Disabled {
+		if !c.Disabled && !c.Deleted {
 			out = append(out, c)
 		}
 	}

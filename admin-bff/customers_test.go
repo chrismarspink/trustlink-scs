@@ -156,8 +156,8 @@ func TestCustomerCRUD(t *testing.T) {
 	req = httptest.NewRequest("DELETE", "/api/customers/delta", nil)
 	req.SetPathValue("id", "delta")
 	s.apiCustomerDelete(w, req)
-	if _, ok := s.cust().find("delta"); w.Code != 200 || ok {
-		t.Fatal("삭제")
+	if x, ok := s.cust().find("delta"); w.Code != 200 || !ok || !x.Deleted {
+		t.Fatal("삭제는 휴지통으로(표시만)")
 	}
 	evs, _ := s.sor.list()
 	acts := []string{}

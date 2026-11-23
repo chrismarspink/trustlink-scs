@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Busy } from '@/components/Progress';
+import { Busy, DownloadLink } from '@/components/Progress';
 import { Building2, Plus, Trash2, Pencil, Users, Package, CalendarClock, AlertTriangle, Mail, Phone, RefreshCw, Save, X } from 'lucide-react';
 import {
   adminCustomers, adminCustomerSave, adminCustomerDelete, adminCustomerProduct, adminCustomerSettings, adminCustomerExpiring, adminCustomerExpiryCheck,
-  adminOrgs, adminUsers, searchRepos, adminCustomerStatus, adminCustomerLogo, adminCustomerLogoDelete, CUST_DISABLE_REASONS,
+  adminOrgs, adminUsers, searchRepos, adminCustomerStatus, adminCustomerLogo, adminCustomerLogoDelete, CUST_DISABLE_REASONS, adminCustomerUndelete, adminCustomerPurge, adminCustomersRestore,
   type CustDisableReason,
   type Customer, type CustomerView, type CustContact, type CustUsage, type CustExpiry, type VerPolicy, type CustSettings, type ExpiryRec, type CustNotifyKind
 } from '@/lib/api';
@@ -45,7 +45,7 @@ const emptyCustomer = (): Customer => ({ id: '', name: '', industry: '일반', l
 export default function Customers() {
   const [data, setData] = useState<{ customers: CustomerView[]; products: Record<string, VerPolicy[]>; settings: CustSettings } | null>(null);
   const [err, setErr] = useState('');
-  const [tab, setTab] = useState<'list' | 'expiring' | 'versions'>('list');
+  const [tab, setTab] = useState<'list' | 'expiring' | 'versions' | 'trash'>('list');
   const [sel, setSel] = useState('');
   const [form, setForm] = useState<{ c: Customer; isNew: boolean } | null>(null);
   const [q, setQ] = useState('');
@@ -53,28 +53,43 @@ export default function Customers() {
   const load = () => adminCustomers().then((d) => { setData(d); setErr(''); }).catch((e) => setErr(String(e)));
   useEffect(() => { load(); }, []);
 
-  const offCount = (data?.customers || []).filter((c) => c.disabled).length;
-  const list = useMemo(() => (data?.customers || []).filter((c) => (showOff || !c.disabled)).filter((c) => !q || (c.name + c.id + c.orgGroup + c.usages.map((u) => u.repo).join(' ')).toLowerCase().includes(q.toLowerCase())), [data, q, showOff]);
+  const offCount = (data?.customers || []).filter((c) => c.disabled && !c.deleted).length;
+  const trash = (data?.customers || []).filter((c) => c.deleted);
+  const list = useMemo(() => (data?.customers || []).filter((c) => !c.deleted && (showOff || !c.disabled)).filter((c) => !q || (c.name + c.id + c.orgGroup + c.usages.map((u) => u.repo).join(' ')).toLowerCase().includes(q.toLowerCase())), [data, q, showOff]);
   const cur = data?.customers.find((c) => c.id === sel);
 
+  const restore = async (f: File) => {
+    let j: { customers?: unknown[]; exportedAt?: string };
+    try { j = JSON.parse(await f.text()); } catch { alert('백업 파일을 읽을 수 없습니다'); return; }
+    const n = String(j.customers?.length ?? '?'), at = j.exportedAt || '';
+    if (!confirm(`백업(${at ? new Date(at).toLocaleString('ko-KR') : '시각 모름'}, 고객 ${n}곳)으로 고객 정보를 바꿀까요?\n\n지금 고객 목록·버전 정책·설정이 백업 내용으로 바뀝니다(통지 이력은 그대로).\n지금 상태는 서버에 따로 저장해 두므로 필요하면 되돌릴 수 있습니다.`)) return;
+    try { const r = await adminCustomersRestore(f); alert(`복원했습니다 — 고객 ${r.customers}곳, 로고 ${r.logos}개.\n이전 상태 사본: ${r.previousCopy}`); setSel(''); load(); } catch (e) { alert('복원 실패: ' + e); }
+  };
   const del = async (c: Customer) => {
-    if (!confirm(`${c.name} 고객을 삭제할까요? (통지 이력은 남습니다)`)) return;
+    if (!confirm(`${c.name} 고객을 삭제할까요?\n\n휴지통(삭제된 고객 탭)으로 옮겨지며 언제든 되살릴 수 있습니다.\n삭제된 동안에는 고객 통지·만료 알림·내 제품에서 빠집니다.`)) return;
     try { await adminCustomerDelete(c.id); setSel(''); load(); } catch (e) { alert('삭제 실패: ' + e); }
   };
 
   return (
     <>
       <PageHeader title="고객 등록부" description="고객별 담당자·설치 버전·계약·유지보수·통지 정책. 패치 권고는 이 등록부를 기준으로 영향 고객을 찾습니다."
-        actions={<Button onClick={() => setForm({ c: emptyCustomer(), isNew: true })}><Plus size={14} />고객 추가</Button>} />
+        actions={<div className="flex flex-wrap gap-2">
+          <DownloadLink href="/api/customers-backup" className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm hover:bg-secondary" title="고객(휴지통 포함)·버전 정책·설정·로고를 JSON 파일 하나로">백업 받기</DownloadLink>
+          <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border px-3 text-sm hover:bg-secondary" title="백업 파일로 고객 정보를 되돌립니다">
+            복원…
+            <input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) restore(f); }} />
+          </label>
+          <Button onClick={() => setForm({ c: emptyCustomer(), isNew: true })}><Plus size={14} />고객 추가</Button>
+        </div>} />
       {err && <Alert tone="crit">오류: {err}</Alert>}
       <div className="mb-4 flex gap-1 border-b">
-        {([['list', '고객 목록', Building2], ['expiring', '만료 예정', CalendarClock], ['versions', '제품 버전 정책', Package]] as const).map(([k, l, I]) => (
-          <button key={k} onClick={() => setTab(k)} className={cn('-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm', tab === k ? 'border-primary font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+        {([['list', '고객 목록', Building2], ['expiring', '만료 예정', CalendarClock], ['versions', '제품 버전 정책', Package], ['trash', `삭제된 고객${trash.length ? ` ${trash.length}` : ''}`, Trash2]] as const).map(([k, l, I]) => (
+          <button key={k} onClick={() => setTab(k)} className={cn('-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm', tab === k ? 'border-primary font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground', k === 'trash' && 'ml-auto')}>
             <I size={14} />{l}
           </button>
         ))}
       </div>
-      {!data ? <Loading /> : tab === 'expiring' ? <ExpiringPanel settings={data.settings} onSettings={load} /> : tab === 'versions' ? (
+      {!data ? <Loading /> : tab === 'trash' ? <TrashPanel items={trash} onChanged={load} /> : tab === 'expiring' ? <ExpiringPanel settings={data.settings} onSettings={load} /> : tab === 'versions' ? (
         <VersionPolicy products={data.products} repos={[...new Set(data.customers.flatMap((c) => c.usages.map((u) => u.repo)))]} onSaved={load} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
@@ -126,6 +141,43 @@ export default function Customers() {
       )}
       {form && <CustomerForm init={form.c} isNew={form.isNew} onClose={() => setForm(null)} onSaved={(id) => { setForm(null); setSel(id); load(); }} />}
     </>
+  );
+}
+
+// ---------- 삭제된 고객(휴지통) ----------
+
+function TrashPanel({ items, onChanged }: { items: CustomerView[]; onChanged: () => void }) {
+  const [err, setErr] = useState('');
+  const undo = async (c: Customer) => { setErr(''); try { await adminCustomerUndelete(c.id); onChanged(); } catch (e) { setErr(String(e)); } };
+  const purge = async (c: Customer) => {
+    const typed = prompt(`완전 삭제하면 되살릴 수 없습니다(백업 파일로만 복원).\n확인을 위해 고객 이름을 그대로 입력하세요:\n\n${c.name}`);
+    if (typed === null) return;
+    if (typed.trim() !== c.name) { setErr('이름이 달라 완전 삭제하지 않았습니다.'); return; }
+    setErr(''); try { await adminCustomerPurge(c.id, typed.trim()); onChanged(); } catch (e) { setErr(String(e)); }
+  };
+  return (
+    <div>
+      <p className="mb-3 text-sm text-muted-foreground">삭제한 고객은 여기 모입니다. <b>되살리기</b>로 원래대로 돌리거나, 이름을 확인한 뒤 <b>완전 삭제</b>합니다. 완전 삭제 전에 위의 <b>백업 받기</b>를 권합니다.</p>
+      {err && <Alert tone="crit">{err}</Alert>}
+      <Table>
+        <thead><tr><Th>고객</Th><Th>삭제한 때</Th><Th>삭제한 사람</Th><Th className="w-56" /></tr></thead>
+        <tbody>
+          {items.length === 0 ? <tr><Td colSpan={4} className="text-center text-muted-foreground">삭제된 고객이 없습니다.</Td></tr> : items.map((c) => (
+            <tr key={c.id}>
+              <Td><div className="flex items-center gap-2.5"><CompanyLogo logo={c.logo} size={28} disabled /><div><div className="font-medium">{c.name}</div><div className="text-xs text-muted-foreground">ID {c.id}{c.orgGroup ? ` · ${c.orgGroup}` : ''}</div></div></div></Td>
+              <Td className="text-sm">{fmt(c.deletedAt)}</Td>
+              <Td className="text-sm">{c.deletedBy || '—'}</Td>
+              <Td className="text-right">
+                <div className="flex justify-end gap-1">
+                  <Button size="sm" variant="outline" onClick={() => undo(c)}>되살리기</Button>
+                  <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => purge(c)}><Trash2 size={13} />완전 삭제</Button>
+                </div>
+              </Td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </div>
   );
 }
 
@@ -197,7 +249,7 @@ function CustomerCard({ c, products, onEdit, onDelete, onChanged }: { c: Custome
           </div>
           <div className="flex gap-1">
             <Button size="sm" variant="outline" onClick={onEdit}><Pencil size={13} />편집</Button>
-            <Button size="sm" variant="ghost" onClick={onDelete} title="삭제"><Trash2 size={13} /></Button>
+            <Button size="sm" variant="ghost" onClick={onDelete} title="삭제(휴지통으로 — 되살릴 수 있음)"><Trash2 size={13} /></Button>
           </div>
         </div>
         <StatusLogo c={c} onChanged={onChanged} />

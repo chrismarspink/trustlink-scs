@@ -89,6 +89,10 @@ type Customer struct {
 	DisabledAt     string `json:"disabledAt,omitempty"`
 	DisabledBy     string `json:"disabledBy,omitempty"`
 	Logo           string `json:"logo,omitempty"` // 서버 데이터의 로고 파일 이름(+?v=) — PUT /api/customers/{id}/logo 로만 바꾼다
+	// 삭제(휴지통): DELETE 는 표시만 한다. 휴지통에서 되살리거나(restore) 이름을 확인한 뒤 완전 삭제(purge)한다.
+	Deleted   bool   `json:"deleted,omitempty"`
+	DeletedAt string `json:"deletedAt,omitempty"`
+	DeletedBy string `json:"deletedBy,omitempty"`
 }
 
 // VerPolicy: 제품 버전 정책 한 줄.
@@ -604,9 +608,11 @@ func (s *Server) apiCustomerSave(w http.ResponseWriter, r *http.Request) {
 	case idx >= 0:
 		old := c.d.Customers[idx] // 상태·로고는 전용 API 로만 바뀐다(편집 화면 저장이 지우지 않게)
 		in.Disabled, in.DisabledReason, in.DisabledNote, in.DisabledAt, in.DisabledBy, in.Logo = old.Disabled, old.DisabledReason, old.DisabledNote, old.DisabledAt, old.DisabledBy, old.Logo
+		in.Deleted, in.DeletedAt, in.DeletedBy = old.Deleted, old.DeletedAt, old.DeletedBy
 		c.d.Customers[idx] = in
 	default:
 		in.Disabled, in.DisabledReason, in.DisabledNote, in.DisabledAt, in.DisabledBy, in.Logo = false, "", "", "", "", ""
+		in.Deleted, in.DeletedAt, in.DeletedBy = false, "", ""
 		c.d.Customers = append(c.d.Customers, in)
 	}
 	err := c.saveLocked()
@@ -621,33 +627,24 @@ func (s *Server) apiCustomerSave(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[bool]int{true: 201, false: 200}[id == ""], in)
 }
 
-// DELETE /api/customers/{id}
+// DELETE /api/customers/{id} — 휴지통으로(삭제 표시). 되살리기·완전 삭제는 customer_trash.go.
 func (s *Server) apiCustomerDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	actor := w.Header().Get("X-User")
 	c := s.cust()
-	c.mu.Lock()
-	out, name := []Customer{}, ""
-	for _, x := range c.d.Customers {
-		if x.ID == id {
-			name = x.Name
-			continue
-		}
-		out = append(out, x)
-	}
-	if name == "" {
-		c.mu.Unlock()
+	x, ok, err := c.updateOne(id, func(x *Customer) {
+		x.Deleted, x.DeletedAt, x.DeletedBy = true, c.now().UTC().Format(time.RFC3339), actor
+	})
+	if !ok {
 		writeJSON(w, 404, map[string]string{"error": "고객 없음"})
 		return
 	}
-	c.d.Customers = out
-	err := c.saveLocked()
-	c.mu.Unlock()
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return
 	}
-	_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "customer-delete", Subject: id, Detail: map[string]any{"name": name}})
-	writeJSON(w, 200, map[string]any{"deleted": id})
+	_ = s.sor.append(SoREvent{Actor: actor, Action: "customer-delete", Subject: id, Detail: map[string]any{"name": x.Name, "soft": true}})
+	writeJSON(w, 200, map[string]any{"deleted": id, "trash": true})
 }
 
 // PUT /api/customer-products {repo, versions[]} — 제품 버전 정책(빈 목록이면 삭제).

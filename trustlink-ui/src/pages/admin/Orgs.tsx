@@ -45,7 +45,7 @@ export default function Orgs() {
     setErr('');
     try {
       const [os, cs] = await Promise.all([adminOrgs(), adminCustomers().catch(() => ({ customers: [] as Customer[] }))]);
-      setCustOf(Object.fromEntries(cs.customers.filter((c) => c.orgGroup).map((c) => [c.orgGroup!, c])));
+      setCustOf(Object.fromEntries(cs.customers.filter((c) => c.orgGroup && !c.deleted).map((c) => [c.orgGroup!, c])));
       setOrgs(os.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {
       setErr(String(e));

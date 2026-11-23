@@ -75,7 +75,7 @@ export default function Users() {
     setErr('');
     try {
       const [us, os, cs] = await Promise.all([adminUsers(), adminOrgs(), adminCustomers().catch(() => ({ customers: [] as Customer[] }))]);
-      setCustOf(Object.fromEntries(cs.customers.filter((c) => c.orgGroup).map((c) => [c.orgGroup!.slice(ORG_PREFIX.length), c])));
+      setCustOf(Object.fromEntries(cs.customers.filter((c) => c.orgGroup && !c.deleted).map((c) => [c.orgGroup!.slice(ORG_PREFIX.length), c])));
       setUsers(us);
       setOrgs(os.map((o) => o.name).sort());
     } catch (e) {

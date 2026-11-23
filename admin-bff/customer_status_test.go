@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -72,5 +73,54 @@ func TestCustomerStatusAndLogo(t *testing.T) {
 	s.apiCustomerLogoGet(w, r)
 	if w.Code != 404 {
 		t.Fatal("경로 이탈 거부")
+	}
+}
+
+func TestCustomerTrashAndBackup(t *testing.T) {
+	s := testCustServer(t)
+	c := s.cust()
+	id, name := c.d.Customers[0].ID, c.d.Customers[0].Name
+	n0 := len(c.d.Customers)
+	req := func(method, body string, h http.HandlerFunc) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(method, "/", strings.NewReader(body))
+		r.SetPathValue("id", id)
+		h(w, r)
+		return w
+	}
+	if w := req("DELETE", `{"confirm":"`+name+`"}`, s.apiCustomerPurge); w.Code != 409 {
+		t.Fatalf("휴지통에 없으면 완전 삭제 불가: %d", w.Code)
+	}
+	req("DELETE", "", s.apiCustomerDelete)
+	if len(activeCustomers(c.snapshot().Customers)) != n0-1 {
+		t.Fatal("휴지통 고객은 통지 대상 아님")
+	}
+	req("POST", "", s.apiCustomerUndelete)
+	if x, _ := c.find(id); x.Deleted {
+		t.Fatal("되살리기")
+	}
+	// 백업 → 완전 삭제 → 복원으로 되돌림
+	bw := httptest.NewRecorder()
+	s.apiCustomersBackup(bw, httptest.NewRequest("GET", "/", nil))
+	backup := bw.Body.String()
+	req("DELETE", "", s.apiCustomerDelete)
+	if w := req("DELETE", `{"confirm":"다른 이름"}`, s.apiCustomerPurge); w.Code != 400 {
+		t.Fatalf("이름이 다르면 거부: %d", w.Code)
+	}
+	if w := req("DELETE", `{"confirm":"`+name+`"}`, s.apiCustomerPurge); w.Code != 200 {
+		t.Fatalf("완전 삭제: %d %s", w.Code, w.Body.String())
+	}
+	if _, ok := c.find(id); ok {
+		t.Fatal("완전 삭제 후 없어야 함")
+	}
+	if w := req("POST", `{"format":"x"}`, s.apiCustomersRestore); w.Code != 400 {
+		t.Fatal("형식 아닌 파일 거부")
+	}
+	w := req("POST", backup, s.apiCustomersRestore)
+	if _, ok := c.find(id); w.Code != 200 || !ok || len(c.snapshot().Customers) != n0 {
+		t.Fatalf("복원: %d %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "before-restore-") {
+		t.Fatal("복원 전 사본 이름 안내")
 	}
 }
