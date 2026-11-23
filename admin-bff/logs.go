@@ -36,7 +36,8 @@ type logEntry struct {
 // 이벤트 종류(화면 선택지와 같음)
 var logEvents = []struct{ Key, Label string }{
 	{"upload", "업로드"}, {"download", "다운로드"}, {"delete", "삭제"}, {"authfail", "인증·권한 실패"},
-	{"error", "오류"}, {"request", "기타 요청"}, {"system", "시작·설정"}, {"other", "기타"},
+	{"error", "오류"}, {"login", "인증 성공"}, {"cleanup", "정리(GC·보존 정책)"}, {"request", "기타 요청"},
+	{"system", "시작·설정"}, {"other", "기타"},
 }
 
 var logAuthMsgs = []string{"authorization header", "api token", "bcrypt compare failed", "unauthorized", "authentication failed"}
@@ -56,6 +57,10 @@ func classifyLog(e *logEntry) string {
 		return "download"
 	case e.Msg == "HTTP API":
 		return "request"
+	case strings.HasPrefix(low, "user profile"):
+		return "login"
+	case containsAny(low, []string{"garbage collect", "gc ", "gc of", "applied policy", "untagged manifest", "retention"}):
+		return "cleanup"
 	case e.Level == "warn" || strings.Contains(low, "start") || strings.Contains(low, "config") || strings.Contains(low, "loaded"):
 		return "system"
 	}
@@ -270,11 +275,8 @@ func (s *Server) apiLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 날짜를 골랐으면 그 기간을 끝까지 세어 요약을 정확히(최대 96MB), 아니면 한 쪽 찾는 동안만(최대 48MB).
-	budget := int64(48 << 20)
-	if fromS != "" {
-		budget = 96 << 20
-	}
+	// 날짜를 골랐으면 그 기간을 끝까지 세어 요약을 정확히, 아니면 한 쪽을 채울 때까지만 읽는다.
+	budget := int64(256 << 20) // 서버 실측 1MB ≈ 1ms — 드문 조건도 대개 한 번에 찾는다
 	match := func(e *logEntry, line []byte) bool {
 		return (len(levels) == 0 || levels[e.Level]) && (event == "" || e.Event == event) &&
 			(user == "" || strings.EqualFold(e.User, user)) && (len(q) == 0 || bytes.Contains(bytes.ToLower(line), q))

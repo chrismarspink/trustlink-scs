@@ -25,6 +25,12 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.16.1', date: '2026-11-23', title: '로그 찾기 보강',
+    items: [
+      { kind: '개선', text: '드문 조건(업로드·오류 등)도 한 번에 찾도록 읽는 범위 확대, "인증 성공"·"정리(GC·보존 정책)" 이벤트 추가' },
+    ],
+  },
+  {
     version: '2.16.0', date: '2026-11-23', title: '로그 화면 개편',
     items: [
       { kind: '개선', text: '로그를 날짜별로 묶고 한 줄에 시각·레벨·이벤트·사용자·요약, 누르면 원문 펼침' },

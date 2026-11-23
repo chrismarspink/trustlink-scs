@@ -19,7 +19,7 @@ const levelCls = (l: string) => LEVELS.find((x) => x.key === l)?.cls || 'bg-slat
 const levelLabel = (l: string) => LEVELS.find((x) => x.key === l)?.label || l || '—';
 const EVENT_CLS: Record<string, string> = {
   upload: 'text-violet-700', download: 'text-sky-700', delete: 'text-orange-700', authfail: 'text-red-700',
-  error: 'text-red-700', request: 'text-slate-600', system: 'text-slate-500', other: 'text-slate-500',
+  error: 'text-red-700', login: 'text-emerald-700', cleanup: 'text-slate-500', request: 'text-slate-600', system: 'text-slate-500', other: 'text-slate-500',
 };
 
 const kstDate = (t: string) => (t ? new Date(t).toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }) : '');

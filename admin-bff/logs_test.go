@@ -111,6 +111,11 @@ func TestLogsDateAndEvent(t *testing.T) {
 	if len(af.Entries) == 0 || af.Entries[0].Event != "authfail" {
 		t.Fatalf("인증 실패 %+v", af.Entries)
 	}
+	for msg, want := range map[string]string{"applied policy": "cleanup", "garbage collected blobs": "cleanup", "user profile successfully set": "login"} {
+		if got := classifyLog(&logEntry{Msg: msg, Level: "info"}); got != want {
+			t.Fatalf("%s → %s, want %s", msg, got, want)
+		}
+	}
 	if r.FirstTime == "" || r.LastTime <= r.FirstTime {
 		t.Fatalf("범위 %s ~ %s", r.FirstTime, r.LastTime)
 	}
