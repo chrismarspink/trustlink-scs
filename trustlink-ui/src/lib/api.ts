@@ -343,17 +343,29 @@ export const adminMailTest = (c: string | MailCompose) =>
   aj<{ status: string; to: string[]; dropped?: string[]; attachments?: number }>('/api/mail/test', jsonInit('POST', typeof c === 'string' ? { to: c } : c));
 export const regReportPdfUrl = (id: string) => `/api/regs-report/${encodeURIComponent(id)}/pdf`;
 
-export type LogsResult = {
-  file: string;
-  total: number;
-  page: number;
-  pageSize: number;
-  pages: number;
-  lines: string[];
-  error?: string;
+export type LogEntry = {
+  off: number; time: string; level: string; msg: string; event: string; user?: string; method?: string; path?: string;
+  status?: number; latency?: string; ip?: string; err?: string; raw: string;
 };
-export const adminLogs = (p: { page: number; q: string; level: string }) =>
-  aj<LogsResult>(`/api/logs?page=${p.page}&pageSize=100&q=${encodeURIComponent(p.q)}&level=${encodeURIComponent(p.level)}`);
+export type LogsResult = {
+  entries: LogEntry[]; next: number; more: boolean; partial?: boolean; scanned: number; scope: number;
+  byLevel: Record<string, number>; byEvent: Record<string, number>; countsComplete: boolean;
+  fileSize: number; firstTime: string; lastTime: string; events: { Key: string; Label: string }[]; ms: number; error?: string;
+};
+export type LogsQuery = { cursor?: number; limit?: number; q?: string; levels?: string[]; event?: string; user?: string; from?: string; to?: string; all?: boolean };
+export const adminLogs = (p: LogsQuery) => {
+  const u = new URLSearchParams();
+  if (p.cursor !== undefined) u.set('cursor', String(p.cursor));
+  u.set('limit', String(p.limit ?? 100));
+  if (p.q) u.set('q', p.q);
+  if (p.levels?.length) u.set('levels', p.levels.join(','));
+  if (p.event) u.set('event', p.event);
+  if (p.user) u.set('user', p.user);
+  if (p.from) u.set('from', p.from);
+  if (p.to) u.set('to', p.to);
+  if (p.all) u.set('all', '1');
+  return aj<LogsResult>('/api/logs?' + u.toString());
+};
 
 export type RepoEntry = { repo: string; tags: string[]; tagCount: number };
 export const adminRepos = () => aj<RepoEntry[]>('/api/repos');

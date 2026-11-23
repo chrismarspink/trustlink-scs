@@ -1016,60 +1016,7 @@ func (s *Server) scrapeRepoSizes() ([]map[string]any, uint64) {
 }
 
 // ---------- logs ----------
-
-// apiLogs: 검색(q) + 레벨필터 + 페이지네이션(page/pageSize), 최신순.
-func (s *Server) apiLogs(w http.ResponseWriter, r *http.Request) {
-	q := strings.ToLower(r.URL.Query().Get("q"))
-	level := strings.ToLower(r.URL.Query().Get("level"))
-	page := atoiDefault(r.URL.Query().Get("page"), 1)
-	pageSize := atoiDefault(r.URL.Query().Get("pageSize"), 100)
-	if pageSize < 1 || pageSize > 500 {
-		pageSize = 100
-	}
-
-	data, err := os.ReadFile(s.cfg.LogFile)
-	if err != nil {
-		writeJSON(w, 200, map[string]any{"file": s.cfg.LogFile, "total": 0, "page": 1, "pageSize": pageSize,
-			"lines": []string{}, "error": "로그 파일을 읽을 수 없음: " + err.Error()})
-		return
-	}
-	all := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
-	// 필터 (최신순으로 뒤집어 수집)
-	filtered := make([]string, 0, len(all))
-	for i := len(all) - 1; i >= 0; i-- {
-		ln := all[i]
-		if ln == "" {
-			continue
-		}
-		low := strings.ToLower(ln)
-		if q != "" && !strings.Contains(low, q) {
-			continue
-		}
-		if level != "" && !strings.Contains(low, `"level":"`+level+`"`) {
-			continue
-		}
-		filtered = append(filtered, ln)
-	}
-	total := len(filtered)
-	start := (page - 1) * pageSize
-	if start < 0 {
-		start = 0
-	}
-	end := start + pageSize
-	var pageLines []string
-	if start < total {
-		if end > total {
-			end = total
-		}
-		pageLines = filtered[start:end]
-	} else {
-		pageLines = []string{}
-	}
-	writeJSON(w, 200, map[string]any{
-		"file": filepath.Clean(s.cfg.LogFile), "total": total, "page": page, "pageSize": pageSize,
-		"pages": (total + pageSize - 1) / pageSize, "lines": pageLines,
-	})
-}
+// apiLogs 는 logs.go
 
 func atoiDefault(s string, def int) int {
 	if x, err := strconv.Atoi(s); err == nil {
