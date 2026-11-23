@@ -8,7 +8,8 @@
 > 아래 CA/CMS 관련 완료·backlog 항목은 **역사적 기록**(현재는 미해당).
 
 ## 임시 설정 — 되돌릴 것
-- [ ] **admin1 을 고객사 그룹 org-acme 에 임시 추가** (2026-11-23): "내 제품" 화면에서 ACME 은행(시연)의 innopouch 를 보이게 하려고. 시연이 끝나면 관리 › 계정 및 권한 › 사용자에서 admin1 의 고객사를 비운다(역할 admins 만). 그동안 admin1 의 다운로드가 ACME 은행(시연) 집계에 잡힌다.
+- [ ] **시연 고객 교체** (2026-11-23): 현대로템·한화오션·LIG D&A(구 LIG넥스원) 고객사·사용자(rotem1·hanwha1·lig1)·고객 등록부·로고를 추가하고 innopouch 읽기 권한을 줌. ACME 은행·Global Bank 는 고객 등록부에서 "중지(관계 종료)" — 지우지 않음. acme1·acme2·org-acme·robot-acme 는 그대로(~/innopouch-demo 스크립트용).
+- [ ] **admin1 을 고객사 그룹에 임시 추가** (2026-11-23, 오후에 org-acme → org-hyundai-rotem 으로 변경): "내 제품" 화면에서 현대로템의 innopouch 를 보이게 하려고. 시연이 끝나면 관리 › 계정 및 권한 › 사용자에서 admin1 의 고객사를 비운다(역할 admins 만). 그동안 admin1 의 다운로드가 현대로템 집계에 잡힌다.
 
 ---
 
