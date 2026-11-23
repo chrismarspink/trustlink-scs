@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -243,11 +244,18 @@ func pickFix(steps []fixStep, from string) (fixStep, bool) {
 // ---------- 통지 기록 ----------
 
 type custSendResult struct {
-	At      string   `json:"at"`
-	Sent    []string `json:"sent,omitempty"`
-	Dropped []string `json:"dropped,omitempty"` // 메일 허용 목록 밖이라 건너뜀
-	Error   string   `json:"error,omitempty"`
+	At        string   `json:"at"`
+	Sent      []string `json:"sent,omitempty"`
+	Dropped   []string `json:"dropped,omitempty"` // 메일 허용 목록 밖이라 건너뜀
+	Error     string   `json:"error,omitempty"`
+	Outbox    string   `json:"outbox,omitempty"`    // 발송함 ID(mail_outbox.go)
+	Pending   bool     `json:"pending,omitempty"`   // 발송함에서 기다리는 중 — 이때는 취소할 수 있다
+	SendAt    string   `json:"sendAt,omitempty"`    // 실제로 나갈 시각
+	Cancelled bool     `json:"cancelled,omitempty"` // 보내기 취소됨(다시 보낼 수 있음)
 }
+
+// 고객 통지를 읽고-고치고-저장하는 동안 다른 쪽(발송함 완료 처리)과 겹치지 않게
+var custNoticeMu sync.Mutex
 
 type CustTarget struct {
 	Key        string          `json:"key"` // 고객|사용|언어
@@ -816,55 +824,97 @@ func (c *custStore) notice(id string) (*CustNotice, bool) {
 
 // ---------- ⑤ 발송 ----------
 
-// sendNotice: 선택한 대상(키)에 발송. 이미 보낸 대상은 다시 보내지 않는다.
-func (s *Server) sendNotice(n *CustNotice, keys []string, actor string) {
+// sendNotice: 선택한 대상(키)을 발송함에 넣는다(delay 뒤 발송, 그 전에는 취소 가능).
+// 이미 보냈거나 기다리는 대상은 다시 넣지 않는다. custNoticeMu 를 잡은 채로 부른다.
+func (s *Server) sendNotice(n *CustNotice, keys []string, actor string, delay time.Duration) {
 	now := s.cust().now().UTC().Format(time.RFC3339)
-	ok, fail := 0, 0
+	queued, fail := 0, 0
 	log := []map[string]any{}
 	for i := range n.Targets {
 		t := &n.Targets[i]
-		if !inList(t.Key, keys) || (t.Result != nil && len(t.Result.Sent) > 0) {
+		if !inList(t.Key, keys) || (t.Result != nil && (len(t.Result.Sent) > 0 || t.Result.Pending)) {
 			continue
 		}
 		res := &custSendResult{At: now}
 		to := append(append([]string{}, t.To...), t.Cc...)
+		allowed, dropped := s.mail.filter(to)
 		switch {
 		case !s.mail.Configured():
 			res.Error = "메일 서버 미설정(SMTP_HOST)"
 		case len(to) == 0:
 			res.Error = "받는 주소 없음"
+		case len(allowed) == 0:
+			res.Dropped = dropped // 모두 허용 목록 밖 — 발송함에 넣지 않음
 		default:
-			sent, dropped, err := s.mail.SendRich(to, t.Subject, mailContent{Text: t.Text, HTML: t.HTML})
-			res.Sent, res.Dropped, res.Error = sent, dropped, errString(err)
+			id, key := n.ID, t.Key
+			it := s.enqueueMail("custnotify", t.Customer, n.ID, actor, to, t.Subject, mailContent{Text: t.Text, HTML: t.HTML}, delay,
+				func(it outboxItem) { s.noticeOutboxDone(id, key, it) })
+			res.Outbox, res.Pending, res.SendAt = it.ID, true, it.SendAt
 		}
 		t.Result = res
-		if res.Error == "" && len(res.Sent) > 0 {
-			ok++
+		if res.Pending {
+			queued++
 		} else {
 			fail++
 		}
-		log = append(log, map[string]any{"customer": t.CustomerID, "lang": t.Lang, "sent": res.Sent, "dropped": res.Dropped, "error": res.Error})
+		log = append(log, map[string]any{"customer": t.CustomerID, "lang": t.Lang, "outbox": res.Outbox, "dropped": res.Dropped, "error": res.Error})
 	}
 	n.SentAt, n.SentBy = now, actor
-	sentAny, allSent, dropOnly := false, true, true
+	n.Status = noticeStatus(n)
+	_ = s.sor.append(SoREvent{Actor: actor, Action: "customer-notify", Subject: n.ID, Repo: n.Repo, Status: n.Status,
+		Detail: map[string]any{"kind": n.Kind, "vuln": n.VulnID, "recommend": n.Fix.Tag, "queued": queued, "failed": fail, "delaySec": int(delay / time.Second), "targets": log}})
+}
+
+// noticeStatus: 대상별 결과로 통지 상태를 정한다.
+func noticeStatus(n *CustNotice) string {
+	sentAny, allSent, dropOnly, pending, tried := false, true, true, false, false
 	for _, t := range n.Targets {
+		if t.Result != nil {
+			tried = true
+		}
+		pending = pending || (t.Result != nil && t.Result.Pending)
 		done := t.Result != nil && len(t.Result.Sent) > 0
 		sentAny = sentAny || done
 		allSent = allSent && done
-		dropOnly = dropOnly && (t.Result == nil || (t.Result.Error == "" && len(t.Result.Sent) == 0 && len(t.Result.Dropped) > 0))
+		dropOnly = dropOnly && (t.Result == nil || (t.Result.Error == "" && !t.Result.Pending && len(t.Result.Sent) == 0 && len(t.Result.Dropped) > 0))
 	}
 	switch {
+	case pending:
+		return "queued" // 발송함에서 기다리는 중
 	case allSent && sentAny:
-		n.Status = "sent"
+		return "sent"
 	case sentAny:
-		n.Status = "partial"
-	case dropOnly && fail > 0:
-		n.Status = "dropped" // 모두 허용 목록 밖이라 건너뜀
-	default:
-		n.Status = "failed"
+		return "partial"
+	case dropOnly && tried:
+		return "dropped" // 모두 허용 목록 밖이라 건너뜀
+	case !tried:
+		return n.Status
 	}
-	_ = s.sor.append(SoREvent{Actor: actor, Action: "customer-notify", Subject: n.ID, Repo: n.Repo, Status: n.Status,
-		Detail: map[string]any{"kind": n.Kind, "vuln": n.VulnID, "recommend": n.Fix.Tag, "ok": ok, "failed": fail, "targets": log}})
+	return "failed"
+}
+
+// noticeOutboxDone: 발송함에서 보냈거나 취소된 뒤 통지의 대상 결과를 바꾼다.
+func (s *Server) noticeOutboxDone(noticeID, key string, it outboxItem) {
+	custNoticeMu.Lock()
+	defer custNoticeMu.Unlock()
+	c := s.cust()
+	n, ok := c.notice(noticeID)
+	if !ok {
+		return
+	}
+	for i := range n.Targets {
+		t := &n.Targets[i]
+		if t.Key != key || t.Result == nil || t.Result.Outbox != it.ID {
+			continue
+		}
+		t.Result.Pending, t.Result.At = false, it.DoneAt
+		t.Result.Sent, t.Result.Dropped, t.Result.Error = it.Sent, it.Dropped, it.Error
+		if it.Status == "cancelled" {
+			t.Result.Cancelled, t.Result.Error = true, "보내기 취소됨("+it.DoneBy+")"
+		}
+	}
+	n.Status = noticeStatus(n)
+	_ = c.putNotice(n)
 }
 
 // ---------- API ----------
@@ -1001,12 +1051,19 @@ func (s *Server) apiCustNotifyAI(w http.ResponseWriter, r *http.Request) {
 // POST /api/custnotify/{id}/send {keys:[...]} — ⑤ 발송.
 func (s *Server) apiCustNotifySend(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Keys []string `json:"keys"`
+		Keys  []string `json:"keys"`
+		Delay *int     `json:"delay"` // 발송함 대기(초) — 0·10·30·60·120, 없으면 30
 	}
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || len(in.Keys) == 0 {
 		writeJSON(w, 400, map[string]string{"error": "보낼 대상을 고르세요"})
 		return
 	}
+	delay := 30 * time.Second
+	if in.Delay != nil {
+		delay = outboxDelay(*in.Delay)
+	}
+	custNoticeMu.Lock()
+	defer custNoticeMu.Unlock()
 	c := s.cust()
 	n, ok := c.notice(r.PathValue("id"))
 	if !ok {
@@ -1017,7 +1074,7 @@ func (s *Server) apiCustNotifySend(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 409, map[string]string{"error": "AI 설명을 작성하는 중입니다 — 끝난 뒤 보내세요"})
 		return
 	}
-	s.sendNotice(n, in.Keys, w.Header().Get("X-User"))
+	s.sendNotice(n, in.Keys, w.Header().Get("X-User"), delay)
 	if err := c.putNotice(n); err != nil {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return

@@ -316,6 +316,10 @@ func main() {
 	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))                     // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
 	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                    // 본문 미리보기
 	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                    // 받는 사람·항목·첨부 추천(규칙 + AI)
+	mux.HandleFunc("GET /api/mail/templates", s.guard(s.apiMailTemplates))                 // 현황 메일 템플릿(기본 + 관리자 작성)
+	mux.HandleFunc("PUT /api/mail/templates", s.guard(s.apiMailTemplatesPut))              // 관리자 작성 템플릿 저장
+	mux.HandleFunc("GET /api/mail/outbox", s.guard(s.apiMailOutbox))                       // 발송함(기다리는 메일·최근 기록)
+	mux.HandleFunc("DELETE /api/mail/outbox/{id}", s.guard(s.apiMailOutboxCancel))         // 보내기 취소(기다리는 동안만)
 	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF))            // 규제 보고서 PDF(Gotenberg)
 	mux.HandleFunc("GET /api/notifications", s.guardSession(s.apiNotifications))           // 내 통보
 	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead)) // 읽음 표시

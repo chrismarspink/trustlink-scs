@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Busy, DownloadLink } from '@/components/Progress';
 import { Sparkles, Paperclip, Eye, Send, X } from 'lucide-react';
 import {
-  adminMailOptions, adminMailPreview, adminMailSuggest, adminMailTest, regReportPdfUrl,
-  type MailOptions, type MailSuggestion, type MailCompose as Compose
+  adminMailOptions, adminMailPreview, adminMailSuggest, adminMailTest, regReportPdfUrl, adminMailTemplates, adminMailTemplatesSave, adminMe,
+  type MailOptions, type MailSuggestion, type MailCompose as Compose, type MailTemplate
 } from '@/lib/api';
+import { DelayPicker, OutboxPanel } from '@/components/Outbox';
+import { useSendDelay } from '@/lib/sendDelay';
 import { Badge, Button, Input } from '@/components/ui/primitives';
 import { Alert, selectCls } from './_ui';
 
@@ -30,8 +32,17 @@ export default function MailCompose({ allowlist }: { allowlist: string[] }) {
   const [busy, setBusy] = useState('');
   const [res, setRes] = useState<{ tone: 'ok' | 'warn' | 'crit'; text: string } | null>(null);
   const [roleFilter, setRoleFilter] = useState('internal');
+  const [delay, setDelay] = useSendDelay();
+  const [sentIds, setSentIds] = useState<string[]>([]); // 방금 발송함에 넣은 메일
+  const [tpls, setTpls] = useState<MailTemplate[]>([]);
+  const [tplId, setTplId] = useState('');
+  const [me, setMe] = useState('');
 
-  useEffect(() => { adminMailOptions().then(setO).catch((e) => setLoadErr(errText(e))); }, []);
+  useEffect(() => {
+    adminMailOptions().then(setO).catch((e) => setLoadErr(errText(e)));
+    adminMailTemplates().then(setTpls).catch(() => {});
+    adminMe().then((m) => setMe(m.username)).catch(() => {});
+  }, []);
   const allow = useMemo(() => new Set(allowlist.map((a) => a.toLowerCase())), [allowlist]);
   const blocked = (a: string) => allow.size > 0 && !allow.has(a.toLowerCase());
   const reason = useMemo(() => Object.fromEntries((sg?.recipients || []).map((r) => [r.email.toLowerCase(), r.reason])), [sg]);
@@ -40,7 +51,32 @@ export default function MailCompose({ allowlist }: { allowlist: string[] }) {
   if (!o) return null;
 
   const toggle = (l: string[], v: string, set: (x: string[]) => void) => set(l.includes(v) ? l.filter((x) => x !== v) : [...l, v]);
-  const compose = (): Compose => ({ recipients: rc, sections: secs, reports: reps, subject, note });
+  const compose = (): Compose => ({ recipients: rc, sections: secs, reports: reps, subject, note, delay });
+  // 템플릿: {날짜}·{보낸 사람}·{받는 분} 을 채워 제목·인사말·항목에 넣는다
+  const fill = (t: string) => {
+    const who = rc.length === 1 ? (o.users.find((u) => u.email.toLowerCase() === rc[0].toLowerCase())?.username || rc[0].split('@')[0]) + ' 님' : '여러분';
+    return t.replaceAll('{날짜}', new Date().toLocaleDateString('sv-SE')).replaceAll('{보낸 사람}', me || '관리자').replaceAll('{받는 분}', who);
+  };
+  const applyTpl = (id: string) => {
+    setTplId(id);
+    const t = tpls.find((x) => x.id === id);
+    if (!t) return;
+    if ((subject || note) && !window.confirm(`'${t.name}' 템플릿으로 제목·인사말·항목을 바꿀까요?`)) return;
+    setSubject(fill(t.subject)); setNote(fill(t.note)); if (t.sections.length) setSecs(t.sections);
+  };
+  const custom = tpls.filter((t) => !t.builtin);
+  const saveTpl = async () => {
+    const name = window.prompt('템플릿 이름(예: 협력사 월간 공유)\n지금 제목·인사말·항목을 저장합니다. {날짜}·{보낸 사람}·{받는 분} 을 넣으면 고를 때 채워집니다.');
+    if (!name?.trim()) return;
+    const id = 'c-' + crypto.randomUUID().slice(0, 8);
+    try { setTpls(await adminMailTemplatesSave([...custom, { id, name: name.trim(), subject, note, sections: secs }])); setTplId(id); setRes({ tone: 'ok', text: `템플릿 '${name.trim()}' 을 저장했습니다.` }); }
+    catch (e) { setRes({ tone: 'crit', text: `템플릿 저장 실패: ${errText(e)}` }); }
+  };
+  const delTpl = async () => {
+    const t = custom.find((x) => x.id === tplId);
+    if (!t || !window.confirm(`템플릿 '${t.name}' 을 지울까요?`)) return;
+    try { setTpls(await adminMailTemplatesSave(custom.filter((x) => x.id !== t.id))); setTplId(''); } catch (e) { setRes({ tone: 'crit', text: `템플릿 삭제 실패: ${errText(e)}` }); }
+  };
   const addExtra = () => {
     const a = extra.trim();
     if (a && /.+@.+\..+/.test(a) && !rc.includes(a)) setRc([...rc, a]);
@@ -68,11 +104,12 @@ export default function MailCompose({ allowlist }: { allowlist: string[] }) {
   };
   const send = async () => {
     const out = rc.filter(blocked);
-    if (!window.confirm(`${rc.length}명에게 보냅니다${out.length ? ` (허용 목록 밖 ${out.length}명은 서버가 건너뜀)` : ''}.${reps.length ? `\n첨부 PDF ${reps.length}개 — 처음 만드는 PDF 는 수십 초 걸릴 수 있습니다.` : ''}`)) return;
+    if (!window.confirm(`${rc.length}명에게 보냅니다${out.length ? ` (허용 목록 밖 ${out.length}명은 서버가 건너뜀)` : ''}.${reps.length ? `\n첨부 PDF ${reps.length}개 — 처음 만드는 PDF 는 수십 초 걸릴 수 있습니다.` : ''}${delay ? `\n\n${delay}초 동안 발송함에서 기다리며, 그 사이 '보내기 취소'를 누르면 나가지 않습니다.` : ''}`)) return;
     setBusy('send'); setRes(null);
     try {
       const r = await adminMailTest(compose());
-      setRes({ tone: r.dropped?.length ? 'warn' : 'ok', text: `${r.to.join(', ')} 에게 보냈습니다${r.attachments ? ` (첨부 ${r.attachments}개)` : ''}.${r.dropped?.length ? ` 허용 목록 밖이라 건너뜀: ${r.dropped.join(', ')}` : ''}` });
+      if (r.outbox) setSentIds((x) => [r.outbox!.id, ...x]);
+      setRes({ tone: r.dropped?.length ? 'warn' : 'ok', text: `${r.to.join(', ')} 에게 ${delay ? `${delay}초 뒤 보냅니다 — 아래에서 취소할 수 있습니다` : '보냅니다'}${r.attachments ? ` (첨부 ${r.attachments}개)` : ''}.${r.dropped?.length ? ` 허용 목록 밖이라 건너뜀: ${r.dropped.join(', ')}` : ''}` });
       adminMailOptions().then(setO).catch(() => {});
     } catch (e) { setRes({ tone: 'crit', text: `발송 실패: ${errText(e)}` }); }
     setBusy('');
@@ -177,15 +214,30 @@ export default function MailCompose({ allowlist }: { allowlist: string[] }) {
       </div>
 
       <div className={box}>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold">템플릿</span>
+          <select className={selectCls} value={tplId} onChange={(e) => applyTpl(e.target.value)}>
+            <option value="">고르기 — 제목·인사말·항목을 채웁니다</option>
+            <optgroup label="기본">{tpls.filter((t) => t.builtin).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
+            {custom.length > 0 && <optgroup label="우리가 만든 템플릿">{custom.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>}
+          </select>
+          <Button variant="ghost" className="h-8 text-xs" onClick={saveTpl} disabled={!subject && !note}>지금 내용을 템플릿으로 저장</Button>
+          {custom.some((t) => t.id === tplId) && <Button variant="ghost" className="h-8 text-xs text-red-600" onClick={delTpl}>이 템플릿 지우기</Button>}
+        </div>
         <Input placeholder="제목(비우면 '공급망 보안 현황 — 오늘 날짜')" value={subject} onChange={(e) => setSubject(e.target.value)} />
         <textarea className="mt-2 min-h-20 w-full rounded-md border bg-background p-2 text-sm" placeholder="인사말·전할 말(선택)" value={note} onChange={(e) => setNote(e.target.value)} />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={doPreview} disabled={!!busy}><Eye size={14} className="mr-1" />{busy === 'preview' ? '만드는 중…' : '미리보기'}</Button>
           <Button onClick={send} disabled={!!busy || rc.length === 0 || !o.configured}><Send size={14} className="mr-1" />{busy === 'send' ? (reps.length ? 'PDF 만들고 보내는 중…' : '보내는 중…') : '보내기'}</Button>
+          <DelayPicker value={delay} onChange={setDelay} />
           <span className="text-xs text-muted-foreground">항목·첨부·인사말을 모두 비우면 짧은 시험 메일이 갑니다.</span>
         </div>
         <Busy className="mt-2" active={busy === 'send'} label={reps.length ? `첨부 PDF ${reps.length}개 만들고 보내는 중` : '보내는 중'} hint={reps.length ? '처음 만드는 PDF 는 하나에 수십 초' : undefined} />
         {res && <div className="mt-3"><Alert tone={res.tone}>{res.text}</Alert></div>}
+        <div className="mt-3">
+          <div className="mb-1.5 text-xs font-semibold text-muted-foreground">발송함 — 최근 현황 메일</div>
+          <OutboxPanel kind="digest" refreshKey={sentIds.length} compact />
+        </div>
       </div>
 
       {preview && (

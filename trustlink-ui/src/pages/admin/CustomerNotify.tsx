@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { DelayPicker, OutboxPanel } from '@/components/Outbox';
+import { useSendDelay } from '@/lib/sendDelay';
 import { Busy } from '@/components/Progress';
 import { Send, ShieldCheck, ShieldAlert, Wrench, Eye, History, ArrowRight, ArrowLeft, Trash2, CheckCircle2, XCircle, MinusCircle, Building2 } from 'lucide-react';
 import {
@@ -18,7 +20,7 @@ const fmt = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR') : '—');
 const base = (r: string) => r.split('/').pop() || r;
 const KIND = { patch: '패치 권고', notaffected: '영향 없음 확인서' } as const;
 const STATUS: Record<CustNotice['status'], { l: string; v: 'muted' | 'success' | 'warn' | 'danger' }> = {
-  draft: { l: '초안', v: 'muted' }, sent: { l: '발송 완료', v: 'success' }, partial: { l: '일부 발송', v: 'warn' }, dropped: { l: '허용 목록 밖 — 건너뜀', v: 'warn' }, failed: { l: '실패', v: 'danger' }
+  draft: { l: '초안', v: 'muted' }, queued: { l: '보내기 대기(취소 가능)', v: 'warn' }, sent: { l: '발송 완료', v: 'success' }, partial: { l: '일부 발송', v: 'warn' }, dropped: { l: '허용 목록 밖 — 건너뜀', v: 'warn' }, failed: { l: '실패', v: 'danger' }
 };
 
 function Sev({ s }: { s: string }) {
@@ -29,6 +31,7 @@ function Sev({ s }: { s: string }) {
 function SendState({ t }: { t: CustTarget }) {
   const r = t.result;
   if (!r) return <span className="text-xs text-muted-foreground">미발송</span>;
+  if (r.pending) return <span className="text-xs font-medium text-amber-700">보내기 대기 — 아래 발송함에서 취소 가능</span>;
   return (
     <div className="space-y-0.5 text-xs">
       {!!r.sent?.length && <div className="flex items-center gap-1 text-emerald-700"><CheckCircle2 size={12} />보냄 {r.sent.join(', ')}</div>}
@@ -50,6 +53,7 @@ export default function CustomerNotify() {
   const [n, setN] = useState<CustNotice | null>(null);
   const [stage, setStage] = useState(1);
   const [busy, setBusy] = useState<'' | 'plan' | 'ai' | 'send'>('');
+  const [delay, setDelay] = useSendDelay();
   const [err, setErr] = useState('');
   const [sel, setSel] = useState<string[]>([]);
 
@@ -61,7 +65,7 @@ export default function CustomerNotify() {
 
   const open = (x: CustNotice) => {
     setN(x); setErr(''); setTab('flow'); setKind(x.kind);
-    setSel(x.targets.filter((t) => !t.result?.sent?.length).map((t) => t.key));
+    setSel(x.targets.filter((t) => !t.result?.sent?.length && !t.result?.pending).map((t) => t.key));
     setStage(x.status === 'draft' ? 2 : 5);
   };
   const pick = async (c: CustVulnCand) => {
@@ -89,9 +93,9 @@ export default function CustomerNotify() {
   }, [aiRunning]);
   const aiSec = n?.aiStarted && now ? Math.max(0, Math.floor((now - new Date(n.aiStarted).getTime()) / 1000)) : 0;
   const send = async () => {
-    if (!n || !sel.length || !confirm(`${sel.length}곳에 메일을 보낼까요?`)) return;
+    if (!n || !sel.length || !confirm(`${sel.length}곳에 메일을 보낼까요?${delay ? `\n\n${delay}초 동안 발송함에서 기다리며, 그 사이 '보내기 취소'를 누르면 나가지 않습니다(취소한 곳은 다시 보낼 수 있음).` : ''}`)) return;
     setBusy('send'); setErr('');
-    try { const r = await adminCustNotifySend(n.id, sel); setN(r); setSel([]); } catch (e) { setErr(String(e)); }
+    try { const r = await adminCustNotifySend(n.id, sel, delay); setN(r); setSel([]); } catch (e) { setErr(String(e)); }
     setBusy('');
   };
   const reset = () => { setN(null); setStage(1); setErr(''); };
@@ -228,11 +232,18 @@ export default function CustomerNotify() {
               <TargetTable n={n} sel={sel} setSel={setSel} showResult />
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Button onClick={send} disabled={!!busy || sel.length === 0}><Send size={14} />{busy === 'send' ? '보내는 중…' : `선택한 ${sel.length}곳에 발송`}</Button>
+                <DelayPicker value={delay} onChange={setDelay} />
                 <Badge variant={STATUS[n.status].v}>{STATUS[n.status].l}</Badge>
                 {n.status === 'draft' && <Button size="sm" variant="ghost" onClick={async () => { if (confirm('초안을 지울까요?')) { await adminCustNotifyDelete(n.id).catch(() => {}); reset(); } }}><Trash2 size={13} />초안 삭제</Button>}
                 <span className="text-xs text-muted-foreground">이미 보낸 고객은 다시 보내지 않습니다. 결과는 감사 기록에 남습니다.</span>
               </div>
               <Busy className="mt-2" active={busy === 'send'} label={`${sel.length}곳에 고객별 언어로 메일 보내는 중`} />
+              {n.targets.some((t) => t.result?.outbox) && (
+                <div className="mt-3">
+                  <div className="mb-1.5 text-xs font-semibold text-muted-foreground">발송함 — 이 통지</div>
+                  <OutboxPanel ids={n.targets.map((t) => t.result?.outbox || '').filter(Boolean)} onChange={() => adminCustNotifyGet(n.id).then(setN).catch(() => {})} />
+                </div>
+              )}
               <Nav back={() => setStage(4)} />
             </>
           )}
@@ -265,7 +276,7 @@ function NoticeHead({ n }: { n: CustNotice }) {
 }
 
 function TargetTable({ n, sel, setSel, showResult }: { n: CustNotice; sel: string[]; setSel: (v: string[]) => void; showResult?: boolean }) {
-  const open = n.targets.filter((t) => !t.result?.sent?.length).map((t) => t.key);
+  const open = n.targets.filter((t) => !t.result?.sent?.length && !t.result?.pending).map((t) => t.key);
   return (
     <Table>
       <thead><tr>
@@ -275,7 +286,7 @@ function TargetTable({ n, sel, setSel, showResult }: { n: CustNotice; sel: strin
       <tbody>
         {n.targets.length === 0 ? <tr><Td colSpan={7} className="text-center text-muted-foreground">보낼 고객이 없습니다(제외 사유 참고).</Td></tr> : n.targets.map((t) => (
           <tr key={t.key}>
-            <Td><input type="checkbox" disabled={!!t.result?.sent?.length} checked={sel.includes(t.key)} onChange={(e) => setSel(e.target.checked ? [...sel, t.key] : sel.filter((x) => x !== t.key))} /></Td>
+            <Td><input type="checkbox" disabled={!!t.result?.sent?.length || !!t.result?.pending} checked={sel.includes(t.key)} onChange={(e) => setSel(e.target.checked ? [...sel, t.key] : sel.filter((x) => x !== t.key))} /></Td>
             <Td><div className="flex items-center gap-1.5"><Building2 size={13} className="text-muted-foreground" /><b>{t.customer}</b>{t.lang === 'en' && <Badge variant="outline">EN</Badge>}</div></Td>
             <Td className="text-xs">{t.tags.join(', ')}</Td>
             {n.kind === 'patch' && <Td>{t.recommend ? <Badge variant="success">{t.recommend}</Badge> : <span className="text-xs text-amber-700">없음 — 완화 조치</span>}</Td>}

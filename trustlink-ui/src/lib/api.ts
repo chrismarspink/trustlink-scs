@@ -331,7 +331,17 @@ export type MailOptions = {
   sections: MailSection[]; reports: MailReport[]; users: MailUser[]; usersError?: string;
   pdf: boolean; ai: boolean; allowlist: string[]; configured: boolean; roles: Record<string, string>;
 };
-export type MailCompose = { recipients: string[]; sections: string[]; reports: string[]; subject: string; note: string };
+export type MailCompose = { recipients: string[]; sections: string[]; reports: string[]; subject: string; note: string; delay?: number };
+// 발송함: 보내기 전 잠깐 기다리고(취소 가능) 보낸다
+export type OutboxItem = {
+  id: string; kind: 'digest' | 'custnotify'; label: string; ref?: string; recipients: string[]; subject: string; createdBy: string; createdAt: string; sendAt: string;
+  status: 'pending' | 'sent' | 'blocked' | 'failed' | 'cancelled' | 'lost'; sent?: string[]; dropped?: string[]; error?: string; doneAt?: string; doneBy?: string; attachments?: number;
+};
+export const adminOutbox = () => aj<{ items: OutboxItem[]; now: string }>('/api/mail/outbox');
+export const adminOutboxCancel = (id: string) => aj<OutboxItem>(`/api/mail/outbox/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export type MailTemplate = { id: string; name: string; subject: string; note: string; sections: string[]; builtin?: boolean; updatedBy?: string; updatedAt?: string };
+export const adminMailTemplates = () => aj<MailTemplate[]>('/api/mail/templates');
+export const adminMailTemplatesSave = (custom: MailTemplate[]) => aj<MailTemplate[]>('/api/mail/templates', jsonInit('PUT', custom));
 export type MailSuggestion = {
   by: 'ai' | 'rule'; recipients: { username: string; email: string; role: MailRole; reason: string }[];
   sections: string[]; reports: string[]; subject: string; note: string; reasons?: string[]; aiError?: string; aiMeta?: { model: string; provider?: string };
@@ -340,7 +350,7 @@ export const adminMailOptions = () => aj<MailOptions>('/api/mail/options');
 export const adminMailPreview = (c: MailCompose) => aj<{ subject: string; html: string; text: string }>('/api/mail/preview', jsonInit('POST', c));
 export const adminMailSuggest = (goal: string, ai: boolean) => aj<MailSuggestion>('/api/mail/suggest', jsonInit('POST', { goal, ai }));
 export const adminMailTest = (c: string | MailCompose) =>
-  aj<{ status: string; to: string[]; dropped?: string[]; attachments?: number }>('/api/mail/test', jsonInit('POST', typeof c === 'string' ? { to: c } : c));
+  aj<{ status: string; to: string[]; dropped?: string[]; attachments?: number; outbox?: OutboxItem }>('/api/mail/test', jsonInit('POST', typeof c === 'string' ? { to: c } : c));
 export const regReportPdfUrl = (id: string) => `/api/regs-report/${encodeURIComponent(id)}/pdf`;
 
 export type LogEntry = {
@@ -788,14 +798,14 @@ export type CustFix = {
   found: boolean; tag?: string; compVersion?: string; note?: string; from?: string; steps: FixStep[];
   osv?: { id: string; target?: string; fixed?: string[]; ranges?: string[] }; osvNote?: string; message?: string;
 };
-export type CustSendResult = { at: string; sent?: string[]; dropped?: string[]; error?: string };
+export type CustSendResult = { at: string; sent?: string[]; dropped?: string[]; error?: string; outbox?: string; pending?: boolean; sendAt?: string; cancelled?: boolean };
 export type CustTarget = {
   key: string; customerId: string; customer: string; usageId: string; lang: 'ko' | 'en'; tags: string[]; recommend?: string; recComp?: string;
   notes?: string[]; internal?: string[]; contacts: string[]; to: string[]; cc?: string[]; subject: string; text: string; html: string; result?: CustSendResult;
 };
 export type CustAIText = { summary: string; impact: string; action: string; citations: string[]; source: 'ai' | 'rule'; model?: string; warnings?: string[] };
 export type CustNotice = {
-  id: string; kind: 'patch' | 'notaffected'; status: 'draft' | 'sent' | 'partial' | 'dropped' | 'failed'; created: string; createdBy: string;
+  id: string; kind: 'patch' | 'notaffected'; status: 'draft' | 'queued' | 'sent' | 'partial' | 'dropped' | 'failed'; created: string; createdBy: string;
   aiState?: 'running' | 'done'; aiStarted?: string;
   sentAt?: string; sentBy?: string; repo: string; vulnId: string; severity: string; cvss?: number; kev: boolean; component: string; compVersion: string;
   fix: CustFix; facts: AIFact[]; ai: Record<string, CustAIText>; aiError?: string; targets: CustTarget[]; skipped: { customerId: string; customer: string; reason: string }[];
@@ -807,7 +817,7 @@ export type CustNoticeRow = {
 export const adminCustNotifyVulns = (kind: CustNotice['kind']) => aj<{ items: CustVulnCand[]; error?: string }>(`/api/custnotify/vulns?kind=${kind}`);
 export const adminCustNotifyCreate = (b: { kind: CustNotice['kind']; repo: string; vulnId: string }) => aj<CustNotice>('/api/custnotify', jsonInit('POST', b));
 export const adminCustNotifyAI = (id: string) => aj<CustNotice>(`/api/custnotify/${encodeURIComponent(id)}/ai`, { method: 'POST' });
-export const adminCustNotifySend = (id: string, keys: string[]) => aj<CustNotice>(`/api/custnotify/${encodeURIComponent(id)}/send`, jsonInit('POST', { keys }));
+export const adminCustNotifySend = (id: string, keys: string[], delay?: number) => aj<CustNotice>(`/api/custnotify/${encodeURIComponent(id)}/send`, jsonInit('POST', { keys, delay }));
 export const adminCustNotifyList = () => aj<CustNoticeRow[]>('/api/custnotify');
 export const adminCustNotifyGet = (id: string) => aj<CustNotice>(`/api/custnotify/${encodeURIComponent(id)}`);
 export const adminCustNotifyDelete = (id: string) => aj<{ deleted: string }>(`/api/custnotify/${encodeURIComponent(id)}`, { method: 'DELETE' });

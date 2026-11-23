@@ -34,7 +34,8 @@ type mailComposeIn struct {
 	Sections   []string `json:"sections"`
 	Reports    []string `json:"reports"` // 첨부할 규제 보고서 ID
 	Subject    string   `json:"subject"`
-	Note       string   `json:"note"` // 인사말·전할 말
+	Note       string   `json:"note"`  // 인사말·전할 말
+	Delay      *int     `json:"delay"` // 발송함 대기(초) — 0·10·30·60·120, 없으면 30(mail_outbox.go)
 }
 
 func (in *mailComposeIn) normalize() error {
@@ -558,21 +559,22 @@ func (s *Server) apiMailTest(w http.ResponseWriter, r *http.Request) {
 			content.Attachments = append(content.Attachments, mailAttachment{Name: rp.FileName + ".pdf", Type: "application/pdf", Data: pdf})
 		}
 	}
-	sent, dropped, err := s.mail.SendRich(in.Recipients, subject, content)
-	status := "sent"
-	if err != nil {
-		status = "failed"
-	} else if len(sent) == 0 {
-		status = "blocked"
-	}
-	_ = s.sor.append(SoREvent{Actor: actor, Action: "mail-test", Status: status,
-		Detail: map[string]any{"to": in.Recipients, "sent": sent, "dropped": dropped, "sections": in.Sections, "reports": in.Reports, "subject": subject, "error": errString(err)}})
+	// 바로 보내지 않고 발송함에 넣는다(기다리는 동안 취소 가능). 보낼 수 없는 경우는 먼저 알려 준다.
+	allowed, dropped := s.mail.filter(in.Recipients)
 	switch {
-	case err != nil:
-		writeJSON(w, 502, map[string]string{"error": err.Error()})
-	case len(sent) == 0:
+	case !s.mail.Configured():
+		writeJSON(w, 502, map[string]string{"error": "메일 서버 미설정(SMTP_HOST)"})
+		return
+	case len(allowed) == 0:
 		writeJSON(w, 403, map[string]string{"error": "허용 목록(MAIL_ALLOWLIST)에 없는 주소라 보내지 않았습니다"})
-	default:
-		writeJSON(w, 200, map[string]any{"status": "sent", "to": sent, "dropped": dropped, "attachments": len(content.Attachments)})
+		return
 	}
+	delay := 30 * time.Second
+	if in.Delay != nil {
+		delay = outboxDelay(*in.Delay)
+	}
+	it := s.enqueueMail("digest", subject, "", actor, in.Recipients, subject, content, delay, nil)
+	_ = s.sor.append(SoREvent{Actor: actor, Action: "mail-test", Status: "queued",
+		Detail: map[string]any{"to": in.Recipients, "allowed": allowed, "dropped": dropped, "sections": in.Sections, "reports": in.Reports, "subject": subject, "outbox": it.ID}})
+	writeJSON(w, 202, map[string]any{"status": "queued", "outbox": it, "to": allowed, "dropped": dropped, "attachments": len(content.Attachments)})
 }

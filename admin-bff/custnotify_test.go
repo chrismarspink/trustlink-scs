@@ -207,14 +207,14 @@ func TestCustNotifyAIGuardAndFallback(t *testing.T) {
 func TestCustNotifySendAllowlist(t *testing.T) {
 	s := testCustServer(t)
 	n, _ := s.buildNotice("patch", "products/prod", "CVE-2026-0001", "admin")
-	s.sendNotice(n, []string{n.Targets[0].Key}, "admin")
+	s.sendNotice(n, []string{n.Targets[0].Key}, "admin", 0)
 	if r := n.Targets[0].Result; r == nil || !strings.Contains(r.Error, "미설정") {
 		t.Fatalf("메일 서버 없으면 오류 기록: %+v", r)
 	}
 	// 허용 목록 밖 주소는 보내지 않고(접속도 안 함) 건너뜀으로 기록
 	s.mail = &Mailer{Host: "smtp.invalid", Port: "587", From: "tl@example.com", Allow: map[string]bool{"allowed@example.com": true}}
 	n.Targets[0].Result = nil
-	s.sendNotice(n, []string{n.Targets[0].Key}, "admin")
+	s.sendNotice(n, []string{n.Targets[0].Key}, "admin", 0)
 	r := n.Targets[0].Result
 	if r == nil || r.Error != "" || len(r.Sent) != 0 || len(r.Dropped) != 2 || n.Status != "dropped" {
 		t.Fatalf("허용 목록 밖: %+v status=%s", r, n.Status)
@@ -234,7 +234,7 @@ func TestCustNotifySendAllowlist(t *testing.T) {
 func TestMyProductsScoped(t *testing.T) {
 	s := testCustServer(t)
 	n, _ := s.buildNotice("patch", "products/prod", "CVE-2026-0001", "admin")
-	s.sendNotice(n, []string{n.Targets[0].Key}, "admin")
+	s.sendNotice(n, []string{n.Targets[0].Key}, "admin", 0)
 	s.cust().putNotice(n)
 	get := func(groups ...string) string {
 		sid := s.store.put(Session{Username: "u1", Groups: groups, Expiry: time.Now().Add(time.Hour)})
@@ -327,5 +327,46 @@ func TestCustNotifyOSVKEVEvidence(t *testing.T) {
 	}
 	if !hasR1 || !strings.Contains(n.Targets[0].Text, "OSV GHSA-test-0001") {
 		t.Fatalf("OSV 사실·메일 참고: %+v", n.Facts)
+	}
+}
+
+// 발송함: 허용된 주소는 기다렸다가 보내고, 그 사이 취소하면 보내지 않으며 다시 보낼 수 있다.
+func TestCustNotifyOutboxCancel(t *testing.T) {
+	s := testCustServer(t)
+	n, _ := s.buildNotice("patch", "products/prod", "CVE-2026-0001", "admin")
+	to := append(append([]string{}, n.Targets[0].To...), n.Targets[0].Cc...)
+	allow := map[string]bool{}
+	for _, a := range to {
+		allow[strings.ToLower(a)] = true
+	}
+	s.mail = &Mailer{Host: "smtp.invalid", Port: "587", From: "tl@example.com", Allow: allow}
+	custNoticeMu.Lock()
+	s.sendNotice(n, []string{n.Targets[0].Key}, "admin", time.Minute)
+	_ = s.cust().putNotice(n)
+	custNoticeMu.Unlock()
+	r := n.Targets[0].Result
+	if r == nil || !r.Pending || r.Outbox == "" || n.Status != "queued" {
+		t.Fatalf("발송함 대기: %+v %s", r, n.Status)
+	}
+	// 기다리는 동안 다시 눌러도 두 번 넣지 않음
+	s.sendNotice(n, []string{n.Targets[0].Key}, "admin", time.Minute)
+	if n.Targets[0].Result.Outbox != r.Outbox {
+		t.Fatal("중복 발송함 등록")
+	}
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("DELETE", "/", nil)
+	req.SetPathValue("id", r.Outbox)
+	s.apiMailOutboxCancel(w, req)
+	if w.Code != 200 {
+		t.Fatalf("취소: %d %s", w.Code, w.Body.String())
+	}
+	got, _ := s.cust().notice(n.ID)
+	if gr := got.Targets[0].Result; gr == nil || gr.Pending || !gr.Cancelled || len(gr.Sent) != 0 || got.Status == "sent" {
+		t.Fatalf("취소 반영: %+v %s", gr, got.Status)
+	}
+	w = httptest.NewRecorder()
+	s.apiMailOutboxCancel(w, req)
+	if w.Code != 409 {
+		t.Fatalf("두 번 취소는 거부: %d", w.Code)
 	}
 }
