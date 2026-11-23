@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, X, Mail } from 'lucide-react';
-import { adminOrgs, adminCreateOrg, adminDeleteOrg, adminSetOrgContacts, adminCustomers, CUST_DISABLE_REASONS, type Org, type Customer } from '@/lib/api';
+import { adminOrgs, adminCreateOrg, adminDeleteOrg, adminSetOrgContacts, adminCustomers, CUST_DISABLE_REASONS, INDUSTRY_CLS, type Org, type Customer } from '@/lib/api';
 import { CompanyLogo } from '@/components/CompanyLogo';
 import { Button, Input, Badge } from '@/components/ui/primitives';
 import { PageTitle, SectionTitle, Loading, Alert, Table, Th, Td } from './_ui';
@@ -121,7 +121,10 @@ export default function Orgs() {
                   <CompanyLogo logo={cu?.logo} disabled={cu?.disabled} size={34} />
                   <div className="min-w-0">
                     <div className="font-medium">{cu?.name || o.name}</div>
-                    <div className="text-xs text-muted-foreground">ID {o.name}{!cu && ' · 고객 등록부에 연결 안 됨'}</div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {cu && <span className={'rounded px-1.5 py-px text-[11px] font-medium ' + (INDUSTRY_CLS[cu.industry] || INDUSTRY_CLS['일반'])}>{cu.industry}</span>}
+                      ID {o.name}{!cu && ' · 고객 등록부에 연결 안 됨'}
+                    </div>
                     {cu?.disabled && (
                       <div className="mt-0.5 text-xs">
                         <span className="rounded bg-slate-200 px-1.5 py-px text-slate-700">중지 · {CUST_DISABLE_REASONS[cu.disabledReason || 'other']}</span>

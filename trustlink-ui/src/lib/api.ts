@@ -732,7 +732,7 @@ export type VexQueueRowAuto = VexQueueRow & { batchAuto?: number };
 
 // ---------- 고객 등록부 · 고객 통지(패치 권고) ----------
 export type CustNotifyKind = 'vuln' | 'vex' | 'incident' | 'patch' | 'eos' | 'contract';
-export type CustContact = { name: string; role: 'security' | 'itops' | 'purchase' | 'other'; email: string; phone?: string; notify: CustNotifyKind[]; lang?: '' | 'ko' | 'en' };
+export type CustContact = { name: string; role: 'security' | 'itops' | 'purchase' | 'other'; email: string; phone?: string; mobile?: string; dept?: string; title?: string; notify: CustNotifyKind[]; lang?: '' | 'ko' | 'en' };
 export type CustInstall = { tag: string; env: '운영' | 'DR' | '검증' | '개발'; qty: number };
 export type CustUsage = {
   id?: string; repo: string; installs: CustInstall[]; contractNo?: string; licenseType?: '' | 'perpetual' | 'subscription' | 'term';
@@ -740,11 +740,18 @@ export type CustUsage = {
   notifyLevel: 'critical_kev' | 'high' | 'all'; notifyContacts?: string[]; memo?: string;
 };
 export type Customer = {
-  id: string; name: string; industry: '공공' | '금융' | '일반' | '해외'; country?: string; lang: 'ko' | 'en'; orgGroup?: string;
+  id: string; name: string; industry: CustIndustry; country?: string; lang: 'ko' | 'en'; orgGroup?: string;
   salesOwner?: string; supportOwner?: string; memo?: string; contacts: CustContact[]; usages: CustUsage[]; updated?: string; updatedBy?: string;
   // 사용/중지(폐업·관계 종료·계약 해지)와 로고 — 전용 API 로만 바뀐다
   disabled?: boolean; disabledReason?: CustDisableReason; disabledNote?: string; disabledAt?: string; disabledBy?: string; logo?: string;
   deleted?: boolean; deletedAt?: string; deletedBy?: string; // 휴지통
+};
+export const CUST_INDUSTRIES = ['공공', '금융', '방산', '제조', '통신', '에너지', '의료', '일반', '해외'] as const;
+export type CustIndustry = (typeof CUST_INDUSTRIES)[number];
+// 업종 배지 색
+export const INDUSTRY_CLS: Record<string, string> = {
+  공공: 'bg-sky-100 text-sky-800', 금융: 'bg-emerald-100 text-emerald-800', 방산: 'bg-indigo-100 text-indigo-800', 제조: 'bg-amber-100 text-amber-800',
+  통신: 'bg-cyan-100 text-cyan-800', 에너지: 'bg-orange-100 text-orange-800', 의료: 'bg-rose-100 text-rose-800', 일반: 'bg-slate-100 text-slate-700', 해외: 'bg-violet-100 text-violet-800',
 };
 export type CustDisableReason = 'closed' | 'ended' | 'terminated' | 'other';
 export const CUST_DISABLE_REASONS: Record<CustDisableReason, string> = { closed: '폐업', ended: '관계 종료', terminated: '계약 해지', other: '기타' };

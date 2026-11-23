@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	custIndustries = []string{"공공", "금융", "일반", "해외"}
+	custIndustries = []string{"공공", "금융", "방산", "제조", "통신", "에너지", "의료", "일반", "해외"}
 	custRoles      = []string{"security", "itops", "purchase", "other"}
 	custKinds      = []string{"vuln", "vex", "incident", "patch", "eos", "contract"}
 	custEnvs       = []string{"운영", "DR", "검증", "개발"}
@@ -41,8 +41,11 @@ type CustContact struct {
 	Role   string   `json:"role"` // security | itops | purchase | other
 	Email  string   `json:"email"`
 	Phone  string   `json:"phone,omitempty"`
-	Notify []string `json:"notify"`         // 받을 통지 종류(custKinds)
-	Lang   string   `json:"lang,omitempty"` // 비면 고객 언어
+	Mobile string   `json:"mobile,omitempty"`
+	Dept   string   `json:"dept,omitempty"`  // 부서(명함 표시)
+	Title  string   `json:"title,omitempty"` // 직함(명함 표시)
+	Notify []string `json:"notify"`          // 받을 통지 종류(custKinds)
+	Lang   string   `json:"lang,omitempty"`  // 비면 고객 언어
 }
 
 type CustInstall struct {

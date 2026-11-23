@@ -3,7 +3,7 @@ import { Busy, DownloadLink } from '@/components/Progress';
 import { Building2, Plus, Trash2, Pencil, Users, Package, CalendarClock, AlertTriangle, Mail, Phone, RefreshCw, Save, X } from 'lucide-react';
 import {
   adminCustomers, adminCustomerSave, adminCustomerDelete, adminCustomerProduct, adminCustomerSettings, adminCustomerExpiring, adminCustomerExpiryCheck,
-  adminOrgs, adminUsers, searchRepos, adminCustomerStatus, adminCustomerLogo, adminCustomerLogoDelete, CUST_DISABLE_REASONS, adminCustomerUndelete, adminCustomerPurge, adminCustomersRestore,
+  adminOrgs, adminUsers, searchRepos, adminCustomerStatus, adminCustomerLogo, adminCustomerLogoDelete, CUST_DISABLE_REASONS, adminCustomerUndelete, adminCustomerPurge, adminCustomersRestore, CUST_INDUSTRIES, INDUSTRY_CLS,
   type CustDisableReason,
   type Customer, type CustomerView, type CustContact, type CustUsage, type CustExpiry, type VerPolicy, type CustSettings, type ExpiryRec, type CustNotifyKind
 } from '@/lib/api';
@@ -16,7 +16,8 @@ import { CompanyLogo } from '@/components/CompanyLogo';
 // 관리 › 고객 등록부: 고객(CRM 카드) — 담당자 · 제품 사용(설치 버전·계약·유지보수·통지 정책) · 우리 쪽 담당.
 // 만료 D-day 와 "다운로드 기록 추정 버전 ≠ 등록 버전(확인 필요)"을 한눈에 보여 준다. 고객사 그룹(Keycloak)은 이름으로만 연결.
 
-const INDUSTRIES = ['공공', '금융', '일반', '해외'] as const;
+const INDUSTRIES = CUST_INDUSTRIES;
+const Ind = ({ v }: { v: string }) => <span className={cn('rounded px-1.5 py-px text-[11px] font-medium', INDUSTRY_CLS[v] || INDUSTRY_CLS['일반'])}>{v}</span>;
 const ROLES: Record<CustContact['role'], string> = { security: '보안', itops: 'IT 운영', purchase: '구매', other: '기타' };
 const KINDS: Record<CustNotifyKind, string> = { vuln: '취약점', vex: 'VEX', incident: '사고', patch: '패치', eos: 'EOS', contract: '계약' };
 const ENVS = ['운영', 'DR', '검증', '개발'] as const;
@@ -50,12 +51,13 @@ export default function Customers() {
   const [form, setForm] = useState<{ c: Customer; isNew: boolean } | null>(null);
   const [q, setQ] = useState('');
   const [showOff, setShowOff] = useState(false); // 중지된 회사도 보기
+  const [ind, setInd] = useState(''); // 업종 거르기
   const load = () => adminCustomers().then((d) => { setData(d); setErr(''); }).catch((e) => setErr(String(e)));
   useEffect(() => { load(); }, []);
 
   const offCount = (data?.customers || []).filter((c) => c.disabled && !c.deleted).length;
   const trash = (data?.customers || []).filter((c) => c.deleted);
-  const list = useMemo(() => (data?.customers || []).filter((c) => !c.deleted && (showOff || !c.disabled)).filter((c) => !q || (c.name + c.id + c.orgGroup + c.usages.map((u) => u.repo).join(' ')).toLowerCase().includes(q.toLowerCase())), [data, q, showOff]);
+  const list = useMemo(() => (data?.customers || []).filter((c) => !c.deleted && (showOff || !c.disabled) && (!ind || c.industry === ind)).filter((c) => !q || (c.name + c.id + c.orgGroup + c.usages.map((u) => u.repo).join(' ')).toLowerCase().includes(q.toLowerCase())), [data, q, showOff, ind]);
   const cur = data?.customers.find((c) => c.id === sel);
 
   const restore = async (f: File) => {
@@ -96,6 +98,10 @@ export default function Customers() {
           <div>
             <div className="mb-2 flex items-center gap-2">
               <Input placeholder="고객·제품·그룹 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+              <select className={cn(selectCls, 'shrink-0')} value={ind} onChange={(e) => setInd(e.target.value)} title="업종">
+                <option value="">모든 업종</option>
+                {INDUSTRIES.filter((x) => (data?.customers || []).some((c) => !c.deleted && c.industry === x)).map((x) => <option key={x}>{x}</option>)}
+              </select>
               {offCount > 0 && (
                 <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground" title="폐업·관계 종료·계약 해지로 중지한 회사">
                   <input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />중지된 회사 {offCount}곳 보기
@@ -116,7 +122,7 @@ export default function Customers() {
                             <div className="font-medium">{c.name}</div>
                             <div className="mt-0.5 flex flex-wrap gap-1 text-xs text-muted-foreground">
                               {c.disabled && <Badge variant="outline">중지 · {CUST_DISABLE_REASONS[c.disabledReason || 'other']}</Badge>}
-                              <Badge variant="muted">{c.industry}</Badge>{c.lang === 'en' && <Badge variant="outline">EN</Badge>}{c.orgGroup && <span>{c.orgGroup}</span>}
+                              <Ind v={c.industry} />{c.lang === 'en' && <Badge variant="outline">EN</Badge>}{c.orgGroup && <span>{c.orgGroup}</span>}
                             </div>
                           </div>
                         </div>
@@ -235,6 +241,38 @@ function StatusLogo({ c, onChanged }: { c: CustomerView; onChanged: () => void }
   );
 }
 
+// 담당자 명함: 회사 로고·이름 / 이름·직함·부서 / 연락처 / 받는 통지
+function BizCard({ ct, company, logo }: { ct: CustContact; company: string; logo?: string }) {
+  return (
+    <div className="flex aspect-[1.75] min-h-[150px] flex-col justify-between rounded-lg border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3.5 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <CompanyLogo logo={logo} size={26} className="border-0 bg-transparent" />
+          <span className="truncate text-[11px] font-medium text-slate-500">{company}</span>
+        </div>
+        <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-white">{ROLES[ct.role]}{ct.lang ? ` · ${ct.lang.toUpperCase()}` : ''}</span>
+      </div>
+      <div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-base font-bold tracking-tight text-slate-900">{ct.name}</span>
+          {ct.title && <span className="text-xs text-slate-600">{ct.title}</span>}
+        </div>
+        {ct.dept && <div className="text-[11px] text-slate-500">{ct.dept}</div>}
+      </div>
+      <div className="space-y-0.5 border-t border-slate-200 pt-1.5 text-[11px] text-slate-600">
+        <div className="flex items-center gap-1.5"><Mail size={11} className="shrink-0 text-slate-400" /><a href={`mailto:${ct.email}`} className="truncate hover:underline">{ct.email}</a></div>
+        {(ct.phone || ct.mobile) && (
+          <div className="flex flex-wrap items-center gap-x-3">
+            {ct.phone && <span className="inline-flex items-center gap-1.5"><Phone size={11} className="text-slate-400" />{ct.phone}</span>}
+            {ct.mobile && <span className="inline-flex items-center gap-1.5"><Phone size={11} className="text-slate-400" />{ct.mobile} (휴대)</span>}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1 pt-0.5">{ct.notify.length ? ct.notify.map((k) => <span key={k} className="rounded bg-emerald-50 px-1 text-[10px] text-emerald-700">{KINDS[k]}</span>) : <span className="text-amber-700">통지 종류 없음</span>}</div>
+      </div>
+    </div>
+  );
+}
+
 function CustomerCard({ c, products, onEdit, onDelete, onChanged }: { c: CustomerView; products: Record<string, VerPolicy[]>; onEdit: () => void; onDelete: () => void; onChanged: () => void }) {
   return (
     <Card>
@@ -244,7 +282,7 @@ function CustomerCard({ c, products, onEdit, onDelete, onChanged }: { c: Custome
             <CompanyLogo logo={c.logo} disabled={c.disabled} size={44} />
             <div>
               <div className="text-lg font-semibold">{c.name}</div>
-              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground"><Badge variant="muted">{c.industry}</Badge>{c.country && <span>{c.country}</span>}<span>· {c.lang === 'en' ? '영어' : '한국어'} 통지</span><span>· ID {c.id}</span></div>
+              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground"><Ind v={c.industry} />{c.country && <span>{c.country}</span>}<span>· {c.lang === 'en' ? '영어' : '한국어'} 통지</span><span>· ID {c.id}</span></div>
             </div>
           </div>
           <div className="flex gap-1">
@@ -275,15 +313,8 @@ function CustomerCard({ c, products, onEdit, onDelete, onChanged }: { c: Custome
         <div>
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Users size={14} />담당자 {c.contacts.length}</div>
           {c.contacts.length === 0 ? <p className="text-xs text-muted-foreground">담당자가 없습니다 — 통지를 받을 사람이 없습니다.</p> : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {c.contacts.map((ct) => (
-                <div key={ct.email} className="rounded-md border p-2 text-xs">
-                  <div className="flex items-center gap-1.5"><b className="text-sm">{ct.name}</b><Badge variant="muted">{ROLES[ct.role]}</Badge>{ct.lang && <Badge variant="outline">{ct.lang.toUpperCase()}</Badge>}</div>
-                  <div className="mt-1 flex items-center gap-1 text-muted-foreground"><Mail size={11} />{ct.email}</div>
-                  {ct.phone && <div className="flex items-center gap-1 text-muted-foreground"><Phone size={11} />{ct.phone}</div>}
-                  <div className="mt-1 flex flex-wrap gap-1">{ct.notify.length ? ct.notify.map((k) => <Badge key={k} variant="success">{KINDS[k]}</Badge>) : <span className="text-amber-700">통지 종류 없음</span>}</div>
-                </div>
-              ))}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {c.contacts.map((ct, i) => <BizCard key={ct.email + i} ct={ct} company={c.name} logo={c.logo} />)}
             </div>
           )}
         </div>
@@ -386,8 +417,11 @@ function CustomerForm({ init, isNew, onClose, onSaved }: { init: Customer; isNew
                 <div className="grid gap-2 sm:grid-cols-4">
                   <Input placeholder="이름 *" value={ct.name} onChange={(e) => setCt(i, { name: e.target.value })} />
                   <select className={selectCls} value={ct.role} onChange={(e) => setCt(i, { role: e.target.value as CustContact['role'] })}>{Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-                  <Input placeholder="이메일 *" value={ct.email} onChange={(e) => setCt(i, { email: e.target.value })} />
+                  <Input placeholder="직함(예: 책임)" value={ct.title || ''} onChange={(e) => setCt(i, { title: e.target.value })} />
+                  <Input placeholder="부서(예: 정보보호팀)" value={ct.dept || ''} onChange={(e) => setCt(i, { dept: e.target.value })} />
+                  <Input placeholder="이메일 *" className="sm:col-span-2" value={ct.email} onChange={(e) => setCt(i, { email: e.target.value })} />
                   <Input placeholder="전화" value={ct.phone || ''} onChange={(e) => setCt(i, { phone: e.target.value })} />
+                  <Input placeholder="휴대전화" value={ct.mobile || ''} onChange={(e) => setCt(i, { mobile: e.target.value })} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="text-muted-foreground">받을 통지</span>
