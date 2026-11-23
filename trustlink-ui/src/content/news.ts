@@ -25,6 +25,10 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.15.1', date: '2026-11-23', title: 'AI 성능 판단 보정',
+    items: [{ kind: '수정', text: '측정 기록이 없을 때 판단이 "혼합"으로 기울던 문제 — 자료 없음은 안내만 하고 판단에는 넣지 않음' }],
+  },
+  {
     version: '2.15.0', date: '2026-11-23', title: 'AI 성능 대시보드',
     items: [
       { kind: '신규', text: '대시보드 › AI 성능 — 로컬 AI 글 쓰는 속도, 기능별 소요 시간·실패, 메모리·CPU·디스크 영향, 외부 LLM 이 필요한지 판단과 기능별 권장 연결' },

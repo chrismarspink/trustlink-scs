@@ -369,8 +369,7 @@ func aiVerdict(v aiVerdictIn) (level, title string, reasons []aiReason) {
 	crit, warn := 0, 0
 	switch {
 	case v.LocalTPS == 0:
-		add("warn", "아직 측정 자료가 없습니다 — 아래 '성능 측정'을 한 번 눌러 주세요")
-		warn++
+		add("warn", "아직 측정 자료가 없습니다 — 아래 '성능 측정'을 한 번 눌러 주세요") // 판단에는 넣지 않음
 	case v.LocalTPS < 3:
 		add("crit", "글 쓰는 속도가 초당 "+numStr(v.LocalTPS)+"토큰으로 매우 느립니다(긴 보고서는 수십 분)")
 		crit++

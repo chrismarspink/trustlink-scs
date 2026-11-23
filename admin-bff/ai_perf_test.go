@@ -17,6 +17,9 @@ func TestAIVerdict(t *testing.T) {
 	if lv, _, _ := aiVerdict(aiVerdictIn{LocalTPS: 6, LocalFailRate: 30, MemAvailPct: 60}); lv != "external" {
 		t.Fatalf("실패가 많으면 외부: %s", lv)
 	}
+	if lv, _, _ := aiVerdict(aiVerdictIn{MemAvailPct: 60}); lv != "local" {
+		t.Fatalf("측정 전에는 자료 없음만으로 기울지 않음: %s", lv)
+	}
 	if lv, _, _ := aiVerdict(aiVerdictIn{LocalTPS: 30, MemAvailPct: 5}); lv != "external" {
 		t.Fatalf("메모리가 모자라면 외부: %s", lv)
 	}
