@@ -620,6 +620,7 @@ export type RegCandidate = {
 export type RegDiscoverInfo = {
   state: { running: boolean; started?: string; finished?: string; log: string[]; added: number };
   candidates: RegCandidate[]; config: { keywordsUS: string[]; keywordsKR: string[] }; hasLawOC: boolean;
+  aiReady?: boolean; watchBase?: number; // 출처별 사용 가능 여부(AI 연결·변경 감지 기준값 수)
 };
 export const adminRegDiscover = () => aj<RegDiscoverInfo>('/api/regs-discover');
 export const adminRegDiscoverRun = (sources: string[]) => aj('/api/regs-discover', jsonInit('POST', { sources }));

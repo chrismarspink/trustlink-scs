@@ -25,6 +25,13 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.14.3', date: '2026-11-23', title: '규제 탐색 정비',
+    items: [
+      { kind: '개선', text: '규제 탐색 화면에 기능 설명·진행 단계, 출처별 사용 가능 여부와 설정 방법, 탐색 진행 표시' },
+      { kind: '수정', text: '보고서용 AI 가 꺼져 있으면 AI 제안이 늘 건너뛰어지던 문제 — 일반 AI 로 제안' },
+    ],
+  },
+  {
     version: '2.14.2', date: '2026-11-23', title: '대시보드 불러오기 진행 표시',
     items: [{ kind: '개선', text: '대시보드를 여는 동안 기본 지표·버전 추이·보안 집계 중 무엇을 받았는지 막대와 경과 시간으로 표시, 새로 집계 중에도 표시' }],
   },

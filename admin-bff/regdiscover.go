@@ -296,6 +296,15 @@ var regSuggestSchema = map[string]any{
 	"required": []string{"items"},
 }
 
+// discoverAIUse: 규제 탐색 AI 는 보고서용 설정을 우선 쓰고, 꺼져 있으면 일반 AI 를 쓴다
+// (보내는 내용은 공개된 규제 이름 목록뿐이라 고객 데이터가 없다).
+func discoverAIUse() string {
+	if aiEnabledFor("report") {
+		return "report"
+	}
+	return "general"
+}
+
 // AI 제안: 모델 지식 기반이므로 출처 없음 — 반드시 사람이 확인.
 func (s *Server) discoverAI(c *regCatalog) ([]regCandidate, error) {
 	names := []string{}
@@ -310,7 +319,7 @@ func (s *Server) discoverAI(c *regCatalog) ([]regCandidate, error) {
 	var d struct {
 		Items []struct{ Name, Region, Authority, Why string } `json:"items"`
 	}
-	if _, err := s.aiDraftFor("report", "ko", facts, task, regSuggestSchema, 1400, &d); err != nil {
+	if _, err := s.aiDraftFor(discoverAIUse(), "ko", facts, task, regSuggestSchema, 1400, &d); err != nil {
 		return nil, err
 	}
 	out := []regCandidate{}
@@ -382,8 +391,8 @@ func (s *Server) runDiscover(sources []string, actor string) {
 			found = append(found, l...)
 		}
 		if inList("ai", sources) {
-			if !aiEnabledFor("report") {
-				discoverLog("AI 제안: AI 연결이 꺼져 있어 건너뜀")
+			if !aiEnabledFor(discoverAIUse()) {
+				discoverLog("AI 제안: AI 연결이 꺼져 있어 건너뜀(관리 콘솔 › AI 연결)")
 			} else {
 				discoverLog("AI 제안 요청 중(로컬 CPU 면 1~2분)")
 				l, err := s.discoverAI(&cc)
@@ -456,7 +465,10 @@ func (s *Server) apiRegDiscoverGet(w http.ResponseWriter, r *http.Request) {
 	regMu.Unlock()
 	hasOC := cfg.LawOC != ""
 	cfg.LawOC = ""
-	writeJSON(w, 200, map[string]any{"state": st, "candidates": cands, "config": cfg, "hasLawOC": hasOC})
+	base := map[string]string{}
+	_ = readJSONFile(filepath.Join(regDir(), "watch.json"), &base)
+	writeJSON(w, 200, map[string]any{"state": st, "candidates": cands, "config": cfg, "hasLawOC": hasOC,
+		"aiReady": aiEnabledFor(discoverAIUse()), "watchBase": len(base)})
 }
 
 // PUT /api/regs/discover/config {keywordsUS, keywordsKR, lawOC(빈 값=유지), clearLawOC}

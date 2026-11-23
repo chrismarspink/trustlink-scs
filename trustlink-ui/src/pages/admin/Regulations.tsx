@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Busy } from '@/components/Progress';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BookMarked, Search, Plus, Pencil, Trash2, CheckCircle2, CircleDashed, ChevronDown, ChevronRight, Radar, FileText,
   RefreshCw, ExternalLink, Save, X, Scale, Download, Sparkles, RotateCcw
@@ -451,7 +451,7 @@ function CatalogTab({ info, reload, editId }: { info: RegsInfo; reload: () => vo
 // ---------- 탐색 탭 ----------
 function DiscoverTab({ onAdopted }: { onAdopted: (regId: string) => void }) {
   const [d, setD] = useState<RegDiscoverInfo | null>(null);
-  const [src, setSrc] = useState<string[]>(['federal-register', 'law-kr', 'watch', 'ai']);
+  const [src, setSrc] = useState<string[] | null>(null); // null = 아직 안 고름(불러온 뒤 쓸 수 있는 출처로)
   const [filter, setFilter] = useState<'new' | 'all'>('new');
   const [kwUS, setKwUS] = useState('');
   const [kwKR, setKwKR] = useState('');
@@ -465,7 +465,19 @@ function DiscoverTab({ onAdopted }: { onAdopted: (regId: string) => void }) {
     return () => clearTimeout(t);
   }, [d]);
   if (!d) return <Loading />;
-  async function run() { await adminRegDiscoverRun(src); setTimeout(() => adminRegDiscover().then(setD), 500); }
+  // 출처별 사용 가능 여부와 이유
+  const avail: Record<string, { ok: boolean; note: React.ReactNode }> = {
+    'federal-register': { ok: true, note: '미국 연방 관보 공개 API — 키 없이 사용(영문 결과)' },
+    'law-kr': d.hasLawOC
+      ? { ok: true, note: '법령·행정규칙 검색(OC 설정됨)' }
+      : { ok: false, note: <>OC 값이 없어 사용할 수 없습니다 — <a className="text-primary underline" href="https://open.law.go.kr" target="_blank" rel="noreferrer">국가법령정보 공동활용</a>에서 무료 신청 후 오른쪽 '탐색 설정'에 입력</> },
+    watch: { ok: true, note: d.watchBase ? `카탈로그 출처 ${d.watchBase}곳의 원문이 바뀌었는지 비교` : '처음 실행하면 출처 원문을 기준값으로만 저장합니다(다음 실행부터 변경 감지)' },
+    ai: d.aiReady
+      ? { ok: true, note: 'AI 가 카탈로그에 빠진 규제를 제안(모델 지식 기반 — 원문 확인 필요)' }
+      : { ok: false, note: <>AI 연결이 꺼져 있습니다 — <Link className="text-primary underline" to="/admin/ai">AI 연결</Link>에서 켜기</> },
+  };
+  const chosen = (src ?? Object.keys(SRC_LABEL).filter((k) => avail[k].ok)).filter((k) => avail[k].ok);
+  async function run() { await adminRegDiscoverRun(chosen); setTimeout(() => adminRegDiscover().then(setD), 500); }
   async function saveCfg() {
     const r = await adminRegDiscoverCfg({ keywordsUS: kwUS.split('\n'), keywordsKR: kwKR.split('\n'), lawOC: oc || undefined });
     setOc(''); setMsg(`저장했습니다${r.hasLawOC ? ' (OC 설정됨)' : ''}`); load();
@@ -476,43 +488,66 @@ function DiscoverTab({ onAdopted }: { onAdopted: (regId: string) => void }) {
     if (a === 'adopt' && r.candidate.regId && c.source !== 'watch') onAdopted(r.candidate.regId);
   }
   const cands = d.candidates.filter((c) => filter === 'all' || c.state === 'new');
+  const fresh = d.candidates.filter((c) => c.state === 'new').length;
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
       <div>
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 text-sm">
-          {Object.entries(SRC_LABEL).map(([k, v]) => (
-            <label key={k} className="flex items-center gap-1">
-              <input type="checkbox" checked={src.includes(k)} onChange={(e) => setSrc(e.target.checked ? [...src, k] : src.filter((x) => x !== k))} />{v}
-            </label>
-          ))}
-          <div className="flex-1" />
-          <Button size="sm" onClick={run} disabled={d.state.running || !src.length}>
-            <Radar size={14} /> {d.state.running ? '탐색 중…' : '탐색 실행'}
-          </Button>
+        <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50/50 p-3 text-sm">
+          <p className="font-medium">규제 탐색 — 카탈로그에 아직 없는 규제·개정을 바깥 출처에서 찾아 '후보'로 모읍니다.</p>
+          <ol className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-700">
+            <li><b>① 탐색 실행</b> — 아래에서 고른 출처를 검색</li>
+            <li><b>② 후보 검토</b> — 제목·요약·원문 링크 확인</li>
+            <li><b>③ 채택</b> — 카탈로그에 '검토 중' 초안으로 추가(요구사항은 직접 작성) · <b>무시</b> — 목록에서 숨김</li>
+          </ol>
+          <p className="mt-1 text-xs text-muted-foreground">카탈로그는 채택할 때만 바뀝니다. 외부 접속은 '탐색 실행'을 누를 때만 합니다.</p>
         </div>
+        <div className="mb-3 rounded-lg border bg-card p-3 text-sm">
+          <div className="space-y-1.5">
+            {Object.entries(SRC_LABEL).map(([k, v]) => (
+              <label key={k} className={cn('flex items-start gap-2', !avail[k].ok && 'opacity-70')}>
+                <input type="checkbox" className="mt-0.5" disabled={!avail[k].ok || d.state.running} checked={chosen.includes(k)}
+                  onChange={(e) => setSrc(e.target.checked ? [...chosen, k] : chosen.filter((x) => x !== k))} />
+                <span className="w-28 shrink-0 font-medium">{v}</span>
+                <span className={cn('text-xs', avail[k].ok ? 'text-muted-foreground' : 'text-amber-700')}>{avail[k].note}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-3 border-t pt-3">
+            <span className="text-xs text-muted-foreground">
+              {d.state.running ? '' : d.state.finished ? `마지막 탐색 ${kdate(d.state.finished)} — 새 후보 ${d.state.added}건` : '이번 서버 실행 후 아직 탐색하지 않았습니다'}
+            </span>
+            <div className="flex-1" />
+            <Button size="sm" onClick={run} disabled={d.state.running || !chosen.length}>
+              <Radar size={14} /> {d.state.running ? '탐색 중…' : `탐색 실행 (${chosen.length}곳)`}
+            </Button>
+          </div>
+        </div>
+        <Busy active={d.state.running} since={d.state.started} label="탐색 중 — 출처별 진행은 아래 기록에 나옵니다" hint="보통 30초 안팎, AI 제안을 포함하면 1~2분" className="mb-3" />
         {d.state.log.length > 0 && (
           <pre className="mb-3 max-h-40 overflow-auto rounded-md bg-zinc-950 p-2 text-[11px] leading-relaxed text-zinc-200">{d.state.log.join('\n')}</pre>
         )}
         <div className="mb-2 flex items-center gap-2 text-sm">
-          <SectionTitle>후보 {cands.length}건</SectionTitle>
+          <SectionTitle>후보 {cands.length}건{filter === 'all' && ` (검토 대기 ${fresh})`}</SectionTitle>
           <div className="flex-1" />
           <select className={selectCls} value={filter} onChange={(e) => setFilter(e.target.value as 'new' | 'all')}>
             <option value="new">새 후보만</option><option value="all">전체(무시·채택 포함)</option>
           </select>
         </div>
         <div className="space-y-2">
-          {cands.length === 0 && <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">후보가 없습니다. 탐색을 실행하세요.</p>}
+          {cands.length === 0 && <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">{d.candidates.length ? '검토할 새 후보가 없습니다. 무시·채택한 후보는 "전체"에서 볼 수 있습니다.' : '후보가 없습니다. 위에서 탐색을 실행하세요.'}</p>}
           {cands.map((c) => (
             <div key={c.id} className={cn('rounded-lg border bg-card p-3 text-sm', c.state !== 'new' && 'opacity-60')}>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={c.source === 'ai' ? 'warn' : c.source === 'watch' ? 'danger' : 'muted'}>{SRC_LABEL[c.source]}</Badge>
-                {c.region && <RegionChip r={c.region} />}
-                <span className="font-medium">{c.title}</span>
-                {c.date && <span className="text-xs text-muted-foreground">{c.date}</span>}
-                <div className="flex-1" />
+              <div className="flex items-start gap-3">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <Badge variant={c.source === 'ai' ? 'warn' : c.source === 'watch' ? 'danger' : 'muted'}>{SRC_LABEL[c.source]}</Badge>
+                  {c.region && <RegionChip r={c.region} />}
+                  <span className="font-medium">{c.title}</span>
+                  {c.date && <span className="text-xs text-muted-foreground">{c.date}</span>}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
                 {c.state === 'new' ? (
                   <>
-                    <Button size="sm" onClick={() => act(c, 'adopt')}>{c.source === 'watch' ? '재확인 필요로 표시' : '카탈로그에 채택'}</Button>
+                    <Button size="sm" onClick={() => act(c, 'adopt')} title={c.source === 'watch' ? '해당 규제의 원문 확인 표시를 풀고 메모를 남깁니다' : "카탈로그에 '검토 중' 초안 규제로 추가하고 편집기를 엽니다"}>{c.source === 'watch' ? '재확인 필요로 표시' : '초안으로 채택'}</Button>
                     <Button size="sm" variant="ghost" onClick={() => act(c, 'dismiss')}>무시</Button>
                   </>
                 ) : (
@@ -521,6 +556,7 @@ function DiscoverTab({ onAdopted }: { onAdopted: (regId: string) => void }) {
                     <Button size="sm" variant="ghost" onClick={() => act(c, 'restore')}>되돌리기</Button>
                   </>
                 )}
+                </div>
               </div>
               {c.summary && <p className="mt-1 text-xs text-muted-foreground">{c.summary}</p>}
               <div className="mt-1 flex gap-3 text-xs">
@@ -547,12 +583,9 @@ function DiscoverTab({ onAdopted }: { onAdopted: (regId: string) => void }) {
           </div>
         </div>
         <div className="rounded-lg border bg-card p-3 text-xs text-muted-foreground">
-          <p className="mb-1 font-medium text-foreground">출처별 동작</p>
-          <p><b>미국 관보</b>: Federal Register 공개 API 구문 검색(최신순).</p>
-          <p><b>국가법령정보센터</b>: 법령·행정규칙 검색(OC 필요).</p>
-          <p><b>원문 변경 감지</b>: 카탈로그 출처 페이지 본문이 바뀌면 후보로 올립니다. 처음 실행은 기준값만 저장합니다.</p>
-          <p><b>AI 제안</b>: 연결된 LLM 의 지식으로 빠진 규제를 제안합니다. 출처가 없으므로 반드시 원문을 확인하세요.</p>
-          <p className="mt-1">외부 접속은 '탐색 실행'을 누를 때만 합니다.</p>
+          <p className="mb-1 font-medium text-foreground">검색어 안내</p>
+          <p>검색어는 미국 관보·국가법령정보센터에만 쓰입니다. 결과가 너무 많거나 엉뚱하면 검색어를 더 구체적으로 바꾸세요.</p>
+          <p className="mt-1">이미 카탈로그에 있는 규제와 이름이 겹치는 결과는 자동으로 뺍니다.</p>
         </div>
       </div>
     </div>
