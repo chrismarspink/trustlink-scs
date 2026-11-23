@@ -25,6 +25,10 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.14.2', date: '2026-11-23', title: '대시보드 불러오기 진행 표시',
+    items: [{ kind: '개선', text: '대시보드를 여는 동안 기본 지표·버전 추이·보안 집계 중 무엇을 받았는지 막대와 경과 시간으로 표시, 새로 집계 중에도 표시' }],
+  },
+  {
     version: '2.14.1', date: '2026-11-23', title: '내 제품 접기·펼치기',
     items: [{ kind: '개선', text: '내 제품에서 제품·버전별로 접고 펼침 — 버전은 접힌 채로 KEV·치명·높음 건수를 먼저 보여 줌' }],
   },

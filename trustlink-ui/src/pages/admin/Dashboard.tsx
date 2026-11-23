@@ -7,7 +7,8 @@ import {
 } from '@/lib/api';
 import { fmtBytes, cn } from '@/lib/utils';
 import { Card, CardHeader, CardContent, Badge, Button } from '@/components/ui/primitives';
-import { PageTitle, SectionTitle, StatCard, Loading, Alert, BarChart, Gauge, LineChart, Donut, Table, Th, Td, selectCls } from './_ui';
+import { Busy, PartsProgress } from '@/components/Progress';
+import { PageTitle, SectionTitle, StatCard, Alert, BarChart, Gauge, LineChart, Donut, Table, Th, Td, selectCls } from './_ui';
 
 const GROUPS = ['admins', 'developers', 'partners', 'customers'];
 
@@ -315,6 +316,7 @@ export default function Dashboard() {
   const [dash, setDash] = useState<Dash | null>(null);
   const [dashErr, setDashErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [t0] = useState(() => new Date().toISOString()); // 처음 들어온 시각 — 진행 표시의 경과 시간 기준
   const [tab, setTab] = useState<TabKey>(readTab);
   const [repo, setRepo] = useState('');
   const [vexType, setVexType] = useState<'all' | (typeof VEX_TYPES)[number]['key']>('all');
@@ -343,8 +345,20 @@ export default function Dashboard() {
   );
   const selected = products.find((p) => p.repo === (repo || defaultRepo));
 
+  // 처음 불러오는 동안: 무엇을 받았고 무엇을 기다리는지
+  const loading = !data || (!stats && !statsErr) || (!dash && !dashErr);
+  const progress = loading && (
+    <PartsProgress since={t0} className="mb-4"
+      parts={[
+        { label: '기본 지표', done: !!data || !!err, failed: !!err },
+        { label: '버전 추이', done: !!stats || !!statsErr, failed: !!statsErr },
+        { label: '보안·공급망 집계', done: !!dash || !!dashErr, failed: !!dashErr },
+      ]}
+      hint="서버가 막 시작된 직후에는 집계에 10~30초 걸릴 수 있습니다." />
+  );
+
   if (err) return (<><PageTitle>대시보드</PageTitle><Alert tone="crit">오류: {err}</Alert></>);
-  if (!data) return (<><PageTitle>대시보드</PageTitle><Loading /></>);
+  if (!data) return (<><PageTitle>대시보드</PageTitle>{progress}</>);
 
   const { mt, us, h } = data;
   const disk = mt.disk;
@@ -422,7 +436,7 @@ export default function Dashboard() {
       {statsErr ? (
         <Alert tone="warn">통계 집계 실패: {statsErr}</Alert>
       ) : !stats ? (
-        <p className="text-sm text-muted-foreground">버전 추이 집계 중…</p>
+        <Busy active label="버전 추이 집계 중" />
       ) : !selected || versions.length === 0 ? (
         <p className="text-sm text-muted-foreground">표시할 제품/버전이 없습니다.</p>
       ) : (
@@ -486,8 +500,10 @@ export default function Dashboard() {
         </Button>
       </div>
 
+      {progress}
+      {dash && <Busy active={busy} label="새로 집계하는 중 — 제품마다 취약점·SBOM 을 다시 셉니다" hint="보통 10~20초" className="mb-4" />}
       {dashErr && <div className="mb-4"><Alert tone="crit">집계 실패: {dashErr}</Alert></div>}
-      {!dash ? <Loading /> : <TodoPanel d={dash} />}
+      {dash && <TodoPanel d={dash} />}
 
       <div className="mt-6 flex gap-1 border-b">
         {TABS.map((t) => (
@@ -500,7 +516,7 @@ export default function Dashboard() {
       </div>
       <div className="mt-4">
         {tab === 'ops' ? <OpsTab d={dash ?? EMPTY} base={opsBase} />
-          : !dash ? <Loading />
+          : !dash ? null /* 위쪽 진행 표시가 대신 보여 줌 */
             : tab === 'security' ? <SecurityTab d={dash} trend={versionTrend} />
               : tab === 'quality' ? <QualityTab d={dash} />
                 : <CustomersTab d={dash} />}

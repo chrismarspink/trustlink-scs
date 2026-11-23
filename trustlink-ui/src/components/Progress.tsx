@@ -114,3 +114,31 @@ export function DownloadLink({ href, children, className, title }: { href: strin
     </a>
   );
 }
+
+// PartsProgress: 여러 요청을 동시에 기다릴 때 — 받은 항목마다 ✓, 막대는 받은 개수 비율, 경과 시간.
+// since: 기다리기 시작한 시각(화면 조각이 바뀌어도 경과 시간이 이어지도록 바깥에서 준다).
+export function PartsProgress({ parts, since, hint, className }: {
+  parts: { label: string; done: boolean; failed?: boolean }[]; since?: string; hint?: string; className?: string;
+}) {
+  const done = parts.filter((p) => p.done).length;
+  const waiting = parts.filter((p) => !p.done).map((p) => p.label);
+  return (
+    <div className={cn('space-y-2 rounded-md border border-violet-200 bg-violet-50/60 p-3', className)} role="status" aria-live="polite">
+      <div className="flex flex-wrap gap-1.5">
+        {parts.map((p) => (
+          <span key={p.label} className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
+            p.failed ? 'bg-red-100 text-red-700' : p.done ? 'bg-emerald-100 text-emerald-800' : 'bg-white text-slate-600 ring-1 ring-violet-200')}>
+            {p.failed ? '✕' : p.done ? '✓' : <span className="h-2 w-2 animate-pulse rounded-full bg-violet-500" />}{p.label}
+          </span>
+        ))}
+      </div>
+      <Bar pct={(done / Math.max(parts.length, 1)) * 100} />
+      <div className="flex flex-wrap gap-x-3 text-xs text-slate-700">
+        <span className="font-medium">{waiting.length ? `${waiting.join(', ')} 불러오는 중` : '거의 다 됐습니다'}</span>
+        <span className="tabular-nums">{done} / {parts.length}</span>
+        <span className="tabular-nums text-muted-foreground">경과 <Elapsed from={since} /></span>
+        {hint && <span className="text-muted-foreground">{hint}</span>}
+      </div>
+    </div>
+  );
+}
