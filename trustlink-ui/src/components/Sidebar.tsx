@@ -16,10 +16,9 @@ type Sub = { to: string; label: string; icon: LucideIcon; end?: boolean };
 type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; open?: boolean; children?: Sub[] };
 
 // 제품(레지스트리) 섹션 — 항상 노출. "문서"는 하위 트리.
-const PRODUCT: Item[] = [
+// 맨 위(구역 이름 없음): 홈 · 문서
+const TOP: Item[] = [
   { to: '/', label: '홈', icon: Home, end: true },
-  { to: '/artifacts', label: '아티팩트', icon: Package },
-  { to: '/apikeys', label: '내 API 키', icon: KeyRound },
   {
     to: '/docs', label: '문서', icon: BookOpen, children: [
       { to: '/docs', label: '시작하기', icon: Rocket, end: true },
@@ -29,6 +28,9 @@ const PRODUCT: Item[] = [
     ]
   }
 ];
+// 제품: 아티팩트 · 내 제품 · VEX 판단 · 내 API 키 (내 제품·VEX 판단은 권한에 따라)
+const ARTIFACTS_ITEM: Item = { to: '/artifacts', label: '아티팩트', icon: Package };
+const APIKEY_ITEM: Item = { to: '/apikeys', label: '내 API 키', icon: KeyRound };
 const VEX_ITEM: Item = { to: '/vex', label: 'VEX 판단', icon: ShieldQuestion };
 const MY_ITEM: Item = { to: '/my', label: '내 제품', icon: PackageCheck };
 // 관리 콘솔 섹션 — admins 일 때 노출. 성격별로 세 묶음:
@@ -84,8 +86,9 @@ export function navTrail(pathname: string): string[] | null {
   const y = hit(SYSTEM);
   if (y) return ['시스템', ...y];
   if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
-  const p = hit([...PRODUCT, VEX_ITEM, MY_ITEM]);
-  return p ? ['제품', ...p] : null;
+  const p = hit([ARTIFACTS_ITEM, MY_ITEM, VEX_ITEM, APIKEY_ITEM]);
+  if (p) return ['제품', ...p];
+  return hit(TOP);
 }
 
 const linkCls = (extra = '') => ({ isActive }: { isActive: boolean }) =>
@@ -175,7 +178,7 @@ export function Sidebar() {
   const showAdmin = !!sess?.groups?.includes('admins');
   // VEX 판단 대기열: 보안·개발·관리자(VEX 편집 권한)에게만
   // 내 제품: 고객사 사용자용(로그인 사용자 모두에게 보이되 서버가 본인 고객사로 제한)
-  const product = [PRODUCT[0], ...(sess?.canEditVex ? [VEX_ITEM] : []), ...(sess ? [MY_ITEM] : []), ...PRODUCT.slice(1)];
+  const product = [ARTIFACTS_ITEM, ...(sess ? [MY_ITEM] : []), ...(sess?.canEditVex ? [VEX_ITEM] : []), APIKEY_ITEM];
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-sidebar">
@@ -189,6 +192,7 @@ export function Sidebar() {
         </span>
       </Link>
       <nav className="flex-1 space-y-0.5 overflow-y-auto pb-3">
+        <div className="pt-2">{render(TOP)}</div>
         <SectionLabel>제품</SectionLabel>
         {render(product)}
         {showAdmin && (

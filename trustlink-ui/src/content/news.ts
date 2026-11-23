@@ -25,6 +25,10 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.16.3', date: '2026-11-23', title: '왼쪽 메뉴 정리',
+    items: [{ kind: '개선', text: '맨 위에 홈·문서, 그 아래 "제품" 구역에 아티팩트·내 제품·VEX 판단·내 API 키' }],
+  },
+  {
     version: '2.16.2', date: '2026-11-23', title: '로그 원문 보기·쿠키 가림',
     items: [
       { kind: '신규', text: '로그 "원문 보기(기존)" — 예전처럼 한 줄 그대로, 위에 날짜·이벤트·사용자·주요 내용 표시' },
