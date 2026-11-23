@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck
+  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck
 } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,8 @@ type Item = { to: string; label: string; icon: LucideIcon; end?: boolean; open?:
 
 // 제품(레지스트리) 섹션 — 항상 노출. "문서"는 하위 트리.
 const PRODUCT: Item[] = [
-  { to: '/', label: '아티팩트', icon: Package, end: true },
+  { to: '/', label: '홈', icon: Home, end: true },
+  { to: '/artifacts', label: '아티팩트', icon: Package },
   { to: '/apikeys', label: '내 API 키', icon: KeyRound },
   {
     to: '/docs', label: '문서', icon: BookOpen, children: [

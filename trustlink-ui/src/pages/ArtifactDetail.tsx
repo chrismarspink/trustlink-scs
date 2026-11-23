@@ -344,7 +344,7 @@ export default function ArtifactDetail() {
   const bundleUrl = `/api/artifact/bundle?repo=${encodeURIComponent(repo)}&tag=${encodeURIComponent(sel)}`;
   return (
     <div>
-      <Link to="/" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/artifacts" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft size={15} /> 아티팩트 목록
       </Link>
       <div className="mb-6 flex flex-wrap items-center gap-3">

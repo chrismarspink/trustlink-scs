@@ -24,7 +24,7 @@ export default function GettingStarted() {
         <DocTable head={['역할', '주로 하는 일', '시작 화면']} rows={[
           [<b>개발자·CI</b>, '제품 버전 올리기, SBOM·VEX 첨부, SBOM 자동 생성', <Link className="text-primary underline" to="/docs/share">업로드·다운로드</Link>],
           [<b>보안 담당</b>, '취약점 판단(VEX 분류), AI 초안 검토, VEX 발행', <Link className="text-primary underline" to="/docs/vuln">취약점·VEX</Link>],
-          [<b>고객·협력사</b>, '권한 받은 제품의 산출물·SBOM·VEX 내려받기, 통보 메일 확인', <Link className="text-primary underline" to="/">아티팩트</Link>],
+          [<b>고객·협력사</b>, '권한 받은 제품의 산출물·SBOM·VEX 내려받기, 통보 메일 확인', <Link className="text-primary underline" to="/artifacts">아티팩트</Link>],
           [<b>관리자</b>, '계정·고객사·제품 권한, 통보, 규제 보고서, 시스템 운영', <Link className="text-primary underline" to="/docs/rbac">권한·참고</Link>]
         ]} />
       </Section>

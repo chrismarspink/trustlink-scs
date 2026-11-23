@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { isAuthed, oidcLogin } from '@/lib/api';
 import { Layout } from '@/components/Layout';
 import Artifacts from '@/pages/Artifacts';
+import Home from '@/pages/Home';
 import ArtifactDetail from '@/pages/ArtifactDetail';
 import ApiKeys from '@/pages/ApiKeys';
 import GettingStarted from '@/pages/docs/GettingStarted';
@@ -40,7 +41,8 @@ function ProductApp() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Artifacts />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/artifacts" element={<Artifacts />} />
         <Route path="/docs" element={<GettingStarted />} />
         <Route path="/docs/share" element={<ShareGuide />} />
         <Route path="/docs/vuln" element={<Vuln />} />
