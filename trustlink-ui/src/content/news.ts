@@ -25,6 +25,13 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.15.0', date: '2026-11-23', title: 'AI 성능 대시보드',
+    items: [
+      { kind: '신규', text: '대시보드 › AI 성능 — 로컬 AI 글 쓰는 속도, 기능별 소요 시간·실패, 메모리·CPU·디스크 영향, 외부 LLM 이 필요한지 판단과 기능별 권장 연결' },
+      { kind: '신규', text: '고객 데이터 없는 고정 문장으로 로컬·외부 LLM 속도를 재는 성능 측정 버튼' },
+    ],
+  },
+  {
     version: '2.14.3', date: '2026-11-23', title: '규제 탐색 정비',
     items: [
       { kind: '개선', text: '규제 탐색 화면에 기능 설명·진행 단계, 출처별 사용 가능 여부와 설정 방법, 탐색 진행 표시' },

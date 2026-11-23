@@ -784,3 +784,33 @@ export type MyInstall = { tag: string; env: string; qty: number; eos?: string; e
 export type MyUsage = { repo: string; licenseType?: string; licenseExpiry?: string; maintExpiry?: string; supportTier?: string; installs: MyInstall[] };
 export type MyNotice = { id: string; kind: string; repo: string; vulnId: string; severity: string; sentAt: string; subject: string; text: string; recommend?: string };
 export const myProducts = () => aj<{ customers: { name: string; usages: MyUsage[]; notices: MyNotice[] }[]; user: string }>('/api/my/products');
+
+// ---------- AI 성능·자원 (대시보드 › AI 탭) ----------
+export type AIPerfCall = {
+  at: string; feature: string; use: string; kind: string; model?: string; waitMs: number; ms: number;
+  promptTok: number; genTok: number; promptTps?: number; genTps?: number; ok: boolean; fail?: string;
+};
+export type AIPerfBench = AIPerfCall & { cpuDuring: number; err?: string; by?: string };
+export type AIPerfFeature = {
+  feature: string; kind?: string; sensitive?: string; count: number; fails: number; timeouts: number;
+  p50Ms: number; p90Ms: number; avgWaitMs: number; genTps: number; lastAt: string;
+  recommend: 'local' | 'external' | 'either'; why: string;
+};
+export type AIPerf = {
+  config: { mode: string; reportMode: string; localUrl: boolean; external: string; externalReady: boolean };
+  live: { configured: boolean; reachable?: boolean; busy?: boolean; nCtx?: number };
+  verdict: { level: 'local' | 'hybrid' | 'external'; title: string; reasons: { tone: 'ok' | 'warn' | 'crit'; text: string }[] };
+  local: { genTps: number; calls: number; fails: number; failRate: number };
+  external: { genTps: number; calls: number };
+  features: AIPerfFeature[];
+  benches: AIPerfBench[];
+  bench: { running: boolean; started?: string; target?: string };
+  system: {
+    cpus: number; aiCpus: string; aiMemLimit: number; memTotal: number; memAvail: number; swapTotal: number; swapUsed: number;
+    modelFile: string; modelBytes: number; aiMemEst: number; cpuBusy: number; cpuIdle: number; busySamples: number; samples: number;
+    disks: { label: string; free: number; total: number }[];
+    series: { t: number; cpu: number; mem: number; ai: boolean }[];
+  };
+};
+export const aiPerf = () => aj<AIPerf>('/api/ai-perf');
+export const aiPerfBench = (target: 'local' | 'external') => aj<{ started: boolean }>('/api/ai-perf/bench', jsonInit('POST', { target }));

@@ -287,6 +287,7 @@ func main() {
 	mux.HandleFunc("POST /api/custnotify/{id}/ai", s.guard(s.apiCustNotifyAI))                   // ③ AI 설명
 	mux.HandleFunc("POST /api/custnotify/{id}/send", s.guard(s.apiCustNotifySend))               // ⑤ 발송
 	mux.HandleFunc("GET /api/my/products", s.guardSession(s.apiMyProducts))                      // 고객 전용: 내 고객사 제품만
+	go s.aiSysLoop()                                                                             // 서버 CPU·메모리 표본(30초, AI 탭)
 	go s.custExpiryLoop()                                                                        // 만료·EOS 알림(하루 1회)
 	go func() { time.Sleep(20 * time.Second); s.dashboardCached(false); s.statsCached(false) }() // 대시보드·통계 미리 계산(첫 화면 대기 없앰)
 	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts))                     // 제품별 읽기/쓰기 대상
@@ -350,6 +351,8 @@ func main() {
 	mux.HandleFunc("GET /api/ai/config", s.guard(s.apiAIConfigGet)) // AI 연결 설정(로컬·외부 LLM) — 키는 끝 4자리만
 	mux.HandleFunc("PUT /api/ai/config", s.guard(s.apiAIConfigPut))
 	mux.HandleFunc("POST /api/ai/test", s.guard(s.apiAITest))
+	mux.HandleFunc("GET /api/ai-perf", s.guard(s.apiAIPerf))             // AI 성능·자원·외부 LLM 판단(대시보드 AI 탭)
+	mux.HandleFunc("POST /api/ai-perf/bench", s.guard(s.apiAIPerfBench)) // 고정 문장으로 속도 측정
 	// 규제 요구사항 카탈로그·탐색·보고서(관리자)
 	mux.HandleFunc("GET /api/regs", s.guard(s.apiRegs))
 	mux.HandleFunc("PUT /api/regs/{id}", s.guard(s.apiRegPut))

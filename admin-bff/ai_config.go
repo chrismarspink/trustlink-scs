@@ -185,13 +185,25 @@ func validAIURL(s string) bool {
 
 // aiChat: 연결 종류에 맞춰 요청한다. 반환: 응답 본문(JSON 문자열), 모델 이름, 종료 사유.
 func aiChat(e aiEndpoint, system, user string, schema map[string]any, maxTokens int, timeout time.Duration) (string, string, string, error) {
+	c, m, f, _, err := aiChatU(e, system, user, schema, maxTokens, timeout)
+	return c, m, f, err
+}
+
+// aiChatU: aiChat + 토큰 수·처리 속도(성능 측정용). 로컬(llama.cpp)이 도는 동안은 aiLocalBusy 가 0 보다 크다.
+func aiChatU(e aiEndpoint, system, user string, schema map[string]any, maxTokens int, timeout time.Duration) (string, string, string, aiUsage, error) {
 	if e.Kind == "external" && e.Provider == "anthropic" {
 		return anthropicChat(e, system, user, schema, timeout)
+	}
+	if e.Kind == "local" {
+		aiLocalBusy.Add(1)
+		aiBusySeen.Store(true)
+		defer aiLocalBusy.Add(-1)
 	}
 	return openaiChat(e, system, user, schema, maxTokens, timeout)
 }
 
-func openaiChat(e aiEndpoint, system, user string, schema map[string]any, maxTokens int, timeout time.Duration) (string, string, string, error) {
+func openaiChat(e aiEndpoint, system, user string, schema map[string]any, maxTokens int, timeout time.Duration) (string, string, string, aiUsage, error) {
+	var u aiUsage
 	msgs := []map[string]string{}
 	if system != "" {
 		msgs = append(msgs, map[string]string{"role": "system", "content": system})
@@ -218,12 +230,12 @@ func openaiChat(e aiEndpoint, system, user string, schema map[string]any, maxTok
 	}
 	resp, err := (&http.Client{Timeout: timeout}).Do(hr)
 	if err != nil {
-		return "", "", "", errors.New("AI 서버 응답 없음: " + redactKey(err.Error(), e.APIKey))
+		return "", "", "", u, errors.New("AI 서버 응답 없음: " + redactKey(err.Error(), e.APIKey))
 	}
 	defer resp.Body.Close()
 	rb, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if resp.StatusCode != 200 {
-		return "", "", "", errors.New("AI 서버 " + itoa(resp.StatusCode) + ": " + truncate(redactKey(string(rb), e.APIKey), 300))
+		return "", "", "", u, errors.New("AI 서버 " + itoa(resp.StatusCode) + ": " + truncate(redactKey(string(rb), e.APIKey), 300))
 	}
 	var cr struct {
 		Model   string `json:"model"`
@@ -233,15 +245,27 @@ func openaiChat(e aiEndpoint, system, user string, schema map[string]any, maxTok
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
+		Usage struct {
+			Prompt     int `json:"prompt_tokens"`
+			Completion int `json:"completion_tokens"`
+		} `json:"usage"`
+		Timings *struct { // llama.cpp 만 준다
+			PromptMs    float64 `json:"prompt_ms"`
+			PredictedMs float64 `json:"predicted_ms"`
+		} `json:"timings"`
 	}
 	if err := json.Unmarshal(rb, &cr); err != nil || len(cr.Choices) == 0 {
-		return "", "", "", errors.New("AI 응답 형식 오류")
+		return "", "", "", u, errors.New("AI 응답 형식 오류")
+	}
+	u.PromptTok, u.GenTok = cr.Usage.Prompt, cr.Usage.Completion
+	if cr.Timings != nil {
+		u.PromptMs, u.GenMs = cr.Timings.PromptMs, cr.Timings.PredictedMs
 	}
 	model := firstNonEmpty(cr.Model, e.Model)
 	if strings.HasSuffix(model, ".gguf") { // llama.cpp 는 모델 파일 경로를 돌려준다 → 이름만
 		model = strings.TrimSuffix(filepath.Base(model), ".gguf")
 	}
-	return stripFence(cr.Choices[0].Message.Content), model, cr.Choices[0].FinishReason, nil
+	return stripFence(cr.Choices[0].Message.Content), model, cr.Choices[0].FinishReason, u, nil
 }
 
 func anthropicClient(e aiEndpoint, timeout time.Duration) anthropic.Client {
@@ -264,7 +288,8 @@ func anthropicFallbackOK(model string) bool {
 
 // anthropicChat: Claude Messages API(공식 SDK). 구조화 출력(output_config.format)으로 JSON 을 강제한다.
 // 생각(adaptive thinking)이 출력 토큰을 함께 쓰므로 max_tokens 는 넉넉히 잡는다.
-func anthropicChat(e aiEndpoint, system, user string, schema map[string]any, timeout time.Duration) (string, string, string, error) {
+func anthropicChat(e aiEndpoint, system, user string, schema map[string]any, timeout time.Duration) (string, string, string, aiUsage, error) {
+	var u aiUsage
 	cl := anthropicClient(e, timeout)
 	p := anthropic.BetaMessageNewParams{
 		Model:     anthropic.Model(e.Model),
@@ -289,13 +314,14 @@ func anthropicChat(e aiEndpoint, system, user string, schema map[string]any, tim
 		var apierr *anthropic.Error
 		if errors.As(err, &apierr) {
 			msg := map[int]string{401: "API 키가 올바르지 않습니다", 403: "권한 없음", 404: "모델을 찾을 수 없습니다", 429: "요청 한도 초과 — 잠시 후 다시"}[apierr.StatusCode]
-			return "", "", "", errors.New("Claude API " + itoa(apierr.StatusCode) + ": " + firstNonEmpty(msg, truncate(redactKey(apierr.Message, e.APIKey), 300)))
+			return "", "", "", u, errors.New("Claude API " + itoa(apierr.StatusCode) + ": " + firstNonEmpty(msg, truncate(redactKey(apierr.Message, e.APIKey), 300)))
 		}
-		return "", "", "", errors.New("Claude API 응답 없음: " + truncate(redactKey(err.Error(), e.APIKey), 300))
+		return "", "", "", u, errors.New("Claude API 응답 없음: " + truncate(redactKey(err.Error(), e.APIKey), 300))
 	}
 	model := string(resp.Model)
+	u.PromptTok, u.GenTok = int(resp.Usage.InputTokens), int(resp.Usage.OutputTokens)
 	if resp.StopReason == anthropic.BetaStopReasonRefusal {
-		return "", model, "refusal", errors.New("Claude 가 요청을 거절했습니다(" + firstNonEmpty(string(resp.StopDetails.Category), "분류 없음") + ")")
+		return "", model, "refusal", u, errors.New("Claude 가 요청을 거절했습니다(" + firstNonEmpty(string(resp.StopDetails.Category), "분류 없음") + ")")
 	}
 	var b strings.Builder
 	for _, blk := range resp.Content {
@@ -307,7 +333,7 @@ func anthropicChat(e aiEndpoint, system, user string, schema map[string]any, tim
 	if resp.StopReason == anthropic.BetaStopReasonMaxTokens {
 		finish = "length"
 	}
-	return stripFence(b.String()), model, finish, nil
+	return stripFence(b.String()), model, finish, u, nil
 }
 
 // anthropicSchema: 구조화 출력이 받지 않는 제약(길이·개수·수치 범위)을 빼고 모든 object 에 additionalProperties:false 를 붙인다.

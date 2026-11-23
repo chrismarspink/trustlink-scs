@@ -8,6 +8,7 @@ import {
 import { fmtBytes, cn } from '@/lib/utils';
 import { Card, CardHeader, CardContent, Badge, Button } from '@/components/ui/primitives';
 import { Busy, PartsProgress } from '@/components/Progress';
+import AiPerfTab from './AiPerfTab';
 import { PageTitle, SectionTitle, StatCard, Alert, BarChart, Gauge, LineChart, Donut, Table, Th, Td, selectCls } from './_ui';
 
 const GROUPS = ['admins', 'developers', 'partners', 'customers'];
@@ -24,7 +25,8 @@ const TABS = [
   { key: 'security', label: '보안 현황' },
   { key: 'quality', label: '공급망 품질' },
   { key: 'customers', label: '고객·배포' },
-  { key: 'ops', label: '운영' }
+  { key: 'ops', label: '운영' },
+  { key: 'ai', label: 'AI 성능' }
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
 
@@ -515,7 +517,8 @@ export default function Dashboard() {
         ))}
       </div>
       <div className="mt-4">
-        {tab === 'ops' ? <OpsTab d={dash ?? EMPTY} base={opsBase} />
+        {tab === 'ai' ? <AiPerfTab />
+          : tab === 'ops' ? <OpsTab d={dash ?? EMPTY} base={opsBase} />
           : !dash ? null /* 위쪽 진행 표시가 대신 보여 줌 */
             : tab === 'security' ? <SecurityTab d={dash} trend={versionTrend} />
               : tab === 'quality' ? <QualityTab d={dash} />

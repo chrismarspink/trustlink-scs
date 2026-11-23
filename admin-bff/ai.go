@@ -102,24 +102,32 @@ func (s *Server) aiDraftFor(use, lang string, facts []aiFact, task string, schem
 		return meta, errors.New("AI 미설정 (관리 콘솔 › AI 연결)")
 	}
 	meta.Provider = e.Provider
+	rec := aiCall{Feature: aiFeature(), Use: use, Kind: e.Kind}
+	tw := time.Now()
 	if e.Kind == "local" { // CPU 추론은 한 번에 하나(서버 슬롯 1). 외부 API 는 동시에 보내도 된다
 		aiMu.Lock()
 		defer aiMu.Unlock()
 	}
+	rec.WaitMs = time.Since(tw).Milliseconds()
 	sys, user := aiSystem, "사실:\n"+factsBlock(facts, lang)+"\n작업:\n"+task
 	if lang == "en" {
 		sys, user = aiSystemEn, "Facts:\n"+factsBlock(facts, lang)+"\nTask:\n"+task
 	}
 	t0 := time.Now()
-	content, model, finish, err := aiChat(e, sys, user, schema, maxTokens, 6*time.Minute)
+	content, model, finish, usage, err := aiChatU(e, sys, user, schema, maxTokens, 6*time.Minute)
 	meta.ElapsedMs = time.Since(t0).Milliseconds()
+	rec.fill(model, meta.ElapsedMs, usage, finish, err)
 	if err != nil {
+		recordAICall(rec)
 		return meta, err
 	}
 	meta.Model = model
 	if err := json.Unmarshal([]byte(content), out); err != nil {
+		rec.OK, rec.Fail = false, "format"
+		recordAICall(rec)
 		return meta, fmt.Errorf("AI 출력이 스키마와 다름(%s): %v", finish, err)
 	}
+	recordAICall(rec)
 	return meta, nil
 }
 
