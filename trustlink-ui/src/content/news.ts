@@ -25,6 +25,10 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.14.1', date: '2026-11-23', title: '내 제품 접기·펼치기',
+    items: [{ kind: '개선', text: '내 제품에서 제품·버전별로 접고 펼침 — 버전은 접힌 채로 KEV·치명·높음 건수를 먼저 보여 줌' }],
+  },
+  {
     version: '2.14.0', date: '2026-11-23', title: '홈 화면',
     items: [
       { kind: '신규', text: '첫 화면에 소개 자료·공지·버전별 새 소식·바로 가기를 모은 홈 화면' },

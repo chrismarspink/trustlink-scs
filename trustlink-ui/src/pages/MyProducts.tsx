@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Package, ShieldCheck, ShieldAlert, CalendarClock, Mail, ArrowUpCircle } from 'lucide-react';
+import { Package, ShieldCheck, ShieldAlert, CalendarClock, Mail, ArrowUpCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { myProducts, type MyInstall, type MyNotice, type MyUsage } from '@/lib/api';
 import { Card, CardContent, Badge } from '@/components/ui/primitives';
 import { SourceBadge } from '@/components/SourceBadge';
@@ -29,20 +29,32 @@ function DDay({ days, label }: { days: number; label: string }) {
 function Install({ i }: { i: MyInstall }) {
   const open = i.vulns.filter((v) => !['NOT_AFFECTED', 'FALSE_POSITIVE', 'RESOLVED'].includes(v.state));
   const [all, setAll] = useState(false);
+  const [show, setShow] = useState(false);
   const shown = all ? i.vulns : open;
+  const kev = open.filter((v) => v.kev).length;
+  const crit = open.filter((v) => v.severity === 'CRITICAL').length;
+  const high = open.filter((v) => v.severity === 'HIGH').length;
+  const canOpen = i.vulns.length > 0;
   return (
     <div className="rounded-md border p-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={cn('flex flex-wrap items-center gap-2', canOpen && 'cursor-pointer select-none')} onClick={() => canOpen && setShow(!show)}
+        role={canOpen ? 'button' : undefined} aria-expanded={canOpen ? show : undefined}>
+        {canOpen && (show ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />)}
         <b>버전 {i.tag}</b><Badge variant="muted">{i.env}{i.qty ? ` ×${i.qty}` : ''}</Badge>
         {i.eosDays != null && <DDay days={i.eosDays} label="지원 종료" />}
         {i.upgrade && <span className="inline-flex items-center gap-1 text-xs text-sky-700"><ArrowUpCircle size={12} />권장 업그레이드 {i.upgrade}</span>}
         <span className="ml-auto text-xs">
           {!i.analyzed ? <span className="text-muted-foreground">분석 결과 없음</span>
             : open.length === 0 ? <span className="inline-flex items-center gap-1 text-emerald-700"><ShieldCheck size={13} />조치가 필요한 취약점 없음</span>
-              : <span className="inline-flex items-center gap-1 text-red-700"><ShieldAlert size={13} />확인 필요 {open.length}</span>}
+              : <span className="inline-flex items-center gap-2">
+                {kev > 0 && <span className="rounded bg-red-100 px-1.5 font-semibold text-red-700">KEV {kev}</span>}
+                {crit > 0 && <span className="rounded bg-red-600 px-1.5 font-semibold text-white">치명 {crit}</span>}
+                {high > 0 && <span className="rounded bg-orange-500 px-1.5 font-semibold text-white">높음 {high}</span>}
+                <span className="inline-flex items-center gap-1 text-red-700"><ShieldAlert size={13} />확인 필요 {open.length}</span>
+              </span>}
         </span>
       </div>
-      {shown.length > 0 && (
+      {show && shown.length > 0 && (
         <table className="mt-2 w-full text-xs">
           <thead><tr className="text-left text-muted-foreground"><th className="py-1">취약점</th><th>구성요소</th><th>판정(VEX)</th><th>권장 패치 버전</th></tr></thead>
           <tbody>
@@ -57,7 +69,7 @@ function Install({ i }: { i: MyInstall }) {
           </tbody>
         </table>
       )}
-      {i.vulns.length > open.length && (
+      {show && i.vulns.length > open.length && (
         <button className="mt-1 text-xs text-muted-foreground underline" onClick={() => setAll(!all)}>{all ? '조치 필요만 보기' : `영향 없음·해결 ${i.vulns.length - open.length}건도 보기`}</button>
       )}
     </div>
@@ -67,16 +79,19 @@ function Install({ i }: { i: MyInstall }) {
 function Usage({ u }: { u: MyUsage }) {
   const lic = daysLeft(u.licenseExpiry);
   const mnt = daysLeft(u.maintExpiry);
+  const [show, setShow] = useState(true);
   return (
     <Card><CardContent className="space-y-3 p-5">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex cursor-pointer select-none flex-wrap items-center gap-2" onClick={() => setShow(!show)} role="button" aria-expanded={show}>
+        {show ? <ChevronDown size={18} className="text-muted-foreground" /> : <ChevronRight size={18} className="text-muted-foreground" />}
         <Package size={18} className="text-primary" /><span className="text-lg font-semibold">{u.repo}</span>
         {u.licenseType && <Badge variant="outline">{LIC[u.licenseType] || u.licenseType}</Badge>}
         {u.supportTier && <Badge variant="muted">지원 {u.supportTier}</Badge>}
         {lic != null && u.licenseType !== 'perpetual' && <DDay days={lic} label="라이선스" />}
         {mnt != null && <DDay days={mnt} label="유지보수" />}
+        <span className="ml-auto text-xs text-muted-foreground">설치 버전 {u.installs.length}개 · {show ? '접기' : '펼치기'}</span>
       </div>
-      {u.installs.length === 0 ? <p className="text-sm text-muted-foreground">등록된 설치 버전이 없습니다.</p> : u.installs.map((i) => <Install key={i.tag + i.env} i={i} />)}
+      {!show ? null : u.installs.length === 0 ? <p className="text-sm text-muted-foreground">등록된 설치 버전이 없습니다.</p> : u.installs.map((i) => <Install key={i.tag + i.env} i={i} />)}
     </CardContent></Card>
   );
 }
