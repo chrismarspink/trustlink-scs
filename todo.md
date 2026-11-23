@@ -7,6 +7,11 @@
 > TrustLink 는 이제 코어(레지스트리·SBOM·VEX·취약점·대시보드·RBAC)에 집중. CA/파일서명이 필요하면 별도 어플라이언스(bigfoot)로 분리 운영.
 > 아래 CA/CMS 관련 완료·backlog 항목은 **역사적 기록**(현재는 미해당).
 
+## 임시 설정 — 되돌릴 것
+- [ ] **admin1 을 고객사 그룹 org-acme 에 임시 추가** (2026-11-23): "내 제품" 화면에서 ACME 은행(시연)의 innopouch 를 보이게 하려고. 시연이 끝나면 관리 › 계정 및 권한 › 사용자에서 admin1 의 고객사를 비운다(역할 admins 만). 그동안 admin1 의 다운로드가 ACME 은행(시연) 집계에 잡힌다.
+
+---
+
 ## 배포 대기 — v2.13.0 (2026-11-21)
 - [x] **218 서버에 v2.13.0 배포** (2026-11-23 완료): 초기 화면 상단 제품 소개(막대 인형 장면, `trustlink-ui/public/intro.html` + `IntroCard.tsx`). 소스·태그는 GitHub 반영 완료, 서버만 미반영.
   - 막힌 이유: 2026-11-21 집 회선에서 SSH 가 키 교환 단계에서 끊김(`Connection reset by peer`). 재시도가 겹쳐 접속 제한(fail2ban/ufw limit)에 걸린 것으로 추정.
