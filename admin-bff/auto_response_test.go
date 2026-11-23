@@ -55,19 +55,57 @@ func TestAutoResponseFlow(t *testing.T) {
 		t.Fatalf("이미 처리된 건: %d", w.Code)
 	}
 
-	// 패치 없음(최신 2.0 에도 남은 CVE-2026-0004) → 개발자 통보
+	// 패치 없음(최신 2.0 에도 남은 CVE-2026-0004) → 개발자 수정 요청 초안 + 승인 대기(아직 아무에게도 안 감)
 	r2 := s.runAutoResponse(newAutoRun("manual", "admin", "products/prod", "2.0", "CVE-2026-0004"))
-	if r2.Outcome != "dev-request" || r2.State != "done" || r2.NoticeID != "" || len(r2.Customers) != 1 || r2.Customers[0] != "감마공사" {
-		t.Fatalf("패치 없음 → 개발자 통보: %+v", r2)
+	if r2.Outcome != "approval-dev" || r2.State != "waiting" || r2.NoticeID != "" || len(r2.Customers) != 1 || r2.Customers[0] != "감마공사" ||
+		!strings.Contains(r2.DevSubject, "CVE-2026-0004") || !strings.Contains(r2.DevBody, "감마공사") {
+		t.Fatalf("패치 없음 → 개발자 요청 승인 대기: %+v", r2)
+	}
+	for _, nt := range s.notify.st.Notices {
+		if nt.Kind == "patch-needed" {
+			t.Fatal("승인 전에는 개발자에게 보내지 않음")
+		}
+	}
+	// 승인(후보가 없으면 거부) → 후보를 넣고 승인하면 화면 알림
+	w = httptest.NewRecorder()
+	req2 := httptest.NewRequest("POST", "/api/auto-response/"+r2.ID+"/approve", strings.NewReader(`{"delay":0}`))
+	req2.SetPathValue("id", r2.ID)
+	s.apiAutoResponseDecide(w, req2)
+	if w.Code != 400 {
+		t.Fatalf("받는 사람 없으면 거부: %d %s", w.Code, w.Body.String())
+	}
+	autoUpdate(r2.ID, func(x *autoRun) { x.DevCands = []devCand{{Username: "dev1", Email: "dev1@out.example"}} })
+	w = httptest.NewRecorder()
+	req2 = httptest.NewRequest("POST", "/api/auto-response/"+r2.ID+"/approve", strings.NewReader(`{"keys":["dev1"],"delay":0}`))
+	req2.SetPathValue("id", r2.ID)
+	s.apiAutoResponseDecide(w, req2)
+	if w.Code != 200 {
+		t.Fatalf("개발자 요청 승인: %d %s", w.Code, w.Body.String())
 	}
 	found := false
 	for _, nt := range s.notify.st.Notices {
-		if nt.Kind == "patch-needed" && strings.Contains(nt.Title, "CVE-2026-0004") && strings.Contains(nt.Body, "감마공사") {
+		if nt.Kind == "patch-needed" && len(nt.To) == 1 && nt.To[0] == "dev1" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("개발자 통보 기록: %+v", s.notify.st.Notices)
+		t.Fatalf("승인 후 개발자 화면 알림: %+v", s.notify.st.Notices)
+	}
+
+	// 주기 검색: 고객 설치 버전(1.0·1.1·2.0)+최신의 미대응 치명(CVE-2026-0004)을 찾아 처리
+	autoRes.Lock()
+	autoRes.Settings.SweepMax = 5
+	autoRes.Unlock()
+	n0 := len(autoRes.Runs)
+	got := s.autoSweep("test")
+	if got == 0 || len(autoRes.Runs) != n0+got {
+		t.Fatalf("주기 검색이 새 건을 처리: %d", got)
+	}
+	if again := s.autoSweep("test"); again != 0 {
+		t.Fatalf("이미 대응한 건은 다시 안 함: %d", again)
+	}
+	if autoRes.Settings.LastSweep == "" || !strings.Contains(autoRes.Settings.SweepMsg, "검사") {
+		t.Fatalf("검색 기록: %+v", autoRes.Settings)
 	}
 
 	// 없는 취약점은 탐지 단계 오류

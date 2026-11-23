@@ -295,6 +295,7 @@ func main() {
 	mux.HandleFunc("POST /api/custnotify/{id}/ai", s.guard(s.apiCustNotifyAI))                   // ③ AI 설명
 	mux.HandleFunc("POST /api/custnotify/{id}/send", s.guard(s.apiCustNotifySend))               // ⑤ 발송
 	mux.HandleFunc("GET /api/my/products", s.guardSession(s.apiMyProducts))                      // 고객 전용: 내 고객사 제품만
+	go s.autoSweepLoop()                                                                         // 자동 대응 주기 검색(기본 6시간)
 	go s.aiSysLoop()                                                                             // 서버 CPU·메모리 표본(30초, AI 탭)
 	go s.custExpiryLoop()                                                                        // 만료·EOS 알림(하루 1회)
 	go func() { time.Sleep(20 * time.Second); s.dashboardCached(false); s.statsCached(false) }() // 대시보드·통계 미리 계산(첫 화면 대기 없앰)
@@ -318,6 +319,7 @@ func main() {
 	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                      // 받는 사람·항목·첨부 추천(규칙 + AI)
 	mux.HandleFunc("GET /api/auto-response", s.guard(s.apiAutoResponse))                     // 자동 대응 기록·설정
 	mux.HandleFunc("PUT /api/auto-response/settings", s.guard(s.apiAutoResponseSettings))    // 켜기/끄기
+	mux.HandleFunc("POST /api/auto-response/sweep", s.guard(s.apiAutoResponseSweep))         // 주기 검색 지금 실행
 	mux.HandleFunc("POST /api/auto-response/run", s.guard(s.apiAutoResponseRun))             // 직접 실행(시연·재실행)
 	mux.HandleFunc("POST /api/auto-response/{id}/approve", s.guard(s.apiAutoResponseDecide)) // 관리자 승인 → 고객 통지(발송함)
 	mux.HandleFunc("POST /api/auto-response/{id}/reject", s.guard(s.apiAutoResponseDecide))  // 반려

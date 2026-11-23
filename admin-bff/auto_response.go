@@ -7,9 +7,13 @@ package main
 //   ③ 패치 확인: 이 버전보다 새 제품 버전 중 취약점이 사라진 버전을 찾는다(custnotify.go fixScan/pickFix)
 //   ④-가 패치 있음: 영향 고객 통지 초안(고객별 언어·AI 설명)을 만들고 **관리자 승인을 기다린다**.
 //         관리자에게 알림(화면·메일) → 관리자가 받는 사람을 확인하고 "승인·발송" → 발송함(취소 가능) → 고객
-//   ④-나 패치 없음: 개발자(제품 쓰기 권한자·관리자)에게 "수정 버전 필요" 메일 — 사내 메일이라 바로 보낸다
+//   ④-나 패치 없음: 개발자(제품 쓰기 권한자·관리자)에게 보낼 "수정 버전 필요" 메일 초안 + **관리자 승인 대기**
+//   ⑤ 관리자가 화면(관리 › 자동 대응, 대시보드에 승인 대기 표시)에서 받는 사람을 고르고 보낼지 정한다
+//      → 승인하면 발송함(취소 가능)을 거쳐 고객 또는 개발자에게
 //
-// 고객에게 나가는 메일은 반드시 사람이 승인한다(방산 고객 대상 — 잘못된 통지는 되돌릴 수 없다).
+// 시작은 두 가지: DT 새 취약점 알림(바로) + 주기 검색(sweep, 기본 6시간 — 고객에게 납품한 제품의
+// 고객 설치 버전·최신 버전에서 아직 판단·대응하지 않은 KEV·치명 취약점을 찾아 한 번에 최대 N건).
+// 메일은 고객·개발자 모두 관리자가 승인해야 나간다.
 // 기록은 auto-response.json(최근 200건)과 원장(SoR)에 남는다.
 
 import (
@@ -61,14 +65,28 @@ type autoRun struct {
 	Customers   []string    `json:"customers,omitempty"`
 	Waiting     []string    `json:"waiting,omitempty"` // 패치가 아직 없는 버전을 쓰는 고객
 	DevTo       []string    `json:"devTo,omitempty"`
+	DevSubject  string      `json:"devSubject,omitempty"` // 개발자 수정 요청 초안(승인 전)
+	DevBody     string      `json:"devBody,omitempty"`
+	DevCands    []devCand   `json:"devCandidates,omitempty"` // 추천 받는 사람(제품 쓰기 권한자·관리자)
+	Outbox      []string    `json:"outbox,omitempty"`
 	Approver    string      `json:"approver,omitempty"`
 	Error       string      `json:"error,omitempty"`
 }
 
+type devCand struct {
+	Username string `json:"username"`
+	Email    string `json:"email,omitempty"`
+}
+
 type autoSettings struct {
-	Mode      string `json:"mode"` // on / off
-	MaxPerVer int    `json:"maxPerVersion"`
-	UpdatedBy string `json:"updatedBy,omitempty"`
+	Mode       string `json:"mode"` // on / off
+	MaxPerVer  int    `json:"maxPerVersion"`
+	SweepHours int    `json:"sweepHours"` // 주기 검색 간격(시간), 0 = 끔
+	SweepMax   int    `json:"sweepMax"`   // 한 번 검색에서 새로 처리할 최대 건수
+	LastSweep  string `json:"lastSweep,omitempty"`
+	SweepMsg   string `json:"sweepMsg,omitempty"`
+	Sweeping   bool   `json:"sweeping,omitempty"`
+	UpdatedBy  string `json:"updatedBy,omitempty"`
 }
 
 var autoRes = struct {
@@ -99,6 +117,13 @@ func autoLoad() { // 잠근 채로
 	if autoRes.Settings.MaxPerVer <= 0 {
 		autoRes.Settings.MaxPerVer = 3
 	}
+	if autoRes.Settings.SweepHours == 0 && autoRes.Settings.SweepMax == 0 { // 처음: 6시간마다, 5건
+		autoRes.Settings.SweepHours, autoRes.Settings.SweepMax = 6, 5
+	}
+	if autoRes.Settings.SweepMax <= 0 {
+		autoRes.Settings.SweepMax = 5
+	}
+	autoRes.Settings.Sweeping = false
 	for i := range autoRes.Runs { // 재시작으로 끊긴 진행은 오류로
 		if autoRes.Runs[i].State == "running" {
 			autoRes.Runs[i].State, autoRes.Runs[i].Outcome, autoRes.Runs[i].Error = "error", "error", "서버 재시작으로 중단됨 — 다시 실행하세요"
@@ -363,36 +388,23 @@ func (s *Server) autoCustomerNotice(id string, r autoRun, comp string) autoRun {
 	x := autoUpdate(id, func(x *autoRun) {
 		x.NoticeID, x.Customers, x.Recommended, x.Waiting = n.ID, custs, rec, waiting
 		stage(x, "approve", "wait", fmt.Sprintf("관리자 승인 대기 — 고객 %d곳(%s), 받는 사람 %d명 추천", len(custs), strings.Join(custs, ", "), len(rec)))
+		stage(x, "devreq", "skip", "")
 		if len(waiting) > 0 {
-			stage(x, "devreq", "skip", "아직 패치가 없는 버전 사용 고객: "+strings.Join(waiting, ", ")+" — 그 버전의 자동 대응에서 개발자 통보")
+			stage(x, "devreq", "skip", "아직 패치가 없는 버전 사용 고객: "+strings.Join(waiting, ", ")+" — 그 버전의 자동 대응에서 개발자 수정 요청")
 		}
 		x.State, x.Outcome = "waiting", "approval"
 	})
-	// 관리자에게 알림(화면·메일)
-	title := fmt.Sprintf("[TrustLink] 승인 필요 — %s 고객 통지 %s(%s)", path.Base(r.Repo), r.VulnID, comp)
-	var b strings.Builder
-	fmt.Fprintf(&b, "자동 대응이 고객 통지 초안을 만들었습니다. 확인 후 승인해야 고객에게 나갑니다.\n\n")
-	fmt.Fprintf(&b, "- 취약점: %s (%s%s) · 구성요소 %s\n", r.VulnID, x.Severity, map[bool]string{true: " · KEV", false: ""}[x.KEV], comp)
-	if x.AIStatus != "" {
-		fmt.Fprintf(&b, "- AI 판정 초안: %s — %s\n", vexStateKo(x.AIStatus), truncate(x.AISummary, 200))
-	}
-	fmt.Fprintf(&b, "- 권장 버전: %s %s\n- 영향 고객: %s\n- 추천 받는 사람: %d명\n", path.Base(r.Repo), x.FixTag, strings.Join(custs, ", "), len(rec))
-	if len(waiting) > 0 {
-		fmt.Fprintf(&b, "- 아직 패치 없는 버전 사용: %s\n", strings.Join(waiting, ", "))
-	}
-	fmt.Fprintf(&b, "\n승인 화면: %s/admin/auto-response\n", s.publicBase())
-	s.deliver(Notice{Kind: "approval-needed", Audience: "internal", Repo: r.Repo, Tag: r.Tag, Title: title, Body: b.String()}, s.adminUsers(), nil)
+	s.notifyApproval(x, fmt.Sprintf("고객 통지(%s, 권장 %s)", strings.Join(custs, "·"), x.FixTag), "보안 권고 — "+r.VulnID)
 	_ = s.sor.append(SoREvent{Actor: autoActor, Action: "auto-response", Repo: r.Repo, Tag: r.Tag, Status: "approval",
 		Detail: map[string]any{"run": id, "vuln": r.VulnID, "notice": n.ID, "fix": x.FixTag, "customers": custs, "ai": x.AIStatus}})
 	return x
 }
 
-// ④-나 패치 없음 → 개발자 통보(사내)
+// ④-나 패치 없음 → 개발자 수정 요청 초안 + 관리자 승인 요청
 func (s *Server) autoDevRequest(id string, r autoRun, comp, upstream string) autoRun {
 	x := autoUpdate(id, func(x *autoRun) {
-		stage(x, "approve", "skip", "패치 버전이 없어 고객 통지 대신 개발자 통보")
-		stage(x, "notify", "skip", "")
-		stage(x, "devreq", "active", "개발자에게 수정 요청 메일을 보내는 중")
+		stage(x, "notify", "skip", "패치 버전이 없어 고객 통지 대신 개발자 수정 요청")
+		stage(x, "devreq", "active", "개발자 수정 요청 메일을 쓰는 중")
 	})
 	// 이 버전을 쓰는 고객(패치가 나오면 통지할 대상)
 	affected := []string{}
@@ -428,24 +440,54 @@ func (s *Server) autoDevRequest(id string, r autoRun, comp, upstream string) aut
 		b.WriteString("- 고객 등록부에 이 버전을 쓰는 고객은 없습니다\n")
 	}
 	fmt.Fprintf(&b, "\n판단 화면: %s\n", s.artifactURL(r.Repo, r.Tag))
-	to := s.recipients(r.Repo, false)
-	names := []string{}
-	for _, u := range to {
-		names = append(names, u.Username)
+	cands := []devCand{}
+	for _, u := range s.recipients(r.Repo, false) {
+		cands = append(cands, devCand{Username: u.Username, Email: u.Email})
 	}
-	s.deliver(Notice{Kind: "patch-needed", Audience: "internal", Repo: r.Repo, Tag: r.Tag, Title: title, Body: b.String()}, to, nil)
-	_ = s.sor.append(SoREvent{Actor: autoActor, Action: "auto-response", Repo: r.Repo, Tag: r.Tag, Status: "dev-request",
-		Detail: map[string]any{"run": id, "vuln": r.VulnID, "to": names, "upstream": upstream, "customers": affected}})
-	return autoUpdate(id, func(x *autoRun) {
-		x.DevTo, x.Customers, x.Upstream = names, affected, upstream
-		stage(x, "devreq", "done", fmt.Sprintf("개발자 %d명에게 수정 요청(%s)", len(names), strings.Join(names, ", ")))
-		x.Outcome, x.State, x.Finished = "dev-request", "done", time.Now().UTC().Format(time.RFC3339)
-		for i := range x.Stages {
-			if x.Stages[i].State == "todo" {
-				x.Stages[i].State = "skip"
-			}
-		}
+	x = autoUpdate(id, func(x *autoRun) {
+		x.Customers, x.Upstream, x.DevSubject, x.DevBody, x.DevCands = affected, upstream, title, b.String(), cands
+		stage(x, "approve", "wait", fmt.Sprintf("관리자 승인 대기 — 개발자 수정 요청, 받는 사람 %d명 추천", len(cands)))
+		stage(x, "devreq", "todo", "")
+		x.State, x.Outcome = "waiting", "approval-dev"
 	})
+	s.notifyApproval(x, "개발자 수정 요청", title)
+	_ = s.sor.append(SoREvent{Actor: autoActor, Action: "auto-response", Repo: r.Repo, Tag: r.Tag, Status: "approval-dev",
+		Detail: map[string]any{"run": id, "vuln": r.VulnID, "candidates": len(cands), "upstream": upstream, "customers": affected}})
+	return x
+}
+
+// notifyApproval: 관리자에게 "보낼지 정해 달라"는 메일(+화면 알림). 패치 유무와 받을 사람·메일 초안 요약을 담는다.
+func (s *Server) notifyApproval(x autoRun, what, mailTitle string) {
+	patch := x.NoticeID != ""
+	kind := map[bool]string{true: "패치 있음 → 고객에게 보안 권고를 보낼까요?", false: "패치 없음 → 개발자에게 수정 요청을 보낼까요?"}[patch]
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s %s 에서 %s(%s%s)가 발견되었습니다.\n%s\n\n", path.Base(x.Repo), x.Tag, x.VulnID, x.Severity, map[bool]string{true: " · KEV", false: ""}[x.KEV], kind)
+	fmt.Fprintf(&b, "- 구성요소: %s\n", x.Component)
+	if x.AIStatus != "" {
+		fmt.Fprintf(&b, "- AI 분석: %s — %s\n", vexStateKo(x.AIStatus), truncate(x.AISummary, 200))
+	}
+	if patch {
+		fmt.Fprintf(&b, "- 패치 버전: %s %s\n- 보낼 곳: %s (받는 사람 %d명 추천)\n", path.Base(x.Repo), x.FixTag, strings.Join(x.Customers, ", "), len(x.Recommended))
+		if len(x.Waiting) > 0 {
+			fmt.Fprintf(&b, "- 아직 패치 없는 버전 사용 고객: %s\n", strings.Join(x.Waiting, ", "))
+		}
+	} else {
+		names := []string{}
+		for _, c := range x.DevCands {
+			names = append(names, c.Username)
+		}
+		fmt.Fprintf(&b, "- 보낼 곳: 개발자 %s\n", strings.Join(names, ", "))
+		if len(x.Customers) > 0 {
+			fmt.Fprintf(&b, "- 이 버전을 쓰는 고객: %s (패치가 나오면 고객 통지로 이어짐)\n", strings.Join(x.Customers, ", "))
+		}
+	}
+	fmt.Fprintf(&b, "- 메일 제목(초안): %s\n\n", mailTitle)
+	b.WriteString("선택: 승인하면 고른 받는 사람에게 발송함을 거쳐 나갑니다(대기 시간 동안 취소 가능). 반려하면 보내지 않고 사유를 남깁니다.\n")
+	fmt.Fprintf(&b, "선택 화면: %s/admin/auto-response (대시보드에도 '승인 대기'로 표시)\n", s.publicBase())
+	s.deliver(Notice{Kind: "approval-needed", Audience: "internal", Repo: x.Repo, Tag: x.Tag,
+		Title: fmt.Sprintf("[TrustLink] 선택 필요 — %s %s · %s · %s", path.Base(x.Repo), x.Tag, x.VulnID, map[bool]string{true: "고객 통지 여부", false: "개발자 수정 요청 여부"}[patch]),
+		Body:  b.String()}, s.adminUsers(), nil)
+	_ = what
 }
 
 // adminUsers: admins 그룹(활성) — 승인 요청 알림 대상.
@@ -501,9 +543,16 @@ func (s *Server) apiAutoResponseSettings(w http.ResponseWriter, r *http.Request)
 	if in.MaxPerVer < 1 || in.MaxPerVer > 10 {
 		in.MaxPerVer = 3
 	}
+	if in.SweepHours < 0 || in.SweepHours > 168 {
+		in.SweepHours = 6
+	}
+	if in.SweepMax < 1 || in.SweepMax > 20 {
+		in.SweepMax = 5
+	}
 	in.UpdatedBy = w.Header().Get("X-User")
 	autoRes.Lock()
 	autoLoad()
+	in.LastSweep, in.SweepMsg, in.Sweeping = autoRes.Settings.LastSweep, autoRes.Settings.SweepMsg, autoRes.Settings.Sweeping
 	autoRes.Settings = in
 	autoSaveLocked()
 	autoRes.Unlock()
@@ -564,14 +613,18 @@ func (s *Server) apiAutoResponseDecide(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 404, map[string]string{"error": "자동 대응 기록 없음"})
 		return
 	}
-	if cur.State != "waiting" || cur.NoticeID == "" {
+	if cur.State != "waiting" {
 		writeJSON(w, 409, map[string]string{"error": "승인 대기 중인 건이 아닙니다"})
 		return
 	}
 	if !approve {
 		x := autoUpdate(id, func(x *autoRun) {
 			stage(x, "approve", "done", "반려 — "+actor+firstNonEmpty(map[bool]string{true: ": " + truncate(in.Reason, 200)}[in.Reason != ""], ""))
-			stage(x, "notify", "skip", "반려되어 보내지 않음")
+			if x.NoticeID != "" {
+				stage(x, "notify", "skip", "반려되어 보내지 않음")
+			} else {
+				stage(x, "devreq", "skip", "반려되어 보내지 않음")
+			}
 			x.Approver, x.Outcome, x.State, x.Finished = actor, "rejected", "done", time.Now().UTC().Format(time.RFC3339)
 		})
 		_ = s.sor.append(SoREvent{Actor: actor, Action: "auto-response-reject", Subject: id, Detail: map[string]any{"vuln": cur.VulnID, "notice": cur.NoticeID, "reason": in.Reason}})
@@ -581,6 +634,10 @@ func (s *Server) apiAutoResponseDecide(w http.ResponseWriter, r *http.Request) {
 	delay := 30 * time.Second
 	if in.Delay != nil {
 		delay = outboxDelay(*in.Delay)
+	}
+	if cur.NoticeID == "" { // 개발자 수정 요청
+		s.approveDevRequest(w, cur, in.Keys, actor, delay)
+		return
 	}
 	custNoticeMu.Lock()
 	n, ok := s.cust().notice(cur.NoticeID)
@@ -615,4 +672,206 @@ func (s *Server) apiAutoResponseDecide(w http.ResponseWriter, r *http.Request) {
 	})
 	_ = s.sor.append(SoREvent{Actor: actor, Action: "auto-response-approve", Subject: id, Detail: map[string]any{"vuln": cur.VulnID, "notice": cur.NoticeID, "keys": keys}})
 	writeJSON(w, 200, map[string]any{"run": x, "notice": n})
+}
+
+// approveDevRequest: 고른 개발자에게 수정 요청 — 화면 알림은 바로, 메일은 발송함(취소 가능)을 거쳐.
+func (s *Server) approveDevRequest(w http.ResponseWriter, cur autoRun, keys []string, actor string, delay time.Duration) {
+	if len(keys) == 0 {
+		for _, c := range cur.DevCands {
+			keys = append(keys, c.Username)
+		}
+	}
+	users, emails := []string{}, []string{}
+	for _, c := range cur.DevCands {
+		if inList(c.Username, keys) {
+			users = append(users, c.Username)
+			if c.Email != "" {
+				emails = append(emails, c.Email)
+			}
+		}
+	}
+	if len(users) == 0 {
+		writeJSON(w, 400, map[string]string{"error": "받는 사람을 한 명 이상 고르세요"})
+		return
+	}
+	s.recordNotice(Notice{Kind: "patch-needed", Audience: "internal", Repo: cur.Repo, Tag: cur.Tag, Title: cur.DevSubject, Body: cur.DevBody}, users)
+	var ids []string
+	allowed, _ := s.mail.filter(emails)
+	if s.mail.Configured() && len(allowed) > 0 {
+		it := s.enqueueMail("devreq", path.Base(cur.Repo)+" "+cur.Tag+" 수정 요청", cur.ID, actor, emails, cur.DevSubject, mailContent{Text: cur.DevBody}, delay, nil)
+		ids = append(ids, it.ID)
+	}
+	msg := fmt.Sprintf("화면 알림 %d명", len(users))
+	if len(ids) > 0 {
+		msg += fmt.Sprintf(" · 메일은 발송함에서 %d초 뒤 발송(그 전에 취소 가능)", int(delay/time.Second))
+	} else {
+		msg += " · 메일은 보내지 않음(허용 목록 밖 주소이거나 메일 서버 미설정)"
+	}
+	x := autoUpdate(cur.ID, func(x *autoRun) {
+		stage(x, "approve", "done", fmt.Sprintf("승인 — %s (%d명)", actor, len(users)))
+		stage(x, "devreq", "done", msg+" — "+strings.Join(users, ", "))
+		x.DevTo, x.Outbox = users, ids
+		x.Approver, x.Outcome, x.State, x.Finished = actor, "dev-request", "done", time.Now().UTC().Format(time.RFC3339)
+	})
+	_ = s.sor.append(SoREvent{Actor: actor, Action: "auto-response-approve", Subject: cur.ID, Detail: map[string]any{"vuln": cur.VulnID, "devTo": users, "outbox": ids}})
+	writeJSON(w, 200, map[string]any{"run": x})
+}
+
+// recordNotice: 메일 없이 화면 알림(내 통보)만 남긴다.
+func (s *Server) recordNotice(nt Notice, users []string) {
+	now := time.Now().UTC()
+	nt.ID, nt.Time, nt.To = fmt.Sprintf("%d", now.UnixNano()), now.Format(time.RFC3339), users
+	n := s.notify
+	if n == nil {
+		return
+	}
+	n.mu.Lock()
+	n.st.Notices = append(n.st.Notices, nt)
+	if len(n.st.Notices) > notifyKeep {
+		n.st.Notices = n.st.Notices[len(n.st.Notices)-notifyKeep:]
+	}
+	n.saveLocked()
+	n.mu.Unlock()
+}
+
+// ---------- 주기 검색(sweep) ----------
+
+// autoSweepLoop: 설정한 간격마다 납품 제품의 고객 설치 버전·최신 버전을 훑어 새 KEV·치명 취약점을 자동 대응에 넣는다.
+func (s *Server) autoSweepLoop() {
+	time.Sleep(3 * time.Minute) // 기동 직후 부하 피함
+	for {
+		autoRes.Lock()
+		autoLoad()
+		st := autoRes.Settings
+		autoRes.Unlock()
+		due := st.Mode == "on" && st.SweepHours > 0
+		if due && st.LastSweep != "" {
+			if t, err := time.Parse(time.RFC3339, st.LastSweep); err == nil && time.Since(t) < time.Duration(st.SweepHours)*time.Hour {
+				due = false
+			}
+		}
+		if due {
+			s.autoSweep("schedule")
+		}
+		time.Sleep(10 * time.Minute)
+	}
+}
+
+type sweepPick struct {
+	repo, tag, vuln string
+	kev             bool
+	cvss            float64
+}
+
+// autoSweep: 한 번 훑는다. 새로 넣은 건수를 돌려준다(백그라운드 실행은 호출 쪽에서).
+func (s *Server) autoSweep(by string) int {
+	autoRes.Lock()
+	autoLoad()
+	if autoRes.Settings.Sweeping {
+		autoRes.Unlock()
+		return 0
+	}
+	autoRes.Settings.Sweeping = true
+	max := autoRes.Settings.SweepMax
+	done := map[string]bool{}
+	for _, r := range autoRes.Runs {
+		if r.State != "error" {
+			done[r.Repo+"|"+r.Tag+"|"+r.VulnID] = true
+		}
+	}
+	autoSaveLocked()
+	autoRes.Unlock()
+	finish := func(msg string) {
+		autoRes.Lock()
+		autoRes.Settings.Sweeping, autoRes.Settings.LastSweep, autoRes.Settings.SweepMsg = false, time.Now().UTC().Format(time.RFC3339), msg
+		autoSaveLocked()
+		autoRes.Unlock()
+	}
+	if !s.dtEnabled() {
+		finish("Dependency-Track 미설정")
+		return 0
+	}
+	// 대상: 고객 등록부의 제품 → 고객 설치 버전 + 최신 버전
+	c := s.cust()
+	d := c.snapshot()
+	targets := map[string]map[string]bool{}
+	for _, cu := range activeCustomers(d.Customers) {
+		for _, u := range cu.Usages {
+			if targets[u.Repo] == nil {
+				targets[u.Repo] = map[string]bool{}
+			}
+			for _, in := range u.Installs {
+				targets[u.Repo][in.Tag] = true
+			}
+		}
+	}
+	versions, scanned := 0, 0
+	var picks []sweepPick
+	for repo, tags := range targets {
+		all := s.versionTags(repo, d.Products[repo])
+		if len(all) > 0 {
+			tags[all[len(all)-1]] = true // 최신 버전
+		}
+		v := s.dtView(repo)
+		for tag := range tags {
+			fs, ok := v.findings(tag)
+			if !ok {
+				continue
+			}
+			versions++
+			for _, f := range fs {
+				scanned++
+				kev := isKEV(vulnIDs(f))
+				if !kev && !strings.EqualFold(f.Vulnerability.Severity, "CRITICAL") {
+					continue
+				}
+				if st := stateOf(f); st != "NOT_SET" && st != "IN_TRIAGE" { // 이미 사람이 판단함
+					continue
+				}
+				if done[repo+"|"+tag+"|"+f.Vulnerability.VulnID] {
+					continue
+				}
+				cv := 0.0
+				if f.Vulnerability.CvssV3BaseScore != nil {
+					cv = *f.Vulnerability.CvssV3BaseScore
+				}
+				done[repo+"|"+tag+"|"+f.Vulnerability.VulnID] = true
+				picks = append(picks, sweepPick{repo, tag, f.Vulnerability.VulnID, kev, cv})
+			}
+		}
+	}
+	sort.SliceStable(picks, func(i, j int) bool {
+		if picks[i].kev != picks[j].kev {
+			return picks[i].kev
+		}
+		return picks[i].cvss > picks[j].cvss
+	})
+	total := len(picks)
+	if len(picks) > max {
+		picks = picks[:max]
+	}
+	msg := fmt.Sprintf("제품 %d개·버전 %d개·취약점 %d건 검사 → 새 KEV·치명 미대응 %d건 중 %d건 처리", len(targets), versions, scanned, total, len(picks))
+	_ = s.sor.append(SoREvent{Actor: autoActor, Action: "auto-response-sweep", Detail: map[string]any{"by": by, "versions": versions, "scanned": scanned, "found": total, "run": len(picks)}})
+	finish(msg + map[bool]string{true: " — 처리 중", false: ""}[len(picks) > 0])
+	for _, p := range picks {
+		s.runAutoResponse(newAutoRun("sweep", autoActor, p.repo, p.tag, p.vuln))
+	}
+	if len(picks) > 0 {
+		finish(msg)
+	}
+	return len(picks)
+}
+
+// POST /api/auto-response/sweep — 지금 검색(백그라운드)
+func (s *Server) apiAutoResponseSweep(w http.ResponseWriter, r *http.Request) {
+	autoRes.Lock()
+	autoLoad()
+	busy := autoRes.Settings.Sweeping
+	autoRes.Unlock()
+	if busy {
+		writeJSON(w, 409, map[string]string{"error": "이미 검색 중입니다"})
+		return
+	}
+	go s.autoSweep(w.Header().Get("X-User"))
+	writeJSON(w, 202, map[string]any{"started": true})
 }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Play, CheckCircle2, XCircle, Mail, Wrench, ShieldAlert, Eye } from 'lucide-react';
+import { Bot, Play, CheckCircle2, XCircle, Mail, Wrench, ShieldAlert, Eye, Radar } from 'lucide-react';
 import {
-  adminAutoResponse, adminAutoSettings, adminAutoRun, adminAutoApprove, adminAutoReject, adminCustNotifyGet,
+  adminAutoResponse, adminAutoSettings, adminAutoRun, adminAutoApprove, adminAutoReject, adminCustNotifyGet, adminAutoSweep,
   type AutoRun, type AutoSettings, type CustNotice
 } from '@/lib/api';
 import { Button, Input, Badge, Card, CardContent } from '@/components/ui/primitives';
@@ -16,8 +16,9 @@ import { cn } from '@/lib/utils';
 // 고객에게 나가는 메일은 반드시 관리자가 받는 사람을 확인하고 승인해야 나간다(승인 뒤에도 발송함 대기 동안 취소 가능).
 
 const OUT: Record<NonNullable<AutoRun['outcome']>, [string, string]> = {
-  approval: ['관리자 승인 대기', 'bg-amber-100 text-amber-800'], sent: ['고객 통지 승인·발송', 'bg-emerald-100 text-emerald-800'],
-  rejected: ['반려', 'bg-slate-200 text-slate-700'], 'dev-request': ['개발자 수정 요청', 'bg-sky-100 text-sky-800'],
+  approval: ['고객 통지 — 승인 대기', 'bg-amber-100 text-amber-800'], 'approval-dev': ['개발자 요청 — 승인 대기', 'bg-amber-100 text-amber-800'],
+  sent: ['고객 통지 승인·발송', 'bg-emerald-100 text-emerald-800'],
+  rejected: ['반려', 'bg-slate-200 text-slate-700'], 'dev-request': ['개발자 수정 요청 승인·발송', 'bg-sky-100 text-sky-800'],
   'not-affected': ['AI: 영향 없음 — 사람 확인', 'bg-slate-100 text-slate-700'], 'no-customers': ['영향 고객 없음', 'bg-slate-100 text-slate-700'], error: ['오류', 'bg-red-100 text-red-700'],
 };
 const stState = (s: AutoRun['stages'][number]['state']): StepState => (s === 'wait' ? 'active' : s);
@@ -32,12 +33,12 @@ function Flow() {
   const arrow = <span className="self-center text-slate-300">→</span>;
   return (
     <div className="flex flex-wrap items-stretch gap-1.5">
-      {box(<ShieldAlert size={16} className="text-red-600" />, '① 탐지', '새 취약점(KEV·치명)')}{arrow}
+      {box(<ShieldAlert size={16} className="text-red-600" />, '① 탐지', 'DT 새 취약점 알림 + 주기 검색')}{arrow}
       {box(<Bot size={16} className="text-fuchsia-600" />, '② AI 분석', '영향 여부·근거')}{arrow}
       {box(<Wrench size={16} className="text-slate-600" />, '③ 패치 확인', '새 버전에서 해결됐나')}{arrow}
       <div className="flex min-w-[250px] flex-[2] flex-col gap-1">
         {box(<CheckCircle2 size={16} className="text-amber-600" />, '④ 있음: 관리자 승인 → 고객 통지', '받는 사람 확인 후 승인, 발송 전 취소 가능', 'border-amber-200 bg-amber-50/50')}
-        {box(<Mail size={16} className="text-sky-600" />, '④ 없음: 개발자 수정 요청', '사내 메일 — 바로 발송', 'border-sky-200 bg-sky-50/50')}
+        {box(<Mail size={16} className="text-sky-600" />, '④ 없음: 관리자 승인 → 개발자 수정 요청', '받는 사람 확인 후 승인, 발송 전 취소 가능', 'border-sky-200 bg-sky-50/50')}
       </div>
     </div>
   );
@@ -95,6 +96,53 @@ function Approval({ run, onDone }: { run: AutoRun; onDone: () => void }) {
   );
 }
 
+function DevApproval({ run, onDone }: { run: AutoRun; onDone: () => void }) {
+  const cands = run.devCandidates || [];
+  const [sel, setSel] = useState<string[]>(() => cands.map((c) => c.username));
+  const [peek, setPeek] = useState(false);
+  const [delay, setDelay] = useSendDelay();
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const approve = async () => {
+    if (!sel.length || !confirm(`개발자 ${sel.length}명에게 수정 요청을 보냅니다.${delay ? `\n${delay}초 동안 발송함에서 기다리며 그 사이 취소할 수 있습니다.` : ''}`)) return;
+    setBusy(true); setErr('');
+    try { await adminAutoApprove(run.id, sel, delay); onDone(); } catch (e) { setErr(String(e)); }
+    setBusy(false);
+  };
+  const reject = async () => {
+    const why = prompt('반려 사유(선택) — 예: 이미 12.0.1 개발 중');
+    if (why === null) return;
+    setBusy(true); try { await adminAutoReject(run.id, why); onDone(); } catch (e) { setErr(String(e)); } setBusy(false);
+  };
+  return (
+    <div className="mt-3 rounded-lg border-2 border-sky-300 bg-sky-50/60 p-3">
+      <div className="mb-2 text-sm font-semibold text-sky-900">관리자 선택 — 패치 버전이 없습니다. 개발자에게 수정 요청을 보낼까요?</div>
+      <div className="flex flex-wrap gap-1.5">
+        {cands.length === 0 && <span className="text-xs text-red-600">추천 받는 사람이 없습니다(제품 쓰기 권한자 없음)</span>}
+        {cands.map((c) => (
+          <label key={c.username} className="flex items-center gap-1.5 rounded-md border bg-white px-2 py-1 text-xs">
+            <input type="checkbox" checked={sel.includes(c.username)} onChange={(e) => setSel(e.target.checked ? [...sel, c.username] : sel.filter((x) => x !== c.username))} />
+            <b>{c.username}</b><span className="text-muted-foreground">{c.email || '이메일 없음'}</span>
+          </label>
+        ))}
+      </div>
+      <button type="button" className="mt-2 inline-flex items-center gap-1 text-xs text-violet-700 hover:underline" onClick={() => setPeek(!peek)}><Eye size={12} />메일 {peek ? '닫기' : '보기'}</button>
+      {peek && (
+        <div className="mt-2 rounded-md border bg-white p-3 text-xs">
+          <div className="mb-1 font-semibold">{run.devSubject}</div>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-sans leading-relaxed text-slate-700">{run.devBody}</pre>
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button onClick={approve} disabled={busy || !sel.length}><CheckCircle2 size={14} />승인·발송 ({sel.length}명)</Button>
+        <Button variant="outline" onClick={reject} disabled={busy}><XCircle size={14} />반려</Button>
+        <DelayPicker value={delay} onChange={setDelay} />
+      </div>
+      {err && <Alert tone="crit">{err}</Alert>}
+    </div>
+  );
+}
+
 function RunCard({ run, onChange }: { run: AutoRun; onChange: () => void }) {
   const [n, setN] = useState<CustNotice | null>(null);
   useEffect(() => { if (run.outcome === 'sent' && run.noticeId) adminCustNotifyGet(run.noticeId).then(setN).catch(() => {}); }, [run.outcome, run.noticeId]);
@@ -107,7 +155,7 @@ function RunCard({ run, onChange }: { run: AutoRun; onChange: () => void }) {
         {run.severity && <Badge variant={run.severity === 'CRITICAL' ? 'danger' : 'warn'}>{run.severity}</Badge>}
         {run.kev && <Badge variant="danger">KEV</Badge>}
         <span className="text-sm">{run.repo.split('/').pop()} <b>{run.tag}</b>{run.component && <span className="text-muted-foreground"> · {run.component}</span>}</span>
-        <span className="ml-auto text-xs text-muted-foreground">{run.trigger === 'auto' ? '자동' : `직접 실행 · ${run.by}`} · {t(run.started)}</span>
+        <span className="ml-auto text-xs text-muted-foreground">{run.trigger === 'auto' ? 'DT 새 취약점 알림' : run.trigger === 'sweep' ? '주기 검색' : `직접 실행 · ${run.by}`} · {t(run.started)}</span>
       </div>
       <Steps steps={run.stages.map((s) => ({ label: s.label, state: stState(s.state), ai: s.key === 'ai' }))} />
       <ul className="space-y-0.5 text-xs text-slate-700">
@@ -115,7 +163,8 @@ function RunCard({ run, onChange }: { run: AutoRun; onChange: () => void }) {
       </ul>
       {run.aiSummary && <div className="rounded-md border border-fuchsia-200 bg-fuchsia-50/60 p-2 text-xs"><b className="text-fuchsia-700">✦ AI 분석{run.aiModel ? ` · ${run.aiModel}` : ''}</b> — {run.aiSummary}</div>}
       {run.error && <Alert tone="crit">{run.error}</Alert>}
-      {run.state === 'waiting' && <Approval run={run} onDone={onChange} />}
+      {run.state === 'waiting' && (run.noticeId ? <Approval run={run} onDone={onChange} /> : <DevApproval run={run} onDone={onChange} />)}
+      {run.outbox && run.outbox.length > 0 && <OutboxPanel ids={run.outbox} />}
       {n && n.targets.some((x) => x.result?.outbox) && <OutboxPanel ids={n.targets.map((x) => x.result?.outbox || '').filter(Boolean)} />}
     </CardContent></Card>
   );
@@ -129,10 +178,12 @@ export default function AutoResponse() {
   const [vuln, setVuln] = useState('CVE-2026-123007');
   const load = useCallback(() => adminAutoResponse().then((x) => { setD(x); setErr(''); }).catch((e) => setErr(String(e))), []);
   useEffect(() => { adminAutoResponse().then(setD).catch((e) => setErr(String(e))); }, []);
-  const live = !!d?.runs.some((r) => r.state === 'running');
+  const live = !!d?.runs.some((r) => r.state === 'running') || !!d?.settings.sweeping;
   useEffect(() => { if (!live) return; const id = setInterval(load, 3000); return () => clearInterval(id); }, [live, load]);
   const run = async () => { setErr(''); try { await adminAutoRun(repo.trim(), tag.trim(), vuln.trim()); load(); } catch (e) { setErr(String(e)); } };
-  const setMode = async (mode: 'on' | 'off') => { if (!d) return; try { await adminAutoSettings({ ...d.settings, mode }); load(); } catch (e) { setErr(String(e)); } };
+  const save = async (p: Partial<AutoSettings>) => { if (!d) return; try { await adminAutoSettings({ ...d.settings, ...p }); load(); } catch (e) { setErr(String(e)); } };
+  const setMode = (mode: 'on' | 'off') => save({ mode });
+  const sweep = async () => { setErr(''); try { await adminAutoSweep(); setTimeout(load, 1500); } catch (e) { setErr(String(e)); } };
   const waiting = d?.runs.filter((r) => r.state === 'waiting').length || 0;
 
   return (
@@ -149,6 +200,20 @@ export default function AutoResponse() {
             </select>
             <span className="text-xs text-muted-foreground">버전당 최대 {d.settings.maxPerVersion}건 · AI {d.ai ? '연결됨' : '꺼짐(규칙으로 진행)'}</span>
             {waiting > 0 && <span className="ml-auto rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">승인 대기 {waiting}건</span>}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 text-sm">
+            <span className="inline-flex items-center gap-1.5 font-semibold"><Radar size={15} />주기 검색</span>
+            <select className={selectCls} value={d.settings.sweepHours} onChange={(e) => save({ sweepHours: Number(e.target.value) })}>
+              {[[0, '끔'], [1, '1시간마다'], [6, '6시간마다'], [12, '12시간마다'], [24, '하루 한 번']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <select className={selectCls} value={d.settings.sweepMax} onChange={(e) => save({ sweepMax: Number(e.target.value) })} title="한 번에 새로 처리할 최대 건수(로컬 AI 는 건당 1~3분)">
+              {[3, 5, 10, 20].map((v) => <option key={v} value={v}>한 번에 최대 {v}건</option>)}
+            </select>
+            <Button size="sm" variant="outline" onClick={sweep} disabled={!!d.settings.sweeping}><Radar size={14} />{d.settings.sweeping ? '검색 중…' : '지금 검색'}</Button>
+            <span className="text-xs text-muted-foreground">
+              {d.settings.lastSweep ? `마지막 ${t(d.settings.lastSweep)} — ${d.settings.sweepMsg || ''}` : '아직 검색하지 않음'}
+            </span>
+            <span className="w-full text-xs text-muted-foreground">DT 새 취약점 알림만으로는 놓치는 경우(나중에 KEV 로 바뀐 취약점, 새로 등록한 고객의 구버전, 알림을 못 받은 경우)를 채웁니다. 대상: 고객에게 납품한 제품의 고객 설치 버전과 최신 버전, 아직 판단·대응하지 않은 KEV·치명.</span>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3">
             <span className="text-sm font-semibold">직접 실행</span>

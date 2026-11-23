@@ -9,6 +9,7 @@ import { fmtBytes, cn } from '@/lib/utils';
 import { Card, CardHeader, CardContent, Badge, Button } from '@/components/ui/primitives';
 import { Busy, PartsProgress } from '@/components/Progress';
 import AiPerfTab from './AiPerfTab';
+import AutoPending from '@/components/AutoPending';
 import { PageTitle, SectionTitle, StatCard, Alert, BarChart, Gauge, LineChart, Donut, Table, Th, Td, selectCls } from './_ui';
 
 const GROUPS = ['admins', 'developers', 'partners', 'customers'];
@@ -502,6 +503,7 @@ export default function Dashboard() {
         </Button>
       </div>
 
+      <AutoPending />
       {progress}
       {dash && <Busy active={busy} label="새로 집계하는 중 — 제품마다 취약점·SBOM 을 다시 셉니다" hint="보통 10~20초" className="mb-4" />}
       {dashErr && <div className="mb-4"><Alert tone="crit">집계 실패: {dashErr}</Alert></div>}
