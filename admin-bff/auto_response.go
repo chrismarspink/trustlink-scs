@@ -151,6 +151,9 @@ func (s *Server) maybeAutoRespond(repo, tag string, vulns []vulnInfo) {
 	for _, r := range autoRes.Runs {
 		if r.Repo == repo && r.Tag == tag && r.State != "error" {
 			done[r.VulnID] = true
+			if r.Trigger == "auto" {
+				max-- // DT 알림이 여러 번에 나뉘어 와도 버전당 최대 건수를 넘지 않게
+			}
 		}
 	}
 	autoRes.Unlock()
@@ -166,7 +169,7 @@ func (s *Server) maybeAutoRespond(repo, tag string, vulns []vulnInfo) {
 			break
 		}
 	}
-	if len(picks) == 0 {
+	if len(picks) == 0 || max <= 0 {
 		return
 	}
 	go func() {
@@ -278,8 +281,18 @@ func (s *Server) runAutoResponse(r autoRun) autoRun {
 		})
 		return s.autoCustomerNotice(id, r, comp)
 	}
+	// 참고: 이 제품의 다른 버전 중 같은 취약점이 없는(구성요소를 올린) 버전 — 개발자에게 "이 버전으로 올리면 된다"는 단서
+	hint := ""
+	for _, st := range v.fixScan(r.VulnID, f, tags, "0") {
+		if st.Status == "fixed" && st.CompVersion != "" && st.Tag != r.Tag {
+			hint = fmt.Sprintf("%s %s 은(는) %s %s 로 해결됨", path.Base(r.Repo), st.Tag, f.Component.Name, st.CompVersion)
+			if upstream == "" {
+				upstream = f.Component.Name + " " + st.CompVersion + "(" + path.Base(r.Repo) + " " + st.Tag + " 에서 확인)"
+			}
+		}
+	}
 	autoUpdate(id, func(x *autoRun) {
-		stage(x, "fix", "done", "패치 버전 없음 — 확인: "+scan+map[bool]string{true: " · 구성요소 수정 버전: " + upstream, false: ""}[upstream != ""])
+		stage(x, "fix", "done", "패치 버전 없음 — 확인: "+scan+map[bool]string{true: " · 참고: " + hint, false: ""}[hint != ""])
 	})
 	return s.autoDevRequest(id, r, comp, upstream)
 }

@@ -25,6 +25,10 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.22.1', date: '2026-11-23', title: '자동 대응 보완',
+    items: [{ kind: '개선', text: '개발자 수정 요청에 "같은 제품의 다른 버전은 구성요소를 올려 해결됨" 단서 추가, 알림이 나뉘어 와도 버전당 최대 건수 유지' }],
+  },
+  {
     version: '2.22.0', date: '2026-11-23', title: '자동 대응',
     items: [
       { kind: '신규', text: '자동 대응 — 새 취약점(KEV·치명) 탐지 → AI 영향 분석 → 패치 버전 확인 → 패치 있으면 영향 고객 통지 초안과 관리자 승인 요청, 없으면 개발자에게 수정 요청 메일' },
