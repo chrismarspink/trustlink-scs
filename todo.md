@@ -8,7 +8,7 @@
 > 아래 CA/CMS 관련 완료·backlog 항목은 **역사적 기록**(현재는 미해당).
 
 ## 배포 대기 — v2.13.0 (2026-11-21)
-- [ ] **218 서버에 v2.13.0 배포**: 초기 화면 상단 제품 소개(막대 인형 장면, `trustlink-ui/public/intro.html` + `IntroCard.tsx`). 소스·태그는 GitHub 반영 완료, 서버만 미반영.
+- [x] **218 서버에 v2.13.0 배포** (2026-11-23 완료): 초기 화면 상단 제품 소개(막대 인형 장면, `trustlink-ui/public/intro.html` + `IntroCard.tsx`). 소스·태그는 GitHub 반영 완료, 서버만 미반영.
   - 막힌 이유: 2026-11-21 집 회선에서 SSH 가 키 교환 단계에서 끊김(`Connection reset by peer`). 재시도가 겹쳐 접속 제한(fail2ban/ufw limit)에 걸린 것으로 추정.
   - 출근 후: `cd deploy/zot-keycloak && sshpass -e bash scripts/deploy-remote.sh` **한 번만** 실행(실패해도 연달아 재시도하지 말 것).
   - 그래도 끊기면 서버 콘솔에서 `sudo fail2ban-client status sshd` 로 차단 IP 확인 → `sudo fail2ban-client set sshd unbanip <IP>`.
