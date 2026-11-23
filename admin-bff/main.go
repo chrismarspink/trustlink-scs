@@ -311,21 +311,26 @@ func main() {
 	mux.HandleFunc("GET /api/metrics", s.guard(s.apiMetrics))
 	mux.HandleFunc("GET /api/logs", s.guard(s.apiLogs))
 	mux.HandleFunc("GET /api/health", s.guard(s.apiHealth))
-	mux.HandleFunc("GET /api/mail", s.guard(s.apiMailStatus))                              // 통보 메일 설정 상태
-	mux.HandleFunc("POST /api/mail/test", s.guard(s.apiMailTest))                          // 시험 메일 발송
-	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))                     // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
-	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                    // 본문 미리보기
-	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                    // 받는 사람·항목·첨부 추천(규칙 + AI)
-	mux.HandleFunc("GET /api/mail/templates", s.guard(s.apiMailTemplates))                 // 현황 메일 템플릿(기본 + 관리자 작성)
-	mux.HandleFunc("PUT /api/mail/templates", s.guard(s.apiMailTemplatesPut))              // 관리자 작성 템플릿 저장
-	mux.HandleFunc("GET /api/mail/outbox", s.guard(s.apiMailOutbox))                       // 발송함(기다리는 메일·최근 기록)
-	mux.HandleFunc("DELETE /api/mail/outbox/{id}", s.guard(s.apiMailOutboxCancel))         // 보내기 취소(기다리는 동안만)
-	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF))            // 규제 보고서 PDF(Gotenberg)
-	mux.HandleFunc("GET /api/notifications", s.guardSession(s.apiNotifications))           // 내 통보
-	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead)) // 읽음 표시
-	mux.HandleFunc("GET /api/notify/log", s.guard(s.apiNotifyLog))                         // 전체 통보 기록
-	mux.HandleFunc("POST /api/notify/sync", s.guard(s.apiNotifySync))                      // 지금 동기화
-	mux.HandleFunc("GET /api/vulnsources", s.guard(s.apiVulnSources))                      // 취약점 DB(OSV·GitHub) 설정
+	mux.HandleFunc("GET /api/mail", s.guard(s.apiMailStatus))                                // 통보 메일 설정 상태
+	mux.HandleFunc("POST /api/mail/test", s.guard(s.apiMailTest))                            // 시험 메일 발송
+	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))                       // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
+	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                      // 본문 미리보기
+	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                      // 받는 사람·항목·첨부 추천(규칙 + AI)
+	mux.HandleFunc("GET /api/auto-response", s.guard(s.apiAutoResponse))                     // 자동 대응 기록·설정
+	mux.HandleFunc("PUT /api/auto-response/settings", s.guard(s.apiAutoResponseSettings))    // 켜기/끄기
+	mux.HandleFunc("POST /api/auto-response/run", s.guard(s.apiAutoResponseRun))             // 직접 실행(시연·재실행)
+	mux.HandleFunc("POST /api/auto-response/{id}/approve", s.guard(s.apiAutoResponseDecide)) // 관리자 승인 → 고객 통지(발송함)
+	mux.HandleFunc("POST /api/auto-response/{id}/reject", s.guard(s.apiAutoResponseDecide))  // 반려
+	mux.HandleFunc("GET /api/mail/templates", s.guard(s.apiMailTemplates))                   // 현황 메일 템플릿(기본 + 관리자 작성)
+	mux.HandleFunc("PUT /api/mail/templates", s.guard(s.apiMailTemplatesPut))                // 관리자 작성 템플릿 저장
+	mux.HandleFunc("GET /api/mail/outbox", s.guard(s.apiMailOutbox))                         // 발송함(기다리는 메일·최근 기록)
+	mux.HandleFunc("DELETE /api/mail/outbox/{id}", s.guard(s.apiMailOutboxCancel))           // 보내기 취소(기다리는 동안만)
+	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF))              // 규제 보고서 PDF(Gotenberg)
+	mux.HandleFunc("GET /api/notifications", s.guardSession(s.apiNotifications))             // 내 통보
+	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead))   // 읽음 표시
+	mux.HandleFunc("GET /api/notify/log", s.guard(s.apiNotifyLog))                           // 전체 통보 기록
+	mux.HandleFunc("POST /api/notify/sync", s.guard(s.apiNotifySync))                        // 지금 동기화
+	mux.HandleFunc("GET /api/vulnsources", s.guard(s.apiVulnSources))                        // 취약점 DB(OSV·GitHub) 설정
 	mux.HandleFunc("PUT /api/vulnsources", s.guard(s.apiVulnSourcesPut))
 	mux.HandleFunc("POST /api/vulnsources/reanalyze", s.guard(s.apiVulnReanalyze))
 	mux.HandleFunc("GET /api/mirror", s.guard(s.apiMirror)) // 취약점 DB 미러 상태·정책

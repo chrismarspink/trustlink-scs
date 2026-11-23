@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# innoPouch 웹 스택 시연(docs/DEMO-INNOPOUCH-WEB.md): 11.0(취약 nginx·PHP·Node.js) / 11.1(수정 버전) 업로드.
+# innoPouch 웹 스택 시연(docs/DEMO-INNOPOUCH-WEB.md): 11.0(취약 nginx·PHP·Node.js) / 11.1(수정 버전) / 12.0(nginx 1.30.6 — 자동 대응 "패치 없음" 시연) 업로드.
 #
 #   1) tools/demo_innopouch_gen.py --web 으로 바이너리 + CycloneDX SBOM + 설치 매뉴얼 생성
 #   2) products/innopouch:<버전> 업로드 + SBOM·매뉴얼 referrer 첨부 (oras)
@@ -21,7 +21,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 VER=""; DRY=0; SYNC=0
 for a in "$@"; do
   case "$a" in
-    11.0|11.1) VER="$a" ;;
+    11.0|11.1|12.0) VER="$a" ;;
     --dry-run|-n) DRY=1 ;;
     --sync) SYNC=1 ;;
     -h|--help) sed -n '2,18p' "$0"; exit 0 ;;

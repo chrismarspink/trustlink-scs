@@ -4,8 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck
-} from 'lucide-react';
+  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +47,7 @@ const ADMIN: Item[] = [
   },
   { to: '/admin/customers', label: '고객 등록부', icon: Contact },
   { to: '/admin/customer-notify', label: '고객 통지', icon: Megaphone },
+  { to: '/admin/auto-response', label: '자동 대응', icon: Workflow },
   { to: '/admin/notify', label: '취약점 통보', icon: Bell },
   { to: '/admin/logs', label: '로그', icon: ScrollText }
 ];

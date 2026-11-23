@@ -296,7 +296,8 @@ type custAIText struct {
 type CustNotice struct {
 	ID          string                 `json:"id"`
 	Kind        string                 `json:"kind"`                // patch | notaffected
-	Status      string                 `json:"status"`              // draft | sent | partial | dropped | failed
+	Status      string                 `json:"status"`              // draft | queued | sent | partial | dropped | failed
+	AutoRun     string                 `json:"autoRun,omitempty"`   // 자동 대응(auto_response.go)이 만든 초안이면 그 기록 ID
 	AIState     string                 `json:"aiState,omitempty"`   // running | done — AI 설명은 뒤에서 만든다(로컬 LLM 은 수 분)
 	AIStarted   string                 `json:"aiStarted,omitempty"` // 진행 표시용
 	Created     string                 `json:"created"`

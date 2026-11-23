@@ -21,6 +21,7 @@ import Reports from '@/pages/admin/Reports';
 import Upstream from '@/pages/admin/Upstream';
 import Customers from '@/pages/admin/Customers';
 import CustomerNotify from '@/pages/admin/CustomerNotify';
+import AutoResponse from './pages/admin/AutoResponse';
 import UpstreamPrint from '@/pages/admin/UpstreamPrint';
 
 // 관리 콘솔 영역: BFF 세션 + admins 그룹 게이트(AdminLayout 내부).
@@ -60,6 +61,7 @@ function AdminPages() {
         <Route path="upstream" element={<Upstream />} />
         <Route path="customers" element={<Customers />} />
         <Route path="customer-notify" element={<CustomerNotify />} />
+        <Route path="auto-response" element={<AutoResponse />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>
