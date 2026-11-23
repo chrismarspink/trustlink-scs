@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -76,7 +77,18 @@ func containsAny(s string, subs []string) bool {
 	return false
 }
 
+// zot 는 Authorization 만 가리고 Cookie 는 그대로 남긴다(세션 값이 보임) — 화면에 보내기 전에 가린다.
+var logCookieRe = regexp.MustCompile(`"(Cookie|Set-Cookie)":\["[^\]]*\]`)
+
+func maskLogSecrets(line []byte) []byte {
+	if !bytes.Contains(line, []byte(`Cookie"`)) {
+		return line
+	}
+	return logCookieRe.ReplaceAll(line, []byte(`"$1":["******"]`))
+}
+
 func parseLogLine(off int64, line []byte) logEntry {
+	line = maskLogSecrets(line)
 	var l struct {
 		Time       string `json:"time"`
 		Level      string `json:"level"`

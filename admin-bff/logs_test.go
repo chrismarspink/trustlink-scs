@@ -122,3 +122,11 @@ func TestLogsDateAndEvent(t *testing.T) {
 }
 
 func mustT(s string) time.Time { t, _ := time.Parse(time.RFC3339Nano, s); return t }
+
+func TestLogCookieMasked(t *testing.T) {
+	ln := []byte(`{"time":"2026-11-23T05:20:26Z","level":"info","message":"HTTP API","headers":{"Cookie":["tl_admin_sid=SECRET1; session=SECRET2"],"Authorization":["******"]}}`)
+	e := parseLogLine(0, ln)
+	if strings.Contains(e.Raw, "SECRET") || !strings.Contains(e.Raw, `"Cookie":["******"]`) {
+		t.Fatalf("쿠키가 남음: %s", e.Raw)
+	}
+}

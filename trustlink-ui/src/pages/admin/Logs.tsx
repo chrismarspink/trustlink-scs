@@ -33,9 +33,24 @@ const dayTitle = (d: string) => {
 };
 const hms = (t: string) => (t ? new Date(t).toLocaleTimeString('en-GB', { timeZone: 'Asia/Seoul', hour12: false }) : '');
 
+// 주요 내용: 업로드·다운로드는 "제품:버전", 그 밖의 요청은 "방식 경로 → 상태", 나머지는 메시지(+오류)
+const MANIFEST = /^\/v2\/(.+)\/manifests\/([^/]+)$/;
 function summary(e: LogEntry) {
+  const m = e.path ? MANIFEST.exec(e.path) : null;
+  if (m && (e.event === 'upload' || e.event === 'download')) return `${m[1]} : ${m[2]} ${e.event === 'upload' ? '올림' : '받음'}`;
   if (e.method) return `${e.method} ${e.path} → ${e.status}${e.latency && e.latency !== '0s' ? ` (${e.latency})` : ''}`;
   return e.msg + (e.err ? ` — ${e.err}` : '');
+}
+const ymd = (t: string) => kstDate(t).slice(5).replace('-', '.'); // 11.23
+
+// 정리 보기의 열 머리
+function Head() {
+  return (
+    <div className="flex gap-2 border-b bg-slate-50 px-3 py-1.5 pl-[34px] text-[11px] font-medium text-muted-foreground">
+      <span className="w-[7.5rem] shrink-0">날짜 · 시각</span><span className="w-12 shrink-0 text-center">레벨</span>
+      <span className="w-28 shrink-0">이벤트</span><span className="w-24 shrink-0">사용자</span><span className="flex-1">주요 내용</span>
+    </div>
+  );
 }
 
 function Row({ e, evLabel }: { e: LogEntry; evLabel: string }) {
@@ -46,13 +61,29 @@ function Row({ e, evLabel }: { e: LogEntry; evLabel: string }) {
     <div className="border-b last:border-0">
       <button onClick={() => setOpen(!open)} className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-50">
         {open ? <ChevronDown size={14} className="mt-px shrink-0 text-slate-400" /> : <ChevronRight size={14} className="mt-px shrink-0 text-slate-400" />}
-        <span className="w-16 shrink-0 font-mono tabular-nums text-slate-500">{hms(e.time)}</span>
+        <span className="w-[7.5rem] shrink-0 font-mono tabular-nums text-slate-500"><span className="text-slate-400">{ymd(e.time)}</span> {hms(e.time)}</span>
         <span className={cn('w-12 shrink-0 rounded px-1 text-center text-[11px] font-medium', levelCls(e.level))}>{levelLabel(e.level)}</span>
-        <span className={cn('w-24 shrink-0 truncate font-medium', EVENT_CLS[e.event])}>{evLabel}</span>
-        <span className="w-20 shrink-0 truncate text-slate-700" title={e.user}>{e.user || '—'}</span>
-        <span className="min-w-0 flex-1 break-all font-mono text-slate-800">{summary(e)}</span>
+        <span className={cn('w-28 shrink-0 truncate font-medium', EVENT_CLS[e.event])}>{evLabel}</span>
+        <span className="w-24 shrink-0 truncate text-slate-700" title={e.user}>{e.user || '—'}</span>
+        <span className="min-w-0 flex-1 break-all text-slate-800">{summary(e)}</span>
       </button>
       {open && <pre className="mx-3 mb-2 overflow-x-auto rounded bg-slate-900 p-3 text-[11px] leading-relaxed text-slate-100">{pretty}</pre>}
+    </div>
+  );
+}
+
+// 원문 보기(기존 방식): 한 줄 그대로 + 위에 날짜·이벤트·사용자·주요 내용
+function RawRow({ e, evLabel }: { e: LogEntry; evLabel: string }) {
+  return (
+    <div className="border-b px-3 py-1.5 last:border-0">
+      <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
+        <span className="font-mono tabular-nums text-slate-500">{kstDate(e.time)} {hms(e.time)}</span>
+        <span className={cn('rounded px-1 font-medium', levelCls(e.level))}>{levelLabel(e.level)}</span>
+        <span className={cn('font-medium', EVENT_CLS[e.event])}>{evLabel}</span>
+        {e.user && <span className="text-slate-700">· {e.user}</span>}
+        <span className="min-w-0 truncate text-slate-600">· {summary(e)}</span>
+      </div>
+      <div className="whitespace-pre-wrap break-all font-mono text-xs text-slate-800">{e.raw}</div>
     </div>
   );
 }
@@ -68,6 +99,8 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 
 export default function Logs() {
   const [mode, setMode] = useState<'basic' | 'event'>('basic');
+  const [view, setViewS] = useState<'table' | 'raw'>(() => { try { return localStorage.getItem('tl-log-view') === 'raw' ? 'raw' : 'table'; } catch { return 'table'; } });
+  const setView = (v: 'table' | 'raw') => { setViewS(v); try { localStorage.setItem('tl-log-view', v); } catch { /* 저장소 차단 */ } };
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -177,12 +210,17 @@ export default function Logs() {
       </div>
 
       {res && (
-        <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>기록 범위 {minDay} ~ {maxDay}</span>
           <span>이 쪽 {res.entries.length}건</span>
           {mode === 'basic' && Object.keys(res.byLevel).length > 0 && (
             <span>{countNote}: {LEVELS.filter((l) => res.byLevel[l.key]).map((l) => `${l.label} ${res.byLevel[l.key].toLocaleString()}`).join(' · ')}</span>
           )}
+          <span className="ml-auto inline-flex overflow-hidden rounded-md border">
+            {([['table', '정리 보기'], ['raw', '원문 보기(기존)']] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setView(k)} className={cn('px-2.5 py-0.5', view === k ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50')}>{l}</button>
+            ))}
+          </span>
           <span>응답 {res.ms < 1000 ? `${res.ms}ms` : `${(res.ms / 1000).toFixed(1)}초`}</span>
         </div>
       )}
@@ -194,14 +232,14 @@ export default function Logs() {
       <div className="overflow-hidden rounded-lg border bg-card">
         {!res ? <p className="p-4 text-sm text-muted-foreground">불러오는 중…</p>
           : groups.length === 0 ? <p className="p-4 text-sm text-muted-foreground">조건에 맞는 로그가 없습니다.</p>
-            : groups.map((g) => (
+            : <>{view === 'table' && <Head />}{groups.map((g) => (
               <Fragment key={g.day}>
                 <div className="sticky top-0 z-10 flex items-baseline gap-2 border-b bg-slate-100/95 px-3 py-1.5 text-sm font-semibold backdrop-blur">
                   {dayTitle(g.day)} <span className="text-xs font-normal text-muted-foreground">{g.rows.length}건</span>
                 </div>
-                {g.rows.map((e) => <Row key={e.off} e={e} evLabel={evLabel(e.event)} />)}
+                {g.rows.map((e) => view === 'raw' ? <RawRow key={e.off} e={e} evLabel={evLabel(e.event)} /> : <Row key={e.off} e={e} evLabel={evLabel(e.event)} />)}
               </Fragment>
-            ))}
+            ))}</>}
       </div>
 
       <div className="mt-3 flex gap-2">
