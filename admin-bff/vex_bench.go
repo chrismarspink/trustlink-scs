@@ -127,7 +127,8 @@ func (s *Server) vexBenchOne(variant string, f dtFindingFull) vexBenchRow {
 		meta, err = s.aiDraftOpt("vex", "ko", facts, vexTask, vexDraftSchema, 1100, &d, true)
 	case "slim-raw": // 지시문 앞 + 출력 축소, 사실은 원문 그대로(사용 맥락 없음)
 		facts = vexFacts(f, "", sig)
-		meta, err = s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 400, &d, true)
+		meta, err = s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 220, &d, true)
+		vexSlimFill(&d)
 	case "card": // 권고문 요약 카드 만들기(저장함 — 이후 방식이 쓴다)
 		var c *vulnCard
 		c, err = s.cardBuild(f, true)
@@ -141,10 +142,12 @@ func (s *Server) vexBenchOne(variant string, f dtFindingFull) vexBenchRow {
 		return row
 	case "ctx-card": // 사용 맥락 + 카드(축약 AI). 저장된 판정은 쓰지 않는다
 		facts = vexSlimFacts(f, vexBenchCtx, sig, cardGet(f))
-		meta, err = s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 400, &d, true)
+		meta, err = s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 220, &d, true)
+		vexSlimFill(&d)
 	case "ctx-raw": // 사용 맥락 + 권고문 원문(카드 없이)
 		facts = vexSlimFacts(f, vexBenchCtx, sig, nil)
-		meta, err = s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 400, &d, true)
+		meta, err = s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 220, &d, true)
+		vexSlimFill(&d)
 	case "rule":
 		facts = vexFacts(f, "", sig)
 		d = vexRuleDraft(f, sig, facts, cardGet(f))

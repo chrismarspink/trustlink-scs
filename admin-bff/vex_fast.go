@@ -15,6 +15,7 @@ package main
 import (
 	"encoding/json"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -141,8 +142,7 @@ const vexSlimTask = `담당자가 적은 사용 맥락(U1)을 반영해, 위 취
 - not_affected 는 사용 맥락(U1)이나 "OSV 영향 범위 밖"(R1)이 근거일 때만 고르고 justification 을 반드시 채운다. 그 외에는 justification 을 빈 문자열로 둔다.
 - justification: 취약한 함수·기능을 쓰지 않거나 버전이 범위 밖 → vulnerable_code_not_present, 코드는 있으나 실행되지 않음 → vulnerable_code_not_in_execute_path, 외부 입력이 닿지 않음 → vulnerable_code_cannot_be_controlled_by_adversary, 별도 방어 장치가 있음 → inline_mitigations_already_exist, 구성요소가 제품에 없음 → component_not_present.
 - response: affected 일 때만. R1 에 최소 수정 버전이 있으면 update, 없고 임시 완화가 가능하면 workaround_available, 둘 다 없으면 can_not_fix. 그 외에는 빈 문자열.
-- detail: 판단 이유 두 문장. 결론은 status 와 같아야 한다. 각 문장 끝에 근거 사실 ID 를 [U1] 처럼 붙인다. 사실에 없는 버전·설정 값을 지어내지 않는다.
-- missing: 판정을 확정하려면 확인할 점(최대 2개).
+- detail: 판단 이유 한 문장(80자 안팎). 결론은 status 와 같아야 하고, 끝에 근거 사실 ID 를 [U1] 처럼 붙인다. 사실에 없는 버전·설정 값을 지어내지 않는다.
 - confidence: 근거가 충분하면 high, 일부만 있으면 medium, 부족하면 low.`
 
 var vexSlimSchema = map[string]any{
@@ -151,12 +151,31 @@ var vexSlimSchema = map[string]any{
 		"status":        map[string]any{"type": "string", "enum": vexStates},
 		"justification": map[string]any{"type": "string", "enum": vexJusts},
 		"response":      map[string]any{"type": "string", "enum": vexResponses},
-		"detail":        map[string]any{"type": "string", "maxLength": 320},
-		"citations":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "minItems": 1, "maxItems": 5},
-		"missing":       map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 120}, "maxItems": 2},
+		"detail":        map[string]any{"type": "string", "maxLength": 160},
 		"confidence":    map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
 	},
-	"required": []string{"status", "justification", "response", "detail", "citations", "missing", "confidence"},
+	"required": []string{"status", "justification", "response", "detail", "confidence"},
+}
+
+var citeTag = regexp.MustCompile(`\[([A-Z]\d(?:\s*,\s*[A-Z]\d)*)\]`)
+
+// vexSlimFill: AI 가 쓰지 않은 칸을 채운다 — 근거 ID 는 이유 문장의 [U1] 표시에서, 확인할 점은 판정에 맞는 틀에서.
+func vexSlimFill(d *vexDraft) {
+	for _, m := range citeTag.FindAllStringSubmatch(d.Detail, -1) {
+		for _, id := range strings.Split(m[1], ",") {
+			if id = strings.TrimSpace(id); !inList(id, d.Citations) {
+				d.Citations = append(d.Citations, id)
+			}
+		}
+	}
+	switch d.Status {
+	case "not_affected":
+		d.Missing = []string{"사용 맥락에 적은 내용(설정·코드 경로)을 뒷받침하는 근거 자료", "설정이나 구성요소 버전이 바뀌면 다시 판정"}
+	case "affected":
+		d.Missing = []string{"적용할 수정 버전과 배포 일정", "수정 전까지 쓸 임시 완화"}
+	default:
+		d.Missing = []string{"제품이 취약한 기능을 실제로 쓰는지(설정·코드 경로)", "공급자 권고문의 영향 범위·수정 버전"}
+	}
 }
 
 // vexSlimFacts: AI 에 보내는 사실을 줄인다 — 권고문 원문 대신 요약 카드(있으면), CVSS 벡터·EPSS·현재 상태는 뺀다.
@@ -231,11 +250,12 @@ func (s *Server) vexSlimDraft(f dtFindingFull, context string, sig vexSignals, c
 		return d, facts, aiMeta{FactsSHA256: key, Use: "vex", Method: "ai-slim", Cached: true, Model: "저장된 판정"}, nil
 	}
 	var d vexDraft
-	meta, err := s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 400, &d, true)
+	meta, err := s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 220, &d, true)
 	meta.Method = "ai-slim"
 	if err != nil {
 		return d, facts, meta, err
 	}
+	vexSlimFill(&d)
 	if card != nil {
 		d.Workaround = card.Workaround
 	}

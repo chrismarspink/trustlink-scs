@@ -79,6 +79,15 @@ func waitBatch(t *testing.T, project string) *vexBatch {
 		}
 		vexBatchMu.Unlock()
 		if b != nil && st != "running" {
+			for j := 0; j < 200; j++ { // 뒤에서 만드는 권고문 요약 카드가 끝날 때까지(임시 폴더 정리와 겹치지 않게)
+				cardQ.Lock()
+				run := cardQ.running
+				cardQ.Unlock()
+				if !run {
+					break
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
 			return b
 		}
 		time.Sleep(20 * time.Millisecond)

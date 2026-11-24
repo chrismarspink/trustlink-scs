@@ -27,7 +27,7 @@ const cardTask = `아래 취약점 권고문(V3)을 한국어로 정리한다.
 - summary: 무엇이 문제이고 악용되면 어떤 피해가 나는지 한두 문장.
 - condition: 악용에 필요한 조건(설정·기능·공격자 위치) 한 문장. 권고문에 없으면 빈 문자열.
 - workaround: 권고문에 적힌 임시 완화책 한 문장. 권고문에 없으면 빈 문자열.
-- 권고문에 없는 버전·수치·설정 값을 지어내지 않는다.`
+- 권고문에 없는 버전·수치·설정 값을 지어내지 않는다. 사실 ID([V3] 같은 표시)는 붙이지 않는다.`
 
 var cardSchema = map[string]any{
 	"type": "object",
@@ -92,7 +92,7 @@ func (s *Server) cardBuild(f dtFindingFull, save bool) (*vulnCard, error) {
 				return ""
 			}
 		}
-		return strings.TrimSpace(t)
+		return strings.TrimSpace(citeTag.ReplaceAllString(t, "")) // 모델이 붙인 [V3] 같은 표시는 뗀다(초안이 따로 붙인다)
 	}
 	c.Summary, c.Condition, c.Workaround = clean(c.Summary), clean(c.Condition), clean(c.Workaround)
 	c.VulnID, c.Model, c.At, c.ElapsedMs = f.Vulnerability.VulnID, meta.Model, time.Now().UTC().Format(time.RFC3339), meta.ElapsedMs
