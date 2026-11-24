@@ -334,7 +334,7 @@ export type MailOptions = {
 export type MailCompose = { recipients: string[]; sections: string[]; reports: string[]; subject: string; note: string; delay?: number };
 // 발송함: 보내기 전 잠깐 기다리고(취소 가능) 보낸다
 export type OutboxItem = {
-  id: string; kind: 'digest' | 'custnotify'; label: string; ref?: string; recipients: string[]; subject: string; createdBy: string; createdAt: string; sendAt: string;
+  id: string; kind: 'digest' | 'custnotify' | 'devreq' | 'notify' | 'expiry'; label: string; ref?: string; recipients: string[]; subject: string; createdBy: string; createdAt: string; sendAt: string;
   status: 'pending' | 'sent' | 'blocked' | 'failed' | 'cancelled' | 'lost'; sent?: string[]; dropped?: string[]; error?: string; doneAt?: string; doneBy?: string; attachments?: number;
 };
 export const adminOutbox = () => aj<{ items: OutboxItem[]; now: string }>('/api/mail/outbox');

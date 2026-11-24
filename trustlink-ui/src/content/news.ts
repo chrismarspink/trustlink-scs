@@ -30,6 +30,10 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.24.1', date: '2026-11-24', title: '빌드 수정',
+    items: [{ kind: '수정', text: '2.24.0 서버 빌드 실패(발송함 종류 타입) 수정 — 2.24.0 내용이 이 버전으로 배포됨' }],
+  },
+  {
     version: '2.24.0', date: '2026-11-24', title: '신뢰 장부 — 결정함·발송함·메뉴 재배치',
     items: [
       { kind: '신규', text: '결정함 — 자동 대응 승인·VEX 판단·규제 후보·만료 예정·발송 대기를 한 곳에(관리 › 결정 › 결정함)' },
