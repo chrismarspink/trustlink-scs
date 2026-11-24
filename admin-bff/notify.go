@@ -572,6 +572,7 @@ func (s *Server) deliver(nt Notice, to []kcUser, extra []string) {
 	}
 	if s.mail.Configured() && len(emails) > 0 {
 		sent, dropped, err := s.mail.Send(emails, nt.Title, nt.Body)
+		outboxRecord("notify", nt.Kind+" · "+path.Base(nt.Repo)+" "+nt.Tag, nt.Repo+":"+nt.Tag, emails, nt.Title, sent, dropped, err)
 		nt.Mailed, nt.Dropped = sent, dropped
 		if err != nil {
 			nt.MailErr = err.Error()

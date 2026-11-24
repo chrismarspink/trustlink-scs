@@ -20,6 +20,7 @@ const ST: Record<OutboxItem['status'], [string, string]> = {
   pending: ['보내기 대기', 'bg-amber-100 text-amber-800'], sent: ['보냄', 'bg-emerald-100 text-emerald-800'], blocked: ['허용 목록 밖', 'bg-slate-100 text-slate-700'],
   failed: ['실패', 'bg-red-100 text-red-700'], cancelled: ['취소됨', 'bg-slate-200 text-slate-700'], lost: ['재시작으로 못 보냄', 'bg-red-100 text-red-700'],
 };
+const KIND_KO: Record<string, string> = { custnotify: '고객 통지', devreq: '개발자 요청', digest: '현황 메일', notify: '내부 통보', expiry: '만료 안내' };
 const left = (it: OutboxItem, now: number) => Math.max(0, Math.ceil((new Date(it.sendAt).getTime() - now) / 1000));
 
 // 발송함: 기다리는 메일은 남은 시간과 "보내기 취소", 끝난 메일은 결과. ids 를 주면 그것만(방금 보낸 것).
@@ -47,6 +48,7 @@ export function OutboxPanel({ ids, kind, refreshKey = 0, onChange, compact }: { 
       {shown.map((it) => (
         <div key={it.id} className={cn('flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs', it.status === 'pending' && 'border-amber-300 bg-amber-50')}>
           <span className={cn('rounded px-1.5 py-0.5 font-medium', ST[it.status][1])}>{ST[it.status][0]}{it.status === 'pending' && ` · ${left(it, now)}초 뒤`}</span>
+          {!kind && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">{KIND_KO[it.kind] || it.kind}</span>}
           <span className="min-w-0 flex-1 truncate"><b>{it.label || it.subject}</b> <span className="text-muted-foreground">→ {(it.sent?.length ? it.sent : it.recipients).join(', ')}</span></span>
           <span className="text-muted-foreground">{new Date(it.doneAt || it.createdAt).toLocaleTimeString('ko-KR')}{it.doneBy ? ` · ${it.doneBy}` : ''}</span>
           {it.status === 'pending' && (

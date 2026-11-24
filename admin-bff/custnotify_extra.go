@@ -159,6 +159,7 @@ func (s *Server) expiryMail(cu Customer, aud string, to []string, subject, body 
 	default:
 		h := "<div style=\"font-family:sans-serif;font-size:14px\">" + strings.ReplaceAll(html.EscapeString(body), "\n", "<br>") + "</div>"
 		sent, dropped, err := s.mail.SendRich(to, subject, mailContent{Text: body, HTML: h})
+		outboxRecord("expiry", cu.Name+" · 만료 안내", cu.ID, to, subject, sent, dropped, err)
 		r.Sent, r.Dropped, r.Error = sent, dropped, errString(err)
 	}
 	return r

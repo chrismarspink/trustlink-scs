@@ -19,7 +19,7 @@ import (
 
 type outboxItem struct {
 	ID         string   `json:"id"`
-	Kind       string   `json:"kind"`  // digest(현황 메일) / custnotify(고객 통지)
+	Kind       string   `json:"kind"`  // digest(현황 메일) / custnotify(고객 통지) / devreq(개발자 수정 요청) / notify(내부 통보, 자동) / expiry(만료 안내, 자동)
 	Label      string   `json:"label"` // 화면 표시용(고객 이름 등)
 	Ref        string   `json:"ref,omitempty"`
 	Recipients []string `json:"recipients"`
@@ -197,4 +197,22 @@ func (s *Server) apiMailOutboxCancel(w http.ResponseWriter, r *http.Request) {
 		job.onDone(it)
 	}
 	writeJSON(w, 200, it)
+}
+
+// outboxRecord: 기다리지 않고 바로 보낸 자동 메일(내부 통보·만료 안내)도 발송함 기록에 남긴다 — 모든 나간 메일을 한 목록에서.
+func outboxRecord(kind, label, ref string, to []string, subject string, sent, dropped []string, err error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	st := "sent"
+	switch {
+	case err != nil:
+		st = "failed"
+	case len(sent) == 0:
+		st = "blocked"
+	}
+	outbox.Lock()
+	outboxLoad()
+	outbox.items = append(outbox.items, outboxItem{ID: newOutboxID(), Kind: kind, Label: label, Ref: ref, Recipients: to, Subject: subject,
+		CreatedBy: "trustlink", CreatedAt: now, SendAt: now, Status: st, Sent: sent, Dropped: dropped, Error: errString(err), DoneAt: now})
+	outboxSaveLocked()
+	outbox.Unlock()
 }

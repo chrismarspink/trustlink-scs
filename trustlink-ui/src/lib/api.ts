@@ -876,3 +876,8 @@ export const adminAutoSettings = (s: AutoSettings) => aj<AutoSettings>('/api/aut
 export const adminAutoRun = (repo: string, tag: string, vulnId: string) => aj<AutoRun>('/api/auto-response/run', jsonInit('POST', { repo, tag, vulnId }));
 export const adminAutoApprove = (id: string, keys: string[], delay: number) => aj<{ run: AutoRun }>(`/api/auto-response/${encodeURIComponent(id)}/approve`, jsonInit('POST', { keys, delay }));
 export const adminAutoReject = (id: string, reason: string) => aj<AutoRun>(`/api/auto-response/${encodeURIComponent(id)}/reject`, jsonInit('POST', { reason }));
+
+// ---------- 결정함(사람이 결정할 일 모음) ----------
+export type InboxItem = { kind: 'auto-customer' | 'auto-dev' | 'vex' | 'reg' | 'expiry' | 'outbox'; title: string; detail?: string; link: string; urgent?: boolean; at?: string; ref?: string };
+export type InboxGroup = { key: 'auto' | 'vex' | 'reg' | 'expiry' | 'outbox'; label: string; count: number; link: string; items: InboxItem[] };
+export const adminInbox = () => aj<{ groups: InboxGroup[]; decisions: number; generated: string }>('/api/inbox');

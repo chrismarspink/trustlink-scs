@@ -15,7 +15,7 @@ export default function AutoPending() {
         <Workflow size={16} className="text-amber-700" />
         <b className="text-amber-900">자동 대응 — 관리자 선택 대기 {runs.length}건</b>
         <span className="text-xs text-amber-800">고객 통지 {cust} · 개발자 수정 요청 {dev}</span>
-        <Link to="/admin/auto-response" className="ml-auto rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-700">선택하러 가기</Link>
+        <Link to="/admin/inbox" className="ml-auto rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-700">결정함 열기</Link>
       </div>
       <ul className="mt-2 space-y-1 text-xs text-slate-700">
         {runs.slice(0, 4).map((r) => (

@@ -317,6 +317,7 @@ func main() {
 	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))                       // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
 	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                      // 본문 미리보기
 	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                      // 받는 사람·항목·첨부 추천(규칙 + AI)
+	mux.HandleFunc("GET /api/inbox", s.guard(s.apiInbox))                                    // 결정함: 사람이 결정할 일 모음
 	mux.HandleFunc("GET /api/auto-response", s.guard(s.apiAutoResponse))                     // 자동 대응 기록·설정
 	mux.HandleFunc("PUT /api/auto-response/settings", s.guard(s.apiAutoResponseSettings))    // 켜기/끄기
 	mux.HandleFunc("POST /api/auto-response/sweep", s.guard(s.apiAutoResponseSweep))         // 주기 검색 지금 실행

@@ -367,7 +367,65 @@ const CUSTOMER = [
 },
 ];
 
+// 개념: TrustLink = 납품 소프트웨어의 신뢰 장부 — 네 칸 · 하나의 흐름 · 사람은 세 가지만
+const LEDGER = [
+{
+  tab: '한 권의 장부', kicker: 'TRUSTLINK 는', title: '납품한 소프트웨어의 신뢰 장부입니다',
+  text: '무엇을 줬고, 누가 쓰며, 그 뒤 무엇이 바뀌었고, 누가 무엇을 결정해 누구에게 알렸는가. 산출물 관리·보안·고객 연결·분석과 통지·규제 수집과 전달이 모두 이 장부의 칸입니다.',
+  list: ['<b>릴리스</b> — 무엇을 줬나(산출물·SBOM·서명·VEX)', '<b>고객</b> — 누가 쓰나(고객·설치 버전·계정)', '<b>신호</b> — 무엇이 바뀌었나(취약점·규제·만료)', '<b>전달·기록</b> — 누구에게 알렸나(통지·보고·감사 기록)'],
+  svg: () => {
+    const cols = [['릴리스', 'var(--dev)'], ['고객', 'var(--cus)'], ['신호', 'var(--bad)'], ['전달·기록', 'var(--tl)']];
+    return G +
+      `<g transform="translate(150,52)"><rect width="340" height="238" rx="10" fill="#fff" stroke="var(--tl)" stroke-width="2.5"/>
+        <rect width="340" height="34" rx="10" fill="var(--soft)"/><text x="170" y="23" class="lbl" fill="var(--tl)">TrustLink 신뢰 장부</text>
+        ${cols.map((c, i) => `<line x1="${85 * i}" y1="34" x2="${85 * i}" y2="238" stroke="#e2e8f0" stroke-width="${i ? 1.5 : 0}"/><text x="${85 * i + 42}" y="58" font-size="12" font-weight="700" text-anchor="middle" fill="${c[1]}">${c[0]}</text>`).join('')}
+        <line x1="0" y1="68" x2="340" y2="68" stroke="#e2e8f0" stroke-width="1.5"/></g>` +
+      `<g class="pop" style="animation-delay:2.6s">${vbox(170, 130, '3.0')}</g>` +
+      `<g class="pop" style="animation-delay:3.0s"><g transform="translate(250,130)"><rect width="70" height="22" rx="5" fill="#fff7ed" stroke="var(--cus)"/><text x="35" y="15" font-size="10" text-anchor="middle" fill="var(--cus)" font-weight="700">고객사 A · 3.0</text></g><g transform="translate(250,160)"><rect width="70" height="22" rx="5" fill="#fff7ed" stroke="var(--cus)"/><text x="35" y="15" font-size="10" text-anchor="middle" fill="var(--cus)" font-weight="700">고객사 B · 3.1</text></g></g>` +
+      bolt(370, 125, 3.5) + `<g class="pop" style="animation-delay:3.8s"><text x="370" y="190" font-size="10" text-anchor="middle" fill="var(--reg)" font-weight="700">규제 개정</text><text x="370" y="210" font-size="10" text-anchor="middle" fill="#a16207" font-weight="700">EOS 도래</text></g>` +
+      `<g class="pop" style="animation-delay:4.3s">${env(440, 130)}${check(470, 180, 'var(--ok)', 4.5)}</g>` +
+      move(fig(60, 300, 'var(--dev)', '개발사', 'walk') + `<g>${vbox(78, 232, 'v3.0')}<set attributeName="opacity" to="0" begin="2.4s" fill="freeze"/></g>`, 30, 0, 2.4) +
+      fig(585, 300, 'var(--cus)', '고객', 'wave', { flip: true }) +
+      `<path class="fade" style="animation-delay:3.2s" d="M560 230 Q520 200 492 175" stroke="var(--cus)" stroke-width="2" stroke-dasharray="4 4" fill="none"/>` +
+      `<text class="sm fade" x="320" y="330" style="animation-delay:4.8s">기능 여섯 가지 = 장부의 네 칸</text>`;
+  }
+},
+{
+  tab: '하나의 흐름', kicker: '모든 변화는', title: '같은 다섯 단계를 지나갑니다',
+  text: '새 취약점이든, 규제 개정이든, 계약·EOS 만료든 처리 방법은 하나입니다. 신호를 받으면 영향받는 릴리스와 고객을 계산하고, 사람이 결정하면, 전달하고, 기록으로 남깁니다.',
+  list: ['<b>신호</b>: DT 새 취약점·주기 검색, 규제 탐색, 만료 도래', '<b>영향</b>: 어느 릴리스, 어느 고객 — 패치 버전까지', '<b>결정</b>: 사람만 하는 단계(결정함)', '<b>전달·기록</b>: 발송함 한 길로 나가고, 감사 기록에 남음'],
+  svg: () => {
+    const st = [['신호', 'var(--bad)'], ['영향', 'var(--dev)'], ['결정', 'var(--tl)'], ['전달', 'var(--cus)'], ['기록', 'var(--ok)']];
+    const X = i => 40 + i * 118;
+    return G +
+      st.map((s, i) => `<g><rect x="${X(i)}" y="80" width="96" height="46" rx="10" fill="${i === 2 ? 'var(--soft)' : '#fff'}" stroke="${s[1]}" stroke-width="${i === 2 ? 3 : 2}"/><text x="${X(i) + 48}" y="108" class="lbl" fill="${s[1]}">${s[0]}</text>${i < 4 ? `<path d="M${X(i) + 98} 103 h18" stroke="#94a3b8" stroke-width="2.5"/>` : ''}</g>`).join('') +
+      [['취약점', 'var(--bad)', 150, 0], ['규제', 'var(--reg)', 180, 1.2], ['만료', '#a16207', 210, 2.4]].map(([t, c, y, d]) =>
+        `<g opacity="0">${move(`<g><rect x="20" y="${y - 13}" width="56" height="22" rx="11" fill="#fff" stroke="${c}" stroke-width="2"/><text x="48" y="${y + 2}" font-size="11" text-anchor="middle" fill="${c}" font-weight="700">${t}</text></g>`, 520, 0, 4.2, d)}<set attributeName="opacity" to="1" begin="${d}s" fill="freeze"/></g>`).join('') +
+      fig(324, 300, 'var(--tl)', '관리자', 'point') +
+      bub(360, 205, 160, ['이건 고객에게 보내고,', '이건 개발 요청!'], [340, 236], 'pop', 2.2) +
+      `<text class="sm fade" x="320" y="340" style="animation-delay:4.5s">사람은 '결정'에서만 — 나머지는 TrustLink 가</text>`;
+  }
+},
+{
+  tab: '사람은 세 가지만', kicker: '단순하게', title: '올리고, 결정하고, 받습니다',
+  text: '개발자는 릴리스를 올리고, 관리자는 결정함 한 곳에서 결정하고, 고객과 이해관계자는 받습니다. 수집·대조·AI 분석·메일 초안·발송·기록은 TrustLink 가 합니다.',
+  list: ['<b>개발자</b>: 바이너리 + SBOM + 서명을 올린다', '<b>관리자</b>: 결정함에서 승인·반려 — 고객 메일도 개발 요청도 승인해야 나감', '<b>고객·경영진·감독기관</b>: 메일, 내 제품 화면, 보고서로 받는다', '보낸 뒤에도 잠깐은 <b>보내기 취소</b>, 모든 결정은 기록'],
+  svg: () => G +
+    fig(100, 300, 'var(--dev)', '개발자', 'up') + `<g class="bob">${vbox(77, 150, '3.1', 'var(--ok)', '#dcfce7')}</g>` +
+    `<text x="100" y="130" class="lbl" fill="var(--dev)">① 올린다</text>` +
+    `<text x="320" y="52" class="lbl" fill="var(--tl)">② 결정한다</text>` +
+    `<g transform="translate(210,64)"><rect width="220" height="150" rx="10" fill="#fff" stroke="var(--tl)" stroke-width="2.5"/><text x="110" y="24" class="lbl" fill="var(--tl)">결정함</text>
+      ${[['고객 통지 11.0→11.1', 'var(--cus)'], ['개발 요청 12.0 패치 없음', 'var(--dev)'], ['규제 후보 채택?', 'var(--reg)']].map((r, i) => `<g transform="translate(12,${40 + i * 34})"><rect width="196" height="26" rx="6" fill="#f8fafc" stroke="#e2e8f0"/><circle cx="12" cy="13" r="4" fill="${r[1]}"/><text x="22" y="17" font-size="10" fill="#334155">${r[0]}</text></g>`).join('')}</g>` +
+    `<g class="pop" style="animation-delay:1.6s"><g transform="translate(374,108)"><rect width="40" height="18" rx="4" fill="var(--ok)"/><text x="20" y="13" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">승인</text></g></g>` +
+    fig(320, 300, 'var(--tl)', '관리자', 'point') +
+    `<g opacity="0">${move(env(436, 108, 'var(--cus)'), 104, 66, 1.4, 2.2)}<set attributeName="opacity" to="1" begin="2.2s" fill="freeze"/></g>` +
+    fig(560, 300, 'var(--cus)', '고객·이해관계자', 'wave', { flip: true }) + `<text x="560" y="130" class="lbl" fill="var(--cus)">③ 받는다</text>` +
+    `<text class="sm fade" x="320" y="340" style="animation-delay:3.4s">수집·대조·AI 분석·메일 초안·발송·기록은 TrustLink 가</text>`
+},
+];
+
 const STORIES = [
+  { name: 'TrustLink 란', scenes: LEDGER },
   { name: '공급망 보안 흐름', scenes: FLOW },
   { name: '출시된 구버전도 계속 검증', scenes: LEGACY },
   { name: '고객 관리', scenes: CUSTOMER },

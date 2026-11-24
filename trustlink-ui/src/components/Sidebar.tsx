@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow } from 'lucide-react';
+  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -32,12 +32,21 @@ const ARTIFACTS_ITEM: Item = { to: '/artifacts', label: '아티팩트', icon: Pa
 const APIKEY_ITEM: Item = { to: '/apikeys', label: '내 API 키', icon: KeyRound };
 const VEX_ITEM: Item = { to: '/vex', label: 'VEX 판단', icon: ShieldQuestion };
 const MY_ITEM: Item = { to: '/my', label: '내 제품', icon: PackageCheck };
-// 관리 콘솔 섹션 — admins 일 때 노출. 성격별로 세 묶음:
-//   관리(운영 현황·계정·통보) / 규제·보고(문서 발행과 규제 관리) / 시스템(인프라·연결 설정).
-const ADMIN: Item[] = [
+// 관리 콘솔 — admins 일 때. 제품 개념 "납품 소프트웨어의 신뢰 장부"의 칸대로 묶는다:
+//   결정(사람이 할 일) · 릴리스(무엇을 줬나) · 고객(누가 쓰나) · 신호(무엇이 바뀌었나) · 전달·기록(누구에게 알렸나) · 설정.
+// 주소는 그대로 두고 위치와 이름만 바꾼다(기존 링크가 깨지지 않게).
+const DECIDE: Item[] = [
+  { to: '/admin/inbox', label: '결정함', icon: Inbox },
   { to: '/admin', label: '대시보드', icon: LayoutDashboard, end: true },
+];
+const RELEASE: Item[] = [
+  { to: '/admin/registry', label: '레지스트리', icon: Boxes },
+  { to: '/admin/upstream', label: '공개 저장소 분석', icon: GitBranch },
+];
+const CUSTOMER: Item[] = [
+  { to: '/admin/customers', label: '고객 등록부', icon: Contact },
   {
-    to: '/admin/accounts', label: '계정 및 권한', icon: UserCog, open: true, children: [
+    to: '/admin/accounts', label: '계정 및 권한', icon: UserCog, children: [
       { to: '/admin/users', label: '사용자', icon: Users },
       { to: '/admin/orgs', label: '고객사', icon: Building2 },
       { to: '/admin/access', label: '제품 권한', icon: ShieldCheck },
@@ -45,26 +54,27 @@ const ADMIN: Item[] = [
       { to: '/admin/acl', label: '권한 매트릭스', icon: KeyRound }
     ]
   },
-  { to: '/admin/customers', label: '고객 등록부', icon: Contact },
-  { to: '/admin/customer-notify', label: '고객 통지', icon: Megaphone },
+];
+const SIGNAL: Item[] = [
   { to: '/admin/auto-response', label: '자동 대응', icon: Workflow },
+  { to: '/admin/mirror', label: '취약점 DB 미러', icon: DatabaseZap },
+  { to: '/admin/regs', label: '규제 카탈로그·탐색', icon: Landmark },
+  { to: '/admin/compliance', label: '규제 대응 검증', icon: ClipboardCheck },
+];
+const DELIVER: Item[] = [
+  { to: '/admin/outbox', label: '발송함', icon: Send },
+  { to: '/admin/customer-notify', label: '고객 통지', icon: Megaphone },
   { to: '/admin/notify', label: '취약점 통보', icon: Bell },
+  { to: '/admin/reports', label: '보고서함', icon: Archive },
   { to: '/admin/logs', label: '로그', icon: ScrollText }
 ];
-const COMPLY: Item[] = [
-  { to: '/admin/reports', label: '보고서함', icon: Archive },
-  { to: '/admin/regs', label: '규제 카탈로그', icon: Landmark },
-  { to: '/admin/compliance', label: '규제 대응 검증', icon: ClipboardCheck },
-  { to: '/admin/upstream', label: '공개 저장소 분석', icon: GitBranch }
-];
-const SYSTEM: Item[] = [
+const SETTINGS: Item[] = [
   { to: '/admin/system', label: '시스템 상태', icon: Activity },
   { to: '/admin/capacity', label: '용량', icon: HardDrive },
-  { to: '/admin/registry', label: '레지스트리', icon: Boxes },
-  { to: '/admin/mirror', label: '취약점 DB 미러', icon: DatabaseZap },
   { to: '/admin/ai', label: 'AI 연결', icon: Sparkles },
   { to: '/admin/storage', label: '설정·스토리지', icon: Database }
 ];
+const ADMIN_SECTIONS: [string, Item[]][] = [['결정', DECIDE], ['릴리스', RELEASE], ['고객', CUSTOMER], ['신호', SIGNAL], ['전달·기록', DELIVER], ['설정', SETTINGS]];
 
 const matches = (pathname: string, it: Sub) => (it.end ? pathname === it.to : pathname === it.to || pathname.startsWith(it.to + '/'));
 
@@ -79,12 +89,10 @@ export function navTrail(pathname: string): string[] | null {
     }
     return best;
   };
-  const a = hit(ADMIN);
-  if (a) return ['관리', ...a];
-  const c = hit(COMPLY);
-  if (c) return ['규제·보고', ...c];
-  const y = hit(SYSTEM);
-  if (y) return ['시스템', ...y];
+  for (const [name, items] of ADMIN_SECTIONS) {
+    const a = hit(items);
+    if (a) return [name, ...a];
+  }
   if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
   const p = hit([ARTIFACTS_ITEM, MY_ITEM, VEX_ITEM, APIKEY_ITEM]);
   if (p) return ['제품', ...p];
@@ -197,12 +205,12 @@ export function Sidebar() {
         {render(product)}
         {showAdmin && (
           <>
-            <SectionLabel>관리</SectionLabel>
-            {render(ADMIN)}
-            <SectionLabel>규제·보고</SectionLabel>
-            {render(COMPLY)}
-            <SectionLabel>시스템</SectionLabel>
-            {render(SYSTEM)}
+            {ADMIN_SECTIONS.map(([name, items]) => (
+              <div key={name}>
+                <SectionLabel>{name}</SectionLabel>
+                {render(items)}
+              </div>
+            ))}
           </>
         )}
       </nav>
