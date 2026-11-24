@@ -30,6 +30,14 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.29.1',
+    date: '2026-11-24',
+    title: '홈의 흐름도 크기 조정',
+    items: [
+      { kind: '수정', text: '홈과 문서의 "TrustLink 한눈에" 흐름도가 화면 폭만큼 커지던 것을 다른 영역과 맞는 크기로 줄임' },
+    ],
+  },
+  {
     version: '2.29.0',
     date: '2026-11-24',
     title: '묻고 찾기',

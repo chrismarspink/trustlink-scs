@@ -11,7 +11,7 @@ export default function GettingStarted() {
 
       <Section title="한눈에">
         <p>취약점·규제·만료, 어떤 변화든 같은 다섯 단계를 지납니다. 사람은 <b>결정</b>만 하고, 나머지는 TrustLink 가 합니다(관리자: 관리 › 승인·판단 › 승인 대기함).</p>
-        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록, 취약점·규제·만료 세 갈래" className="w-full rounded-lg border bg-white" />
+        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록, 취약점·규제·만료 세 갈래" className="w-full max-w-[720px] rounded-lg border bg-white" />
       </Section>
 
       <Section title="TrustLink 가 하는 일">

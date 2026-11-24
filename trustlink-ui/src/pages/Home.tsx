@@ -110,7 +110,7 @@ export default function Home() {
           <h2 className="text-base font-semibold">TrustLink 한눈에 — 납품 소프트웨어의 신뢰 장부</h2>
           <span className="text-xs text-muted-foreground">변화가 생기면 신호 → 영향 → 결정 → 전달 → 기록. 사람은 결정만 합니다.</span>
         </div>
-        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록, 취약점·규제·만료 세 갈래" className="w-full" loading="lazy" />
+        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록, 취약점·규제·만료 세 갈래" className="mx-auto w-full max-w-[720px]" loading="lazy" />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
