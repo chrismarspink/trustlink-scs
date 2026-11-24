@@ -7,7 +7,12 @@ export default function GettingStarted() {
   const reg = `${window.location.protocol}//${registry}`;
   return (
     <>
-      <DocTitle title="시작하기" lead="TrustLink SCS 는 소프트웨어 산출물과 그 SBOM·VEX 를 한곳에 보관하고, 취약점 판단 결과를 고객에게 전달하는 공급망 보안 플랫폼입니다." />
+      <DocTitle title="시작하기" lead="TrustLink 는 납품한 소프트웨어의 신뢰 장부입니다 — 무엇을 줬고(릴리스), 누가 쓰며(고객), 그 뒤 무엇이 바뀌었고(신호), 누가 무엇을 결정해 누구에게 알렸는가(전달·기록)를 남깁니다." />
+
+      <Section title="한눈에">
+        <p>취약점·규제·만료, 어떤 변화든 같은 다섯 단계를 지납니다. 사람은 <b>결정</b>만 하고, 나머지는 TrustLink 가 합니다(관리자: 관리 › 결정 › 결정함).</p>
+        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록, 취약점·규제·만료 세 갈래" className="w-full rounded-lg border bg-white" />
+      </Section>
 
       <Section title="TrustLink 가 하는 일">
         <p>제품을 고객에게 넘길 때 "무엇으로 만들었고(SBOM), 알려진 취약점에 영향이 있는지(VEX)"를 함께 보여 줘야 하는 경우가 늘고 있습니다(EU CRA, 미국 연방 조달, 국내 공공·금융 등). TrustLink 는 이 일을 다음 순서로 처리합니다.</p>

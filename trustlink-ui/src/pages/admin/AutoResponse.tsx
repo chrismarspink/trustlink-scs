@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 const OUT: Record<NonNullable<AutoRun['outcome']>, [string, string]> = {
   approval: ['고객 통지 — 승인 대기', 'bg-amber-100 text-amber-800'], 'approval-dev': ['개발자 요청 — 승인 대기', 'bg-amber-100 text-amber-800'],
   sent: ['고객 통지 승인·발송', 'bg-emerald-100 text-emerald-800'],
-  rejected: ['반려', 'bg-slate-200 text-slate-700'], 'dev-request': ['개발자 수정 요청 승인·발송', 'bg-sky-100 text-sky-800'],
+  rejected: ['반려', 'bg-slate-200 text-slate-700'], patched: ['패치 나옴 → 고객 통지로 이어 감', 'bg-emerald-100 text-emerald-800'], 'dev-request': ['개발자 수정 요청 승인·발송', 'bg-sky-100 text-sky-800'],
   'not-affected': ['AI: 영향 없음 — 사람 확인', 'bg-slate-100 text-slate-700'], 'no-customers': ['영향 고객 없음', 'bg-slate-100 text-slate-700'], error: ['오류', 'bg-red-100 text-red-700'],
 };
 const stState = (s: AutoRun['stages'][number]['state']): StepState => (s === 'wait' ? 'active' : s);
@@ -38,7 +38,7 @@ function Flow() {
       {box(<Wrench size={16} className="text-slate-600" />, '③ 패치 확인', '새 버전에서 해결됐나')}{arrow}
       <div className="flex min-w-[250px] flex-[2] flex-col gap-1">
         {box(<CheckCircle2 size={16} className="text-amber-600" />, '④ 있음: 관리자 승인 → 고객 통지', '받는 사람 확인 후 승인, 발송 전 취소 가능', 'border-amber-200 bg-amber-50/50')}
-        {box(<Mail size={16} className="text-sky-600" />, '④ 없음: 관리자 승인 → 개발자 수정 요청', '받는 사람 확인 후 승인, 발송 전 취소 가능', 'border-sky-200 bg-sky-50/50')}
+        {box(<Mail size={16} className="text-sky-600" />, '④ 없음: 관리자 승인 → 개발자 수정 요청', '수정 버전이 올라오면 자동으로 고객 통지로 이어 감', 'border-sky-200 bg-sky-50/50')}
       </div>
     </div>
   );
@@ -155,13 +155,15 @@ function RunCard({ run, onChange }: { run: AutoRun; onChange: () => void }) {
         {run.severity && <Badge variant={run.severity === 'CRITICAL' ? 'danger' : 'warn'}>{run.severity}</Badge>}
         {run.kev && <Badge variant="danger">KEV</Badge>}
         <span className="text-sm">{run.repo.split('/').pop()} <b>{run.tag}</b>{run.component && <span className="text-muted-foreground"> · {run.component}</span>}</span>
-        <span className="ml-auto text-xs text-muted-foreground">{run.trigger === 'auto' ? 'DT 새 취약점 알림' : run.trigger === 'sweep' ? '주기 검색' : `직접 실행 · ${run.by}`} · {t(run.started)}</span>
+        <span className="ml-auto text-xs text-muted-foreground">{run.trigger === 'auto' ? 'DT 새 취약점 알림' : run.trigger === 'sweep' ? '주기 검색' : run.trigger === 'patch' ? '수정 버전 확인(이어 가기)' : `직접 실행 · ${run.by}`} · {t(run.started)}</span>
       </div>
       <Steps steps={run.stages.map((s) => ({ label: s.label, state: stState(s.state), ai: s.key === 'ai' }))} />
       <ul className="space-y-0.5 text-xs text-slate-700">
         {run.stages.filter((s) => s.detail).map((s) => <li key={s.key}><b className="mr-1">{s.label}</b>{s.detail}{s.at && <span className="ml-1 text-muted-foreground">({t(s.at)})</span>}</li>)}
       </ul>
       {run.aiSummary && <div className="rounded-md border border-fuchsia-200 bg-fuchsia-50/60 p-2 text-xs"><b className="text-fuchsia-700">✦ AI 분석{run.aiModel ? ` · ${run.aiModel}` : ''}</b> — {run.aiSummary}</div>}
+      {run.followedBy && <div className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">수정 버전 {run.patchTag} 이(가) 올라와 고객 통지로 이어 갔습니다 — 위쪽 "수정 버전 확인" 기록에서 승인하세요.</div>}
+      {run.followOf && <div className="rounded-md bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">개발자 수정 요청 뒤 올라온 수정 버전을 확인해 자동으로 시작한 대응입니다.</div>}
       {run.error && <Alert tone="crit">{run.error}</Alert>}
       {run.state === 'waiting' && (run.noticeId ? <Approval run={run} onDone={onChange} /> : <DevApproval run={run} onDone={onChange} />)}
       {run.outbox && run.outbox.length > 0 && <OutboxPanel ids={run.outbox} />}

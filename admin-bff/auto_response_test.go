@@ -108,6 +108,31 @@ func TestAutoResponseFlow(t *testing.T) {
 		t.Fatalf("검색 기록: %+v", autoRes.Settings)
 	}
 
+	// 수정 버전 이어 가기: 1.0 의 CVE-2026-0001 은 2.0 에서 해결 — 개발자 요청으로 끝난 것처럼 만들어 두면 고객 통지로 이어 간다
+	dev := newAutoRun("manual", "admin", "products/prod", "1.0", "CVE-2026-0001")
+	dev.State, dev.Outcome = "waiting", "approval-dev"
+	autoRes.Lock()
+	autoRes.Runs = append(autoRes.Runs, dev)
+	autoRes.Unlock()
+	if got := s.autoFollowup(); got != 1 {
+		t.Fatalf("수정 버전 이어 가기 1건: %d", got)
+	}
+	var old, nxt autoRun
+	for _, x := range autoRes.Runs {
+		if x.ID == dev.ID {
+			old = x
+		}
+		if x.FollowOf == dev.ID {
+			nxt = x
+		}
+	}
+	if old.Outcome != "patched" || old.State != "done" || old.PatchTag != "2.0" || nxt.ID == "" || nxt.Trigger != "patch" || nxt.Outcome != "approval" {
+		t.Fatalf("이어 가기 결과: old=%+v next=%+v", old, nxt)
+	}
+	if again := s.autoFollowup(); again != 0 {
+		t.Fatalf("이미 이어 간 건은 다시 안 함: %d", again)
+	}
+
 	// 없는 취약점은 탐지 단계 오류
 	r3 := s.runAutoResponse(newAutoRun("manual", "admin", "products/prod", "1.0", "CVE-1999-0000"))
 	if r3.State != "error" || r3.Stages[0].State != "error" {

@@ -105,6 +105,14 @@ export default function Home() {
         <iframe src="/intro.html" title="TrustLink 제품 소개" className="block h-[440px] w-full border-0 bg-white" />
       </section>
 
+      <section className="rounded-lg border bg-white p-4">
+        <div className="mb-2 flex flex-wrap items-baseline gap-2">
+          <h2 className="text-base font-semibold">TrustLink 한눈에 — 납품 소프트웨어의 신뢰 장부</h2>
+          <span className="text-xs text-muted-foreground">변화가 생기면 신호 → 영향 → 결정 → 전달 → 기록. 사람은 결정만 합니다.</span>
+        </div>
+        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록, 취약점·규제·만료 세 갈래" className="w-full" loading="lazy" />
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
           <h2 className="mb-2 text-base font-semibold">공지</h2>

@@ -862,12 +862,13 @@ export const aiPerfBench = (target: 'local' | 'external') => aj<{ started: boole
 // ---------- 자동 대응(탐지 → AI 분석 → 패치 확인 → 관리자 승인 → 고객 통지 / 개발자 통보) ----------
 export type AutoStage = { key: 'detect' | 'ai' | 'fix' | 'approve' | 'notify' | 'devreq'; label: string; state: 'todo' | 'active' | 'done' | 'skip' | 'error' | 'wait'; at?: string; detail?: string };
 export type AutoRun = {
-  id: string; trigger: 'auto' | 'manual' | 'sweep'; by: string; repo: string; tag: string; vulnId: string; component?: string; severity?: string; kev?: boolean; epss?: number;
+  id: string; trigger: 'auto' | 'manual' | 'sweep' | 'patch'; by: string; repo: string; tag: string; vulnId: string; component?: string; severity?: string; kev?: boolean; epss?: number;
   started: string; finished?: string; state: 'running' | 'waiting' | 'done' | 'error';
-  outcome?: 'approval' | 'approval-dev' | 'sent' | 'rejected' | 'dev-request' | 'not-affected' | 'no-customers' | 'error';
+  outcome?: 'approval' | 'approval-dev' | 'sent' | 'rejected' | 'dev-request' | 'patched' | 'not-affected' | 'no-customers' | 'error';
   stages: AutoStage[]; aiStatus?: string; aiSummary?: string; aiModel?: string; fixTag?: string; fixComp?: string; upstream?: string;
   noticeId?: string; recommended?: string[]; customers?: string[]; waiting?: string[]; devTo?: string[]; approver?: string; error?: string;
   devSubject?: string; devBody?: string; devCandidates?: { username: string; email?: string }[]; outbox?: string[];
+  followedBy?: string; followOf?: string; patchTag?: string;
 };
 export type AutoSettings = { mode: 'on' | 'off'; maxPerVersion: number; sweepHours: number; sweepMax: number; lastSweep?: string; sweepMsg?: string; sweeping?: boolean; updatedBy?: string };
 export const adminAutoSweep = () => aj<{ started: boolean }>('/api/auto-response/sweep', { method: 'POST' });

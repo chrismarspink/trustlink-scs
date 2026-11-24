@@ -21,7 +21,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 VER=""; DRY=0; SYNC=0
 for a in "$@"; do
   case "$a" in
-    11.0|11.1|12.0) VER="$a" ;;
+    11.0|11.1|12.0|12.0.1) VER="$a" ;;
     --dry-run|-n) DRY=1 ;;
     --sync) SYNC=1 ;;
     -h|--help) sed -n '2,18p' "$0"; exit 0 ;;

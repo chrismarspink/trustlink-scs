@@ -69,6 +69,9 @@ type autoRun struct {
 	DevBody     string      `json:"devBody,omitempty"`
 	DevCands    []devCand   `json:"devCandidates,omitempty"` // 추천 받는 사람(제품 쓰기 권한자·관리자)
 	Outbox      []string    `json:"outbox,omitempty"`
+	FollowedBy  string      `json:"followedBy,omitempty"` // 수정 버전이 나와 이어 간 자동 대응 기록
+	FollowOf    string      `json:"followOf,omitempty"`   // 이 기록이 이어받은 개발자 요청 기록
+	PatchTag    string      `json:"patchTag,omitempty"`   // 새로 확인된 수정 버전
 	Approver    string      `json:"approver,omitempty"`
 	Error       string      `json:"error,omitempty"`
 }
@@ -750,6 +753,9 @@ func (s *Server) autoSweepLoop() {
 				due = false
 			}
 		}
+		if st.Mode == "on" {
+			s.autoFollowup() // 수정 버전이 올라왔는지(10분마다, 가볍다)
+		}
 		if due {
 			s.autoSweep("schedule")
 		}
@@ -862,6 +868,59 @@ func (s *Server) autoSweep(by string) int {
 	return len(picks)
 }
 
+// autoFollowup: 개발자 수정 요청으로 끝났거나 승인을 기다리는 건 중, 그 뒤 올라온 새 버전에서 취약점이 사라진 것을 찾아
+// 원래 건을 "패치 나옴"으로 닫고 같은 취약점의 자동 대응을 다시 돌린다 → 이번엔 패치가 있으니 영향 고객 통지(관리자 승인)로 간다.
+func (s *Server) autoFollowup() int {
+	if !s.dtEnabled() {
+		return 0
+	}
+	autoRes.Lock()
+	autoLoad()
+	var cands []autoRun
+	for _, r := range autoRes.Runs {
+		if r.FollowedBy == "" && (r.Outcome == "dev-request" || r.Outcome == "approval-dev") {
+			cands = append(cands, r)
+		}
+	}
+	autoRes.Unlock()
+	d := s.cust().snapshot()
+	n := 0
+	for _, r := range cands {
+		v := s.dtView(r.Repo)
+		fs, ok := v.findings(r.Tag)
+		if !ok {
+			continue
+		}
+		f, ok := findVuln(fs, r.VulnID)
+		if !ok {
+			continue
+		}
+		fix, found := pickFix(v.fixScan(r.VulnID, f, s.versionTags(r.Repo, d.Products[r.Repo]), r.Tag), r.Tag)
+		if !found {
+			continue
+		}
+		next := newAutoRun("patch", autoActor, r.Repo, r.Tag, r.VulnID)
+		next.FollowOf = r.ID
+		autoUpdate(r.ID, func(x *autoRun) {
+			x.FollowedBy, x.PatchTag = next.ID, fix.Tag
+			msg := fmt.Sprintf("수정 버전 %s %s 확인(%s %s) — 고객 통지로 이어 감", path.Base(r.Repo), fix.Tag, f.Component.Name, fix.CompVersion)
+			if x.State == "waiting" { // 개발자 요청을 아직 승인하지 않았으면 더 보낼 필요가 없다
+				stage(x, "approve", "skip", "수정 버전이 먼저 올라와 개발자 요청은 보내지 않음")
+				stage(x, "devreq", "skip", msg)
+				x.State, x.Finished = "done", time.Now().UTC().Format(time.RFC3339)
+			} else {
+				stage(x, "devreq", "done", msg)
+			}
+			x.Outcome = "patched"
+		})
+		_ = s.sor.append(SoREvent{Actor: autoActor, Action: "auto-response-followup", Repo: r.Repo, Tag: r.Tag,
+			Detail: map[string]any{"from": r.ID, "run": next.ID, "vuln": r.VulnID, "fix": fix.Tag}})
+		s.runAutoResponse(next)
+		n++
+	}
+	return n
+}
+
 // POST /api/auto-response/sweep — 지금 검색(백그라운드)
 func (s *Server) apiAutoResponseSweep(w http.ResponseWriter, r *http.Request) {
 	autoRes.Lock()
@@ -872,6 +931,6 @@ func (s *Server) apiAutoResponseSweep(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 409, map[string]string{"error": "이미 검색 중입니다"})
 		return
 	}
-	go s.autoSweep(w.Header().Get("X-User"))
+	go func() { s.autoFollowup(); s.autoSweep(w.Header().Get("X-User")) }()
 	writeJSON(w, 202, map[string]any{"started": true})
 }
