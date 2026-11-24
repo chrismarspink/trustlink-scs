@@ -8,6 +8,7 @@
 > 아래 CA/CMS 관련 완료·backlog 항목은 **역사적 기록**(현재는 미해당).
 
 ## 임시 설정 — 되돌릴 것
+- [ ] **admin1 메일을 jkkim@innotium.com 으로 변경** (2026-11-24, 사용자 요청): 관리자 "선택 필요"·내부 통보 메일이 실제로 도착하게. 원래 admin1@innotium.local. 운영 전 실제 관리자 주소로 바꿀 것.
 - [ ] **시연 고객 교체** (2026-11-23): 현대로템·한화오션·LIG D&A(구 LIG넥스원) 고객사·사용자(rotem1·hanwha1·lig1)·고객 등록부·로고를 추가하고 innopouch 읽기 권한을 줌. ACME 은행·Global Bank 는 고객 등록부에서 "중지(관계 종료)" — 지우지 않음. acme1·acme2·org-acme·robot-acme 는 그대로(~/innopouch-demo 스크립트용).
 - [ ] **admin1 을 고객사 그룹에 임시 추가** (2026-11-23, 오후에 org-acme → org-hyundai-rotem 으로 변경): "내 제품" 화면에서 현대로템의 innopouch 를 보이게 하려고. 시연이 끝나면 관리 › 계정 및 권한 › 사용자에서 admin1 의 고객사를 비운다(역할 admins 만). 그동안 admin1 의 다운로드가 현대로템 집계에 잡힌다.
 
@@ -38,6 +39,13 @@
 관련: [AppHeader.tsx](trustlink-ui/src/components/AppHeader.tsx)(현재 `/api/session` 기준 best-effort), `admin-bff/main.go`(`parseToken`, `SessionStore`).
 
 ---
+
+## 점검 결과 후속 (2026-11-24 점검 문서 https://claude.ai/artifact/MRzVRjcNkKZaFW54zytXXz)
+- [ ] 저장소 라이선스·공개 범위 결정(현재 공개 + LICENSE 없음) — 가장 급함
+- [ ] 고객에게 승인 없이 나가는 메일 두 가지(VEX 발행 통보·고객 만료 안내)를 결정함 승인 + 발송함으로
+- [ ] 규제 갈래의 '영향' 단계: 채택한 규제를 제품·고객(업종·국가)과 연결
+- [ ] 결정 묶음(같은 취약점·같은 권장 버전 한 번에 승인)
+- [ ] 운영 서버의 시연 데이터를 별도 시연 환경으로 분리
 
 ## 기타 알려진 후속 (분석 문서 기준)
 - [ ] BFF 미사용 VEX 엔드포인트 정리: `/api/vex/upload`·`/status`·`/export` (관리 VEX 탭 제거로 미사용. 제품 VexPanel이 쓰는 findings/analysis/publish/enabled는 유지)
