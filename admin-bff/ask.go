@@ -42,8 +42,9 @@ type askAnswer struct {
 	More    int      `json:"more,omitempty"` // 줄이느라 보여 주지 않은 건수
 	Sources []string `json:"sources"`        // 답의 출처(어느 기록에서 찾았나)
 	Suggest []string `json:"suggest,omitempty"`
-	CanAI   bool     `json:"canAI"`        // AI 한 줄 정리를 요청할 수 있는가
-	UI      []a2     `json:"ui,omitempty"` // 행동 양식(A2UI v0.9.1 메시지) — ask_action.go
+	CanAI   bool     `json:"canAI"`         // AI 한 줄 정리를 요청할 수 있는가
+	UI      []a2     `json:"ui,omitempty"`  // 행동 양식(A2UI v0.9.1 메시지) — ask_action.go
+	Map     string   `json:"map,omitempty"` // 영향 지도 링크(취약점을 찾았을 때)
 	facts   []aiFact
 	q, user string
 	pending *askPending
@@ -167,6 +168,7 @@ func (s *Server) askAnswer(sess Session, q string) *askAnswer {
 	}
 	a.Suggest = askExamples(sess, isCustomer)
 	if id := strings.ToUpper(askVulnRe.FindString(q)); a.Intent == "vuln" && len(a.Rows) > 0 && !isCustomer { // 찾은 취약점으로 이어서 할 일
+		a.Map = "/impact?vuln=" + id
 		next := []string{}
 		if canEditVex(sess) {
 			next = append(next, id+" VEX 판정 초안")

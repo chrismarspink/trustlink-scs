@@ -124,6 +124,7 @@ export function AskPanel() {
                       </ul>
                     )}
                     {!!t.a.more && <div className="text-xs text-muted-foreground">외 {t.a.more}건 — 해당 화면에서 전체를 볼 수 있습니다.</div>}
+                    {t.a.map && <Link to={t.a.map} className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/5">영향 지도 보기 <ArrowRight size={12} /></Link>}
                     {t.ui && (
                       <div className="rounded-lg border border-primary/30 bg-primary/[0.03] p-3">
                         <A2UISurface surface={t.ui} busy={t.acting} onData={(path, value) => setData(k, path, value)} onAction={(a) => act(k, a)} />

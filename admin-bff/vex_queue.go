@@ -46,6 +46,7 @@ var vexQueueCache struct {
 type vulnHit struct {
 	Repo, Tag, Component, Severity, State string
 	Project                               string // 분석 엔진의 프로젝트 UUID
+	Found                                 int64  // 이 버전에서 처음 발견된 때(epoch ms, 없으면 0)
 }
 
 // vexQueueRows: 전 제품 집계(1분 캐시). 권한 필터는 호출 쪽에서.
@@ -87,7 +88,7 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 			}
 			id := strings.ToUpper(f.Vulnerability.VulnID)
 			idx[id] = append(idx[id], vulnHit{Repo: repo, Tag: tag, Component: strings.TrimSpace(f.Component.Name + " " + f.Component.Version),
-				Severity: strings.ToUpper(f.Vulnerability.Severity), State: f.Analysis.State, Project: uuid})
+				Severity: strings.ToUpper(f.Vulnerability.Severity), State: f.Analysis.State, Project: uuid, Found: f.Attribution.AttributedOn})
 			row.Total++
 			if !pendingState(f.Analysis.State) {
 				row.Analyzed++

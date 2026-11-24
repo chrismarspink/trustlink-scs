@@ -317,6 +317,7 @@ func main() {
 	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))                       // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
 	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                      // 본문 미리보기
 	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                      // 받는 사람·항목·첨부 추천(규칙 + AI)
+	mux.HandleFunc("GET /api/impact", s.guardSession(s.apiImpact))                           // 영향 지도(취약점 → 구성요소 → 버전 → 고객)
 	mux.HandleFunc("POST /api/ask", s.guardSession(s.apiAsk))                                // 묻고 찾기(로그인한 누구나, 자기 권한 안에서)
 	mux.HandleFunc("POST /api/ask/action", s.guardSession(s.apiAskAction))                   // 양식의 단추(A2UI action) — 권한은 행동마다 다시 확인
 	mux.HandleFunc("POST /api/ask/{id}/summary", s.guardSession(s.apiAskSummary))            // 그 답의 AI 한 줄 정리

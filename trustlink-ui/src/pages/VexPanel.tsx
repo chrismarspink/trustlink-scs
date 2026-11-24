@@ -281,6 +281,7 @@ function FindingRow({ uuid, f, onSaved, repo, tag, ai, kev, draft }: {
           </button>
         )}
         <AskChip q={`${f.vulnerability.vulnId} ${repo}:${tag} VEX 판정 초안`} label="묻고 판정" className="border-0 px-1 py-0" />
+        <a href={`/impact?vuln=${encodeURIComponent(f.vulnerability.vulnId)}`} className="text-xs text-primary hover:underline">영향 지도</a>
         <button onClick={() => setDetail(!detail)} className="flex items-center gap-0.5 text-xs text-primary hover:underline">
           {detail ? <ChevronDown size={13} /> : <ChevronRight size={13} />} 상세
         </button>

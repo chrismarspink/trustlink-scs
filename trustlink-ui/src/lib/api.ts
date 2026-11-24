@@ -892,6 +892,7 @@ export type AskAnswer = {
   id: string; intent: 'vuln' | 'component' | 'my' | 'todo' | 'help'; title: string; lead: string;
   rows: AskRow[]; more?: number; sources: string[]; suggest?: string[]; canAI: boolean;
   ui?: Record<string, unknown>[]; // 행동 양식(A2UI v0.9.1 메시지)
+  map?: string; // 영향 지도 링크
 };
 export const ask = (q: string) => aj<AskAnswer>('/api/ask', jsonInit('POST', { q }));
 export const askSummary = (id: string) =>
@@ -899,3 +900,12 @@ export const askSummary = (id: string) =>
 // 양식의 단추가 눌렸을 때: A2UI 클라이언트 → 서버 action 메시지. 답으로 같은 화면을 갱신할 메시지가 온다.
 export const askAction = (action: { name: string; surfaceId: string; sourceComponentId: string; timestamp: string; context: Record<string, unknown> }) =>
   aj<{ ui: Record<string, unknown>[]; lead?: string }>('/api/ask/action', jsonInit('POST', { version: 'v0.9.1', action }));
+
+// ---------- 영향 지도 ----------
+export type ImpactNode = { id: string; type: 'vuln' | 'component' | 'version' | 'safe' | 'customer'; label: string; sub?: string; state?: string; link?: string };
+export type Impact = {
+  vulnId: string; kev: boolean; nodes: ImpactNode[]; edges: { from: string; to: string }[];
+  steps: { key: 'shipped' | 'found' | 'judged' | 'notified'; label: string; at?: string; text: string }[];
+  more?: number; canCustomers?: boolean; empty?: string;
+};
+export const impactMap = (vuln: string) => aj<Impact>(`/api/impact?vuln=${encodeURIComponent(vuln)}`);
