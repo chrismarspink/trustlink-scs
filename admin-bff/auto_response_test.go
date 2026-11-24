@@ -132,6 +132,11 @@ func TestAutoResponseFlow(t *testing.T) {
 	if again := s.autoFollowup(); again != 0 {
 		t.Fatalf("이미 이어 간 건은 다시 안 함: %d", again)
 	}
+	// 이어 간 대응이 오류로 끝나면(서버 재시작 등) 다음 확인 때 다시 이어 간다
+	autoUpdate(nxt.ID, func(x *autoRun) { x.State = "error" })
+	if retry := s.autoFollowup(); retry != 1 {
+		t.Fatalf("오류난 이어 가기 재시도: %d", retry)
+	}
 
 	// 없는 취약점은 탐지 단계 오류
 	r3 := s.runAutoResponse(newAutoRun("manual", "admin", "products/prod", "1.0", "CVE-1999-0000"))

@@ -870,15 +870,23 @@ func (s *Server) autoSweep(by string) int {
 
 // autoFollowup: 개발자 수정 요청으로 끝났거나 승인을 기다리는 건 중, 그 뒤 올라온 새 버전에서 취약점이 사라진 것을 찾아
 // 원래 건을 "패치 나옴"으로 닫고 같은 취약점의 자동 대응을 다시 돌린다 → 이번엔 패치가 있으니 영향 고객 통지(관리자 승인)로 간다.
+var autoFollowMu sync.Mutex // 10분 주기와 "지금 검색"이 겹쳐도 한 번에 하나만(같은 건을 두 번 이어 가지 않게)
+
 func (s *Server) autoFollowup() int {
-	if !s.dtEnabled() {
+	if !s.dtEnabled() || !autoFollowMu.TryLock() {
 		return 0
 	}
+	defer autoFollowMu.Unlock()
 	autoRes.Lock()
 	autoLoad()
+	state := map[string]string{}
+	for _, r := range autoRes.Runs {
+		state[r.ID] = r.State
+	}
 	var cands []autoRun
 	for _, r := range autoRes.Runs {
-		if r.FollowedBy == "" && (r.Outcome == "dev-request" || r.Outcome == "approval-dev") {
+		retry := r.Outcome == "patched" && r.FollowedBy != "" && state[r.FollowedBy] == "error" // 이어 간 대응이 오류(재시작 등)로 끝났으면 다시
+		if retry || (r.FollowedBy == "" && (r.Outcome == "dev-request" || r.Outcome == "approval-dev")) {
 			cands = append(cands, r)
 		}
 	}
