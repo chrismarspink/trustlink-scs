@@ -137,23 +137,38 @@ func vexRuleDraft(f dtFindingFull, sig vexSignals, facts []aiFact, card *vulnCar
 
 // ---------- ③ 축약 AI 판정(사용 맥락이 있을 때) ----------
 
+// 출력 토큰을 줄이려고 긴 CycloneDX 이름 대신 짧은 이름을 쓰게 하고(로컬 LLM 은 토큰 하나에 약 0.2초), 받은 뒤 되돌린다.
 const vexSlimTask = `담당자의 사용 맥락(U1)을 반영해 VEX 판정을 고른다.
-- status: under_investigation / not_affected / affected / fixed.
-- not_affected 는 U1 이나 "OSV 영향 범위 밖"(R1)이 근거일 때만. 이때 justification: 취약한 기능을 쓰지 않음·버전이 범위 밖 → vulnerable_code_not_present, 꺼져 있거나 실행되지 않음 → vulnerable_code_not_in_execute_path, 외부 입력이 닿지 않음 → vulnerable_code_cannot_be_controlled_by_adversary, 별도 방어 장치 → inline_mitigations_already_exist, 구성요소가 제품에 없음 → component_not_present. 그 외에는 빈 문자열.
-- response: affected 일 때만. 수정 버전(R1)이 있으면 update, 없고 완화가 가능하면 workaround_available, 둘 다 없으면 can_not_fix. 그 외에는 빈 문자열.
-- detail: 판단 이유 한 문장(60자 안팎), 끝에 근거 사실 ID 를 [U1] 처럼 붙인다.
-- confidence: high / medium / low.`
+- status: under_investigation / not_affected / affected / fixed. not_affected 는 U1 이나 "OSV 영향 범위 밖"(R1)이 근거일 때만.
+- just(not_affected 일 때만, 아니면 none): 취약한 기능을 안 씀·버전이 범위 밖 no_code, 꺼져 있거나 실행 안 됨 not_executed, 외부 입력이 닿지 않음 no_input, 별도 방어 장치 mitigated, 구성요소가 제품에 없음 no_component.
+- resp(affected 일 때만, 아니면 none): 수정 버전(R1) 있음 update, 없고 완화 가능 workaround, 둘 다 없음 cannot_fix.
+- detail: 이유 한 문장(60자 안팎), 끝에 근거 ID 를 [U1] 처럼.
+- conf: high / medium / low.`
+
+var (
+	slimJust = map[string]string{"no_code": "vulnerable_code_not_present", "not_executed": "vulnerable_code_not_in_execute_path",
+		"no_input": "vulnerable_code_cannot_be_controlled_by_adversary", "mitigated": "inline_mitigations_already_exist", "no_component": "component_not_present"}
+	slimResp = map[string]string{"update": "update", "workaround": "workaround_available", "cannot_fix": "can_not_fix"}
+)
+
+type vexSlimOut struct {
+	Status, Just, Resp, Detail, Conf string
+}
+
+func (o vexSlimOut) draft() vexDraft {
+	return vexDraft{Status: o.Status, Justification: slimJust[o.Just], Response: slimResp[o.Resp], Detail: o.Detail, Confidence: o.Conf}
+}
 
 var vexSlimSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"status":        map[string]any{"type": "string", "enum": vexStates},
-		"justification": map[string]any{"type": "string", "enum": vexJusts},
-		"response":      map[string]any{"type": "string", "enum": vexResponses},
-		"detail":        map[string]any{"type": "string", "maxLength": 120},
-		"confidence":    map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
+		"status": map[string]any{"type": "string", "enum": vexStates},
+		"just":   map[string]any{"type": "string", "enum": []string{"none", "no_code", "not_executed", "no_input", "mitigated", "no_component"}},
+		"resp":   map[string]any{"type": "string", "enum": []string{"none", "update", "workaround", "cannot_fix"}},
+		"detail": map[string]any{"type": "string", "maxLength": 120},
+		"conf":   map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
 	},
-	"required": []string{"status", "justification", "response", "detail", "confidence"},
+	"required": []string{"status", "just", "resp", "detail", "conf"},
 }
 
 var citeTag = regexp.MustCompile(`\[([A-Z]\d(?:\s*,\s*[A-Z]\d)*)\]`)
@@ -211,7 +226,9 @@ var vexSlimCache = struct {
 
 const vexSlimCacheKeep = 500
 
-func vexSlimCachePath() string { return filepath.Join(filepath.Dir(aiConfigPath()), "vex-slim-cache.json") }
+func vexSlimCachePath() string {
+	return filepath.Join(filepath.Dir(aiConfigPath()), "vex-slim-cache.json")
+}
 
 func vexSlimCacheGet(key string) (vexDraft, bool) {
 	vexSlimCache.Lock()
@@ -248,9 +265,10 @@ func (s *Server) vexSlimDraft(f dtFindingFull, context string, sig vexSignals, c
 	if d, ok := vexSlimCacheGet(key); ok {
 		return d, facts, aiMeta{FactsSHA256: key, Use: "vex", Method: "ai-slim", Cached: true, Model: "저장된 판정"}, nil
 	}
-	var d vexDraft
-	meta, err := s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 220, &d, true)
+	var o vexSlimOut
+	meta, err := s.aiDraftOpt("vex", "ko", facts, vexSlimTask, vexSlimSchema, 160, &o, true)
 	meta.Method = "ai-slim"
+	d := o.draft()
 	if err != nil {
 		return d, facts, meta, err
 	}
@@ -263,7 +281,7 @@ func (s *Server) vexSlimDraft(f dtFindingFull, context string, sig vexSignals, c
 }
 
 // vexFastDraftFor: 빠른 경로의 한 건. waitCard 면 요약 카드가 없을 때 만들어서(한 번, 수십 초) 넣고,
-// 아니면 있는 것만 쓰고 없는 것은 뒤에서 만들도록 줄에 넣는다.
+// 아니면 있는 것만 쓴다(일괄 판정은 판정을 먼저 다 낸 뒤 2단계에서 카드를 만든다).
 func (s *Server) vexFastDraftFor(actor, repo, tag string, f dtFindingFull, context string, waitCard bool) (*vexDraftResult, error) {
 	t0 := time.Now()
 	sig := vexSignalsFor(f)
@@ -271,8 +289,6 @@ func (s *Server) vexFastDraftFor(actor, repo, tag string, f dtFindingFull, conte
 	if card == nil && f.Vulnerability.Description != "" {
 		if waitCard {
 			card = s.cardWait(f, cardWaitMax) // 상한 안에 못 만들면 규칙 초안만 먼저 낸다(카드는 뒤에서 마저 만들어 저장)
-		} else {
-			s.cardQueue(f)
 		}
 	}
 	var (

@@ -468,9 +468,20 @@ function BatchPanel({ batch, findings, err, onStart, onCancel }: {
   };
   const done = batch?.done ?? 0, total = batch?.total ?? 0;
   const pct = total ? Math.round((done / total) * 100) : 0;
-  const elapsed = batch?.started ? now - new Date(batch.started).getTime() : 0;
-  const avg = done ? elapsed / done : 0;
-  const eta = done && total > done ? avg * (total - done) : 0;
+  // ① 판정: 시작 ~ 판정 끝(judgedAt). ② 권고문 요약 보강: 판정 끝 ~ 지금. 시간을 따로 잰다.
+  const t0 = batch?.started ? new Date(batch.started).getTime() : now;
+  const tJ = batch?.judgedAt ? new Date(batch.judgedAt).getTime() : 0;
+  const judging = running && !tJ;
+  const jElapsed = (tJ || now) - t0;
+  const jAvg = done ? jElapsed / done : 0;
+  const jEta = judging && done && total > done ? jAvg * (total - done) : 0;
+  const eTotal = batch?.enrichTotal ?? 0, eDone = batch?.enrichDone ?? 0;
+  const enriching = running && !!tJ && eTotal > 0;
+  const ePct = eTotal ? Math.round((eDone / eTotal) * 100) : 0;
+  const eElapsed = tJ ? now - tJ : 0;
+  const eAvg = eDone ? eElapsed / eDone : 0;
+  const eEta = eDone && eTotal > eDone ? eAvg * (eTotal - eDone) : 0;
+  const secs = (ms: number) => (ms < 10000 ? `${(ms / 1000).toFixed(1)}초` : mmss(ms));
   const results = Object.entries(batch?.results || {}).sort((a, b) => (a[1].at < b[1].at ? 1 : -1));
   const failed = Object.entries(batch?.failed || {});
   const [cur, curComp] = (batch?.current || '').split(' · ');
@@ -482,7 +493,7 @@ function BatchPanel({ batch, findings, err, onStart, onCancel }: {
         <AIIcon size={30} spin={running} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-violet-950">
-            AI 일괄 판정 {auto && <AutoMark />} {running ? <span className="font-normal text-violet-700">진행 중 · {done}/{total}건 · {pct}%</span>
+            AI 일괄 판정 {auto && <AutoMark />} {running ? <span className="font-normal text-violet-700">{enriching ? `판정 완료 ${done}/${total}건 · 권고문 요약 보강 ${eDone}/${eTotal}건` : `판정 중 · ${done}/${total}건 · ${pct}%`}</span>
               : batch && batch.state !== 'none' ? <span className="font-normal text-muted-foreground">마지막 실행 {batch.finished ? new Date(batch.finished).toLocaleString() : ''} · 초안 {results.length}건{failed.length ? ` · 실패 ${failed.length}건` : ''}{batch.state === 'cancelled' ? ' (중지됨)' : ''}</span> : null}
           </div>
           <div className="text-xs text-muted-foreground">
@@ -504,24 +515,39 @@ function BatchPanel({ batch, findings, err, onStart, onCancel }: {
       </div>
 
       {running && (
-        <div className="space-y-2 border-t border-violet-200/70 bg-white/60 p-3">
-          <div className="h-2.5 overflow-hidden rounded-full bg-violet-100">
-            <div className="h-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all duration-700" style={{ width: `${Math.max(pct, 3)}%` }} />
+        <div className="space-y-3 border-t border-violet-200/70 bg-white/60 p-3">
+          {/* ① 판정 */}
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="font-semibold text-violet-950">① 판정 {tJ ? '완료' : '중'} <b className="tabular-nums">{done}/{total}건</b></span>
+              <span>{tJ ? '걸린 시간' : '경과'} <b className="tabular-nums text-foreground">{secs(jElapsed)}</b></span>
+              <span>건당 평균 <b className="tabular-nums text-foreground">{done ? secs(jAvg) : '측정 중'}</b></span>
+              {judging && <span>남은 시간 약 <b className="tabular-nums text-foreground">{done ? mmss(jEta) : '—'}</b></span>}
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-violet-100">
+              <div className={`h-full rounded-full transition-all duration-700 ${tJ ? 'bg-emerald-500' : 'bg-gradient-to-r from-violet-600 to-fuchsia-500'}`} style={{ width: `${Math.max(pct, 3)}%` }} />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>경과 <b className="tabular-nums text-foreground">{mmss(elapsed)}</b></span>
-            <span>건당 평균 <b className="tabular-nums text-foreground">{done ? mmss(avg) : '측정 중'}</b></span>
-            <span>남은 시간 약 <b className="tabular-nums text-foreground">{done ? mmss(eta) : '—'}</b></span>
-          </div>
+          {/* ② 권고문 요약 보강 */}
+          {enriching && (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="font-semibold text-violet-950">② 권고문 요약 보강(AI) <b className="tabular-nums">{eDone}/{eTotal}건</b></span>
+                <span>경과 <b className="tabular-nums text-foreground">{mmss(eElapsed)}</b></span>
+                <span>건당 평균 <b className="tabular-nums text-foreground">{eDone ? secs(eAvg) : '측정 중'}</b></span>
+                <span>남은 시간 약 <b className="tabular-nums text-foreground">{eDone ? mmss(eEta) : '—'}</b></span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-violet-100">
+                <div className="h-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all duration-700" style={{ width: `${Math.max(ePct, 3)}%` }} />
+              </div>
+              <p className="text-[11px] text-muted-foreground">판정은 이미 나와 있어 지금 확인·저장할 수 있습니다. 영어 권고문의 한국어 요약을 초안에 덧붙이는 중이며, 중지해도 판정은 그대로 남습니다.</p>
+            </div>
+          )}
           {batch?.current && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-violet-200 bg-white p-2 text-xs">
               <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-fuchsia-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-fuchsia-500" /></span>
+              <span className="text-muted-foreground">{enriching ? '요약 중' : '판정 중'}</span>
               <span className="font-mono font-semibold">{cur}</span>{curComp && <span className="text-muted-foreground">{curComp}</span>}
-              <span className="ml-auto flex items-center gap-1 text-[11px]">
-                {['근거 수집', 'AI 작성', '근거 검증'].map((st, i) => (
-                  <span key={st} className={`rounded-full px-2 py-0.5 ${i === 1 ? 'animate-pulse bg-violet-600 text-white' : 'bg-violet-100 text-violet-800'}`}>{i + 1}. {st}</span>
-                ))}
-              </span>
             </div>
           )}
         </div>

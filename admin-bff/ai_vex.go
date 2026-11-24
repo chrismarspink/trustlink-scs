@@ -493,21 +493,26 @@ func (s *Server) apiAIVexDraft(w http.ResponseWriter, r *http.Request) {
 // ---------- ③ 일괄 판정 ----------
 
 type vexBatch struct {
-	Project  string                     `json:"project"`
-	Repo     string                     `json:"repo"`
-	Tag      string                     `json:"tag"`
-	Actor    string                     `json:"actor"`
-	Trigger  string                     `json:"trigger,omitempty"` // "auto": 새 취약점 통보 뒤 자동 초안(KEV·치명)
-	State    string                     `json:"state"`             // running / done / cancelled / error
-	Total    int                        `json:"total"`
-	Done     int                        `json:"done"`
-	Current  string                     `json:"current,omitempty"`
-	Started  string                     `json:"started"`
-	Finished string                     `json:"finished,omitempty"`
-	Error    string                     `json:"error,omitempty"`
-	Results  map[string]*vexDraftResult `json:"results"` // "컴포넌트UUID|취약점UUID"
-	Failed   map[string]string          `json:"failed,omitempty"`
-	cancel   bool
+	Project  string `json:"project"`
+	Repo     string `json:"repo"`
+	Tag      string `json:"tag"`
+	Actor    string `json:"actor"`
+	Trigger  string `json:"trigger,omitempty"` // "auto": 새 취약점 통보 뒤 자동 초안(KEV·치명)
+	State    string `json:"state"`             // running / done / cancelled / error
+	Total    int    `json:"total"`
+	Done     int    `json:"done"`
+	Current  string `json:"current,omitempty"`
+	Started  string `json:"started"`
+	Finished string `json:"finished,omitempty"`
+	Error    string `json:"error,omitempty"`
+	// 빠른 경로는 두 단계: ① 판정(규칙, 바로 끝남) ② 권고문 요약 보강(AI, 건당 수십 초). 화면이 따로 보여 준다.
+	Phase       string                     `json:"phase,omitempty"`    // judge / enrich
+	JudgedAt    string                     `json:"judgedAt,omitempty"` // ① 이 끝난 시각
+	EnrichTotal int                        `json:"enrichTotal,omitempty"`
+	EnrichDone  int                        `json:"enrichDone,omitempty"`
+	Results     map[string]*vexDraftResult `json:"results"` // "컴포넌트UUID|취약점UUID"
+	Failed      map[string]string          `json:"failed,omitempty"`
+	cancel      bool
 }
 
 var (
@@ -582,8 +587,10 @@ func (s *Server) apiAIVexBatch(w http.ResponseWriter, r *http.Request) {
 	vexBatchMu.Lock()
 	cur := vexBatches[in.Project]
 	if in.Cancel {
-		if cur != nil && cur.State == "running" {
+		if cur != nil && cur.State == "running" { // 바로 멈춘 것으로 표시한다. 돌고 있던 AI 호출 한 건은 끝나면 버린다
 			cur.cancel = true
+			cur.State, cur.Current, cur.Finished = "cancelled", "", time.Now().UTC().Format(time.RFC3339)
+			cur.save()
 		}
 		vexBatchMu.Unlock()
 		writeJSON(w, 200, map[string]string{"status": "cancelling"})
@@ -626,7 +633,7 @@ var errVexBatchRunning = errors.New("이미 일괄 판정이 진행 중입니다
 // keep: 새 결과에 이어 붙일 이전 초안(자동 초안용, 사람 요청은 nil). 이미 진행 중이면 errVexBatchRunning. picks 는 비어 있지 않아야 한다.
 func (s *Server) startVexBatch(project, repo, tag, actor, trigger, context string, picks []dtFindingFull, keep map[string]*vexDraftResult) (*vexBatch, error) {
 	b := &vexBatch{Project: project, Repo: repo, Tag: tag, Actor: actor, Trigger: trigger, State: "running",
-		Total: len(picks), Started: time.Now().UTC().Format(time.RFC3339), Results: map[string]*vexDraftResult{}, Failed: map[string]string{}}
+		Total: len(picks), Phase: "judge", Started: time.Now().UTC().Format(time.RFC3339), Results: map[string]*vexDraftResult{}, Failed: map[string]string{}}
 	vexBatchMu.Lock()
 	if cur := vexBatches[project]; cur != nil && cur.State == "running" { // 경쟁 재확인
 		vexBatchMu.Unlock()
@@ -644,17 +651,21 @@ func (s *Server) startVexBatch(project, repo, tag, actor, trigger, context strin
 func (s *Server) runVexBatch(b *vexBatch, picks []dtFindingFull, context string) {
 	for _, f := range picks {
 		vexBatchMu.Lock()
-		if b.cancel {
+		if b.cancel || b.State != "running" {
 			b.State = "cancelled"
 			vexBatchMu.Unlock()
 			break
 		}
 		b.Current = f.Vulnerability.VulnID + " · " + f.Component.Name
 		vexBatchMu.Unlock()
-		aiYield(b) // 사람이 직접 요청한 AI 가 기다리면 먼저 보낸다
+		aiYield(b)                                                            // 사람이 직접 요청한 AI 가 기다리면 먼저 보낸다
 		res, err := s.vexDraftMode(b.Actor, b.Repo, b.Tag, f, context, false) // 빠른 경로: 요약 카드는 기다리지 않는다(아래에서 보강)
 		key := f.Component.UUID + "|" + f.Vulnerability.UUID
 		vexBatchMu.Lock()
+		if b.cancel { // 중지 뒤에 끝난 호출 — 결과를 버린다
+			vexBatchMu.Unlock()
+			break
+		}
 		if err != nil {
 			b.Failed[key] = f.Vulnerability.VulnID + ": " + err.Error()
 		} else {
@@ -665,8 +676,15 @@ func (s *Server) runVexBatch(b *vexBatch, picks []dtFindingFull, context string)
 		b.save()
 		vexBatchMu.Unlock()
 	}
+	vexBatchMu.Lock()
+	b.JudgedAt = time.Now().UTC().Format(time.RFC3339)
+	vexBatchMu.Unlock()
 	s.vexBatchEnrich(b, picks, context)
 	vexBatchMu.Lock()
+	if b.cancel {
+		vexBatchMu.Unlock()
+		return // 중지할 때 이미 상태·시각을 적었다
+	}
 	if b.State == "running" {
 		b.State = "done"
 		if len(b.Results) == 0 && len(b.Failed) > 0 {
@@ -717,33 +735,44 @@ func (s *Server) vexBatchEnrich(b *vexBatch, picks []dtFindingFull, context stri
 	if !vexFastOn() {
 		return
 	}
-	for i, f := range picks {
+	need := []dtFindingFull{}
+	vexBatchMu.Lock()
+	for _, f := range picks {
+		if cur := b.Results[f.Component.UUID+"|"+f.Vulnerability.UUID]; cur != nil && cur.Meta.Method == "rule" && f.Vulnerability.Description != "" {
+			need = append(need, f)
+		}
+	}
+	b.Phase, b.EnrichTotal, b.EnrichDone = "enrich", len(need), 0
+	b.save()
+	vexBatchMu.Unlock()
+	for _, f := range need {
 		key := f.Component.UUID + "|" + f.Vulnerability.UUID
 		vexBatchMu.Lock()
-		cur := b.Results[key]
 		stop := b.cancel || b.State != "running"
-		if !stop && cur != nil && cur.Meta.Method == "rule" && f.Vulnerability.Description != "" {
-			b.Current = "권고문 요약 보강 중(" + itoa(i+1) + "/" + itoa(len(picks)) + ") — 판정은 이미 나와 있습니다 · " + f.Vulnerability.VulnID
-		} else {
-			cur = nil
+		if !stop {
+			b.Current = f.Vulnerability.VulnID + " · " + f.Component.Name
 		}
 		vexBatchMu.Unlock()
 		if stop {
 			return
 		}
-		if cur == nil {
-			continue
-		}
 		aiYield(b)
-		if _, err := s.cardMake(f); err != nil {
-			continue
+		_, err := s.cardMake(f) // 같은 취약점이 앞에서 만들어졌으면 바로 돌아온다
+		var res *vexDraftResult
+		if err == nil {
+			res, err = s.vexDraftMode(b.Actor, b.Repo, b.Tag, f, context, false)
 		}
-		if res, err := s.vexDraftMode(b.Actor, b.Repo, b.Tag, f, context, false); err == nil {
-			vexBatchMu.Lock()
+		vexBatchMu.Lock()
+		if b.cancel {
+			vexBatchMu.Unlock()
+			return
+		}
+		if err == nil {
 			res.Auto = b.Trigger == "auto"
 			b.Results[key] = res
-			b.save()
-			vexBatchMu.Unlock()
 		}
+		b.EnrichDone++
+		b.save()
+		vexBatchMu.Unlock()
 	}
 }

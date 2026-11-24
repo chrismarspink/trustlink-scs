@@ -6,7 +6,7 @@ import { AIBadge } from './AIBadge';
 // AI 는 AIBadge(보라→자홍), 실제 악용(KEV)은 빨강 불꽃, 취약점 DB 는 출처별 색 + 아이콘.
 type Src = { label: string; icon: LucideIcon; cls: string; title: string };
 const SRC: Record<string, Src> = {
-  kev: { label: 'KEV', icon: Flame, cls: 'bg-red-600 text-white', title: 'CISA KEV — 실제 악용이 확인된 취약점' },
+  kev: { label: 'KEV', icon: Flame, cls: 'bg-red-50 text-red-700 ring-1 ring-red-300', title: 'CISA KEV — 실제 악용이 확인된 취약점' },
   epss: { label: 'EPSS', icon: Gauge, cls: 'bg-orange-100 text-orange-800 ring-1 ring-orange-300', title: 'FIRST EPSS — 30일 안 악용 가능성' },
   exploit: { label: '익스플로잇', icon: ShieldAlert, cls: 'bg-rose-100 text-rose-800 ring-1 ring-rose-300', title: '공개 익스플로잇(Exploit-DB·Metasploit·Nuclei)' },
   osv: { label: 'OSV', icon: Database, cls: 'bg-sky-100 text-sky-800 ring-1 ring-sky-300', title: 'OSV — 생태계별 영향·수정 버전' },

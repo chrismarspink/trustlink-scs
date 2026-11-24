@@ -306,10 +306,10 @@ func (s *Server) apiMailLogoDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiMailLayoutPreview(w http.ResponseWriter, r *http.Request) {
 	mc := s.renderMail(mailCard{Module: "자동 대응", Purpose: "결정 요청", Tone: "decide", Title: "고객 보안 권고 발송 승인 요청",
 		Product: "example-app", Version: "1.0", Lead: "example-app 1.0 에서 치명적 취약점이 확인되었습니다. 수정 버전이 있어 고객 보안 권고 초안을 준비했습니다. 발송 여부를 결정해 주십시오.",
-		Facts: []mailFact{{K: "취약점", V: "CVE-0000-00000", Chips: []string{"CRITICAL", "KEV"}}, {K: "구성요소", V: "nginx 1.28.0"}, {K: "수정 버전", V: "example-app 1.1"}},
-		AI:    &mailAI{Label: "AI 분석 — 조사 필요", Text: "예시 분석 문장입니다.", Model: "local"},
+		Facts:  []mailFact{{K: "취약점", V: "CVE-0000-00000", Chips: []string{"CRITICAL", "KEV"}}, {K: "구성요소", V: "nginx 1.28.0"}, {K: "수정 버전", V: "example-app 1.1"}},
+		AI:     &mailAI{Label: "AI 분석 — 조사 필요", Text: "예시 분석 문장입니다.", Model: "local"},
 		Action: "승인·반려 화면 열기", URL: s.publicBase() + "/admin/auto-response", Alt: "승인 대기함", AltURL: s.publicBase() + "/admin/inbox",
-		Steps: []string{"승인하면 발송함에서 잠시 기다렸다가 나갑니다(그동안 취소 가능).", "반려하면 보내지 않고 사유를 기록합니다."},
+		Steps:  []string{"승인하면 발송함에서 잠시 기다렸다가 나갑니다(그동안 취소 가능).", "반려하면 보내지 않고 사유를 기록합니다."},
 		Reason: "관리자(admins) 그룹", Ref: "예시"})
 	h := mc.HTML
 	if len(mc.Inline) > 0 { // 미리보기에서는 로고를 data: 로

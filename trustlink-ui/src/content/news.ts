@@ -30,6 +30,17 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.28.1',
+    date: '2026-11-24',
+    title: '일괄 판정 진행 표시를 두 단계로',
+    items: [
+      { kind: '개선', text: '일괄 판정 진행을 ① 판정 ② 권고문 요약 보강으로 나눠 건수·시간을 따로 표시' },
+      { kind: '수정', text: '중지를 누르면 바로 멈춘 것으로 표시하고, 뒤에서 돌던 요약 작업도 함께 멈춤' },
+      { kind: '개선', text: '사용 맥락 판정의 지시문·출력을 더 줄여 다른 AI 작업 직후에도 빠르게' },
+      { kind: '개선', text: 'KEV 표시를 진한 빨강에서 옅은 색으로(다른 출처 표시와 같은 톤)' },
+    ],
+  },
+  {
     version: '2.28.0',
     date: '2026-11-24',
     title: 'VEX 판정 초안을 30초 안에',

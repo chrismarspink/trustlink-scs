@@ -559,6 +559,7 @@ export type KevInfo = {
 export type VexBatch = {
   state: 'none' | 'running' | 'done' | 'cancelled' | 'error'; project?: string; total?: number; done?: number;
   current?: string; started?: string; finished?: string; error?: string; message?: string;
+  phase?: 'judge' | 'enrich'; judgedAt?: string; enrichTotal?: number; enrichDone?: number; // 빠른 경로: ① 판정 ② 권고문 요약 보강
   results?: Record<string, VexDraftResult>; failed?: Record<string, string>;
 };
 export const aiVexBatchStart = (b: { project: string; repo: string; tag: string; context?: string; limit?: number }) =>

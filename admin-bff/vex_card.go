@@ -102,63 +102,6 @@ func (s *Server) cardBuild(f dtFindingFull, save bool) (*vulnCard, error) {
 	return &c, nil
 }
 
-// ---------- 뒤에서 만들기(사람이 기다리지 않게) ----------
-
-var cardQ = struct {
-	sync.Mutex
-	items   []dtFindingFull
-	queued  map[string]bool
-	running bool
-}{queued: map[string]bool{}}
-
-const cardQueueMax = 300
-
-// cardQueue: 카드가 없는 취약점을 줄에 넣는다. 사람이 요청한 AI 작업이 있으면 그 뒤로 미룬다.
-func (s *Server) cardQueue(f dtFindingFull) {
-	if !aiEnabledFor("vex") || f.Vulnerability.Description == "" {
-		return
-	}
-	p := cardPath(f)
-	cardQ.Lock()
-	defer cardQ.Unlock()
-	if cardQ.queued[p] || len(cardQ.items) >= cardQueueMax {
-		return
-	}
-	cardQ.queued[p] = true
-	cardQ.items = append(cardQ.items, f)
-	if !cardQ.running {
-		cardQ.running = true
-		go s.cardWorker()
-	}
-}
-
-func (s *Server) cardWorker() {
-	for {
-		cardQ.Lock()
-		if len(cardQ.items) == 0 {
-			cardQ.running = false
-			cardQ.Unlock()
-			return
-		}
-		f := cardQ.items[0]
-		cardQ.items = cardQ.items[1:]
-		cardQ.Unlock()
-		for aiWaiting.Load() > 0 { // 사람이 요청한 작업 먼저
-			time.Sleep(2 * time.Second)
-		}
-		_, _ = s.cardMake(f)
-		cardQ.Lock()
-		delete(cardQ.queued, cardPath(f))
-		cardQ.Unlock()
-	}
-}
-
-func cardQueueLen() int {
-	cardQ.Lock()
-	defer cardQ.Unlock()
-	return len(cardQ.items)
-}
-
 const cardWaitMax = 24 * time.Second
 
 // cardWait: 카드를 만들되 max 까지만 기다린다. 넘으면 nil 을 돌려주고, 만들던 카드는 끝까지 만들어 저장한다.
