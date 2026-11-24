@@ -8,7 +8,6 @@ package main
 //       등록 제품·설치 버전·그 버전의 취약점(VEX 상태)·권장 패치 버전·최근 통지. 다른 고객 데이터·내부 메모는 주지 않는다.
 
 import (
-	"html"
 	"log"
 	"net/http"
 	"path"
@@ -157,8 +156,9 @@ func (s *Server) expiryMail(cu Customer, aud string, to []string, subject, body 
 	case !s.mail.Configured():
 		r.Error = "메일 서버 미설정(SMTP_HOST)"
 	default:
-		h := "<div style=\"font-family:sans-serif;font-size:14px\">" + strings.ReplaceAll(html.EscapeString(body), "\n", "<br>") + "</div>"
-		sent, dropped, err := s.mail.SendRich(to, subject, mailContent{Text: body, HTML: h})
+		reason := map[string]string{"customer": "고객사 담당자", "internal": "이 고객의 영업·지원 담당"}[aud]
+		sent, dropped, err := s.mail.SendRich(to, subject, s.renderMail(mailCard{Module: "계약·지원 만료 관리", Purpose: "만료 안내", Tone: "info",
+			Title: strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(subject, "[TrustLink]"), "[안내]")), Body: body, Reason: reason, Ref: cu.ID}))
 		outboxRecord("expiry", cu.Name+" · 만료 안내", cu.ID, to, subject, sent, dropped, err)
 		r.Sent, r.Dropped, r.Error = sent, dropped, errString(err)
 	}

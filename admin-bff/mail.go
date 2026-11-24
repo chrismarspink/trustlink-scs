@@ -57,13 +57,17 @@ func (m *Mailer) filter(to []string) (ok, dropped []string) {
 type mailAttachment struct {
 	Name, Type string
 	Data       []byte
+	CID        string // 본문 안에 넣는 그림(Inline)일 때 Content-ID
 }
 
 // mailContent: 평문(필수) + HTML(선택) + 첨부.
 type mailContent struct {
 	Text, HTML  string
 	Attachments []mailAttachment
+	Inline      []mailAttachment // HTML 본문이 cid: 로 가리키는 그림(회사 로고)
 }
+
+func b64(b []byte) string { return base64.StdEncoding.EncodeToString(b) }
 
 func writeB64(b *bytes.Buffer, data []byte) {
 	enc := base64.StdEncoding.EncodeToString(data)
@@ -110,7 +114,19 @@ func buildMessageRich(from string, to []string, subject string, c mailContent, n
 		b.WriteString("\r\n--" + alt + "\r\n")
 		part(`text/plain; charset="UTF-8"`, []byte(c.Text))
 		b.WriteString("--" + alt + "\r\n")
-		part(`text/html; charset="UTF-8"`, []byte(c.HTML))
+		if len(c.Inline) == 0 {
+			part(`text/html; charset="UTF-8"`, []byte(c.HTML))
+		} else { // HTML + 본문 안 그림 = multipart/related
+			rel := boundary + "-rel"
+			h("Content-Type", `multipart/related; boundary="`+rel+`"`)
+			b.WriteString("\r\n--" + rel + "\r\n")
+			part(`text/html; charset="UTF-8"`, []byte(c.HTML))
+			for _, a := range c.Inline {
+				b.WriteString("--" + rel + "\r\n")
+				part(a.Type, a.Data, "Content-ID", "<"+a.CID+">", "Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": a.Name}))
+			}
+			b.WriteString("--" + rel + "--\r\n")
+		}
 		b.WriteString("--" + alt + "--\r\n")
 	}
 	if len(c.Attachments) == 0 {

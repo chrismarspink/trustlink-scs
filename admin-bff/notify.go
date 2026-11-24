@@ -45,6 +45,7 @@ type Notice struct {
 	Dropped  []string        `json:"dropped,omitempty"` // 메일 허용 목록 밖이라 보내지 않은 주소
 	MailErr  string          `json:"mailError,omitempty"`
 	Read     map[string]bool `json:"read,omitempty"`
+	card     *mailCard       // 메일 틀(없으면 Body 를 기본 틀에 담는다). 화면 알림에는 쓰지 않음
 }
 
 type notifyState struct {
@@ -571,7 +572,7 @@ func (s *Server) deliver(nt Notice, to []kcUser, extra []string) {
 		}
 	}
 	if s.mail.Configured() && len(emails) > 0 {
-		sent, dropped, err := s.mail.Send(emails, nt.Title, nt.Body)
+		sent, dropped, err := s.mail.SendRich(emails, nt.Title, s.renderMail(noticeCard(nt)))
 		outboxRecord("notify", nt.Kind+" · "+path.Base(nt.Repo)+" "+nt.Tag, nt.Repo+":"+nt.Tag, emails, nt.Title, sent, dropped, err)
 		nt.Mailed, nt.Dropped = sent, dropped
 		if err != nil {
@@ -688,4 +689,23 @@ func (s *Server) apiNotifySync(w http.ResponseWriter, r *http.Request) {
 	msg := s.notifySync()
 	s.flushBatches(true)
 	writeJSON(w, 200, map[string]string{"status": "ok", "message": msg})
+}
+
+// noticeCard: 통보를 메일 틀에 담는다. card 가 없으면 종류에 맞는 기본 틀 + 본문.
+func noticeCard(nt Notice) mailCard {
+	if nt.card != nil {
+		return *nt.card
+	}
+	c := mailCard{Module: "알림", Purpose: "알림", Tone: "info", Product: path.Base(nt.Repo), Version: nt.Tag,
+		Title: strings.TrimSpace(strings.TrimPrefix(nt.Title, "[TrustLink]")), Body: nt.Body}
+	switch nt.Kind {
+	case "vuln-new":
+		c.Module, c.Purpose, c.Tone, c.Reason = "취약점 감시", "판단 요청", "alert", "이 제품의 보안·개발 담당"
+	case "vex-published":
+		c.Module, c.Purpose, c.Reason = "VEX 발행", "보안 판단 안내", "이 제품을 받아 쓰는 고객 담당자"
+	}
+	if nt.Repo == "" {
+		c.Product, c.Version = "", ""
+	}
+	return c
 }

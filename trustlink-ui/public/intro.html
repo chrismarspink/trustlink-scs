@@ -30,7 +30,10 @@
   .tabs { display: flex; gap: 4px; padding: 8px 16px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .tabs button { border: 0; border-bottom: 3px solid transparent; background: none; font: inherit; font-size: 13px; padding: 6px 10px; cursor: pointer; color: var(--muted); }
   .tabs button.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--tl); }
-  .tabs button .n { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  /* 탭 이름 옆 점: 장면 수만큼. 지금 보는 장면은 채운다 */
+  .tabs button .n { display: inline-flex; gap: 3px; margin-left: 7px; vertical-align: middle; }
+  .tabs button .n i { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+  .tabs button.on .n i.on { background: var(--tl); }
   .prog { height: 3px; background: var(--soft); }
   .prog i { display: block; height: 100%; width: 0; background: var(--tl); }
 
@@ -452,6 +455,7 @@ function render(i) {
   try { svg.setCurrentTime(0); } catch (e) { /* SMIL 미지원 브라우저 */ }
   cap.innerHTML = `<div class="kicker">${s.kicker}</div><h2>${s.title}</h2><p>${s.text}</p><ul>${s.list.map(l => `<li>${l}</li>`).join('')}</ul>`;
   [...bar.querySelectorAll('.dot')].forEach((b, k) => { b.classList.toggle('on', k === cur); b.setAttribute('aria-current', k === cur ? 'step' : 'false'); });
+  [...tabs.querySelectorAll('button.on .n i')].forEach((d, k) => d.classList.toggle('on', k === cur));
   t0 = performance.now();
 }
 function tick(now) {
@@ -483,7 +487,8 @@ function pickStory(k) {
 STORIES.forEach((st, k) => {
   const b = btn('', '', () => pickStory(k), tabs);
   b.setAttribute('role', 'tab');
-  b.innerHTML = `${st.name}<span class="n">${st.scenes.length}장면</span>`;
+  b.innerHTML = `${st.name}<span class="n" aria-hidden="true">${'<i></i>'.repeat(st.scenes.length)}</span>`;
+  b.title = `장면 ${st.scenes.length}개`;
 });
 addEventListener('keydown', e => { if (e.key === 'ArrowRight') render(cur + 1); if (e.key === 'ArrowLeft') render(cur - 1); });
 pickStory(story); raf = requestAnimationFrame(tick);

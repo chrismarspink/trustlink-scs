@@ -462,35 +462,66 @@ func (s *Server) autoDevRequest(id string, r autoRun, comp, upstream string) aut
 // notifyApproval: 관리자에게 "보낼지 정해 달라"는 메일(+화면 알림). 패치 유무와 받을 사람·메일 초안 요약을 담는다.
 func (s *Server) notifyApproval(x autoRun, what, mailTitle string) {
 	patch := x.NoticeID != ""
-	kind := map[bool]string{true: "패치 있음 → 고객에게 보안 권고를 보낼까요?", false: "패치 없음 → 개발자에게 수정 요청을 보낼까요?"}[patch]
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s %s 에서 %s(%s%s)가 발견되었습니다.\n%s\n\n", path.Base(x.Repo), x.Tag, x.VulnID, x.Severity, map[bool]string{true: " · KEV", false: ""}[x.KEV], kind)
-	fmt.Fprintf(&b, "- 구성요소: %s\n", x.Component)
-	if x.AIStatus != "" {
-		fmt.Fprintf(&b, "- AI 분석: %s — %s\n", vexStateKo(x.AIStatus), truncate(x.AISummary, 200))
+	c := s.approvalCard(x, mailTitle)
+	s.deliver(Notice{Kind: "approval-needed", Audience: "internal", Repo: x.Repo, Tag: x.Tag,
+		Title: fmt.Sprintf("[TrustLink] 결정 요청 — %s %s · %s · %s", path.Base(x.Repo), x.Tag, x.VulnID, map[bool]string{true: "고객 통지 승인", false: "개발자 수정 요청 승인"}[patch]),
+		Body:  c.plain, card: &c}, s.adminUsers(), nil)
+	_ = what
+}
+
+// approvalCard: 승인 요청 메일의 내용(틀에 담을 항목 + 화면 알림용 평문).
+func (s *Server) approvalCard(x autoRun, mailTitle string) mailCard {
+	patch := x.NoticeID != ""
+	prod := path.Base(x.Repo)
+	chips := []string{x.Severity}
+	if x.KEV {
+		chips = append(chips, "KEV")
 	}
+	sevKo := map[string]string{"CRITICAL": "치명적(CRITICAL)", "HIGH": "높음(HIGH)"}[x.Severity]
+	c := mailCard{Module: "자동 대응", Purpose: "결정 요청", Tone: "decide", Product: prod, Version: x.Tag, Ref: x.ID,
+		Reason: "관리자(admins) 그룹 — 고객·개발자에게 나가는 메일은 관리자 승인이 있어야 발송됩니다",
+		Action: "승인·반려 화면 열기", URL: s.publicBase() + "/admin/auto-response", Alt: "결정함에서 보기", AltURL: s.publicBase() + "/admin/inbox"}
+	c.Facts = []mailFact{{K: "취약점", V: x.VulnID, Chips: chips}, {K: "구성요소", V: x.Component}}
+	trig := map[string]string{"auto": "새 취약점 알림(Dependency-Track)", "sweep": "주기 검색", "manual": "수동 실행", "patch": "수정 버전 확인(이어 가기)"}[x.Trigger]
+	if trig != "" {
+		c.Facts = append(c.Facts, mailFact{K: "감지 경로", V: trig})
+	}
+	var b strings.Builder // 화면 알림용 평문
+	fmt.Fprintf(&b, "%s %s 에서 %s(%s)가 확인되었습니다.\n", prod, x.Tag, x.VulnID, strings.Join(chips, " · "))
 	if patch {
-		fmt.Fprintf(&b, "- 패치 버전: %s %s\n- 보낼 곳: %s (받는 사람 %d명 추천)\n", path.Base(x.Repo), x.FixTag, strings.Join(x.Customers, ", "), len(x.Recommended))
+		c.Title = "고객 보안 권고 발송 승인 요청"
+		c.Lead = fmt.Sprintf("%s %s 에서 %s 취약점이 확인되었습니다(%s). 수정 버전은 %s 입니다. 이 버전을 쓰는 고객 %d곳에 보낼 보안 권고 초안을 준비했으니, 발송 여부를 결정해 주십시오.",
+			prod, x.Tag, firstNonEmpty(sevKo, x.Severity), x.VulnID, x.FixTag, len(x.Customers))
+		c.Facts = append(c.Facts, mailFact{K: "수정 버전", V: prod + " " + x.FixTag},
+			mailFact{K: "통지 대상", V: fmt.Sprintf("%s\n받는 사람 %d명 추천", strings.Join(x.Customers, ", "), len(x.Recommended))})
 		if len(x.Waiting) > 0 {
-			fmt.Fprintf(&b, "- 아직 패치 없는 버전 사용 고객: %s\n", strings.Join(x.Waiting, ", "))
+			c.Facts = append(c.Facts, mailFact{K: "수정 버전 없음", V: strings.Join(x.Waiting, ", ") + " — 이 고객이 쓰는 버전은 아직 수정 버전이 없습니다"})
 		}
+		c.Steps = []string{"승인하면 고른 받는 사람에게 발송함을 거쳐 나갑니다. 대기 시간 동안 취소할 수 있습니다.", "반려하면 보내지 않고 사유를 기록합니다.", "모든 결정은 감사 원장에 남습니다."}
+		fmt.Fprintf(&b, "수정 버전 %s %s 있음 → 고객(%s)에게 보안 권고를 보낼지 결정해 주세요.\n", prod, x.FixTag, strings.Join(x.Customers, ", "))
 	} else {
 		names := []string{}
-		for _, c := range x.DevCands {
-			names = append(names, c.Username)
+		for _, d := range x.DevCands {
+			names = append(names, d.Username)
 		}
-		fmt.Fprintf(&b, "- 보낼 곳: 개발자 %s\n", strings.Join(names, ", "))
+		c.Title = "개발자 수정 요청 발송 승인 요청"
+		c.Lead = fmt.Sprintf("%s %s 에서 %s 취약점이 확인되었습니다(%s). 수정 버전은 아직 없습니다. 개발 담당자에게 보낼 수정 요청 초안을 준비했으니, 발송 여부를 결정해 주십시오.",
+			prod, x.Tag, firstNonEmpty(sevKo, x.Severity), x.VulnID)
+		c.Facts = append(c.Facts, mailFact{K: "수정 버전", V: "없음"}, mailFact{K: "요청 대상", V: "개발자 " + strings.Join(names, ", ")})
 		if len(x.Customers) > 0 {
-			fmt.Fprintf(&b, "- 이 버전을 쓰는 고객: %s (패치가 나오면 고객 통지로 이어짐)\n", strings.Join(x.Customers, ", "))
+			c.Facts = append(c.Facts, mailFact{K: "사용 고객", V: strings.Join(x.Customers, ", ") + " — 수정 버전이 올라오면 고객 통지로 이어집니다"})
 		}
+		c.Steps = []string{"승인하면 고른 개발자에게 발송함을 거쳐 나갑니다. 대기 시간 동안 취소할 수 있습니다.", "반려하면 보내지 않고 사유를 기록합니다.", "수정 버전이 올라오면 TrustLink 가 고객 통지 승인 요청으로 이어 갑니다."}
+		fmt.Fprintf(&b, "수정 버전 없음 → 개발자(%s)에게 수정 요청을 보낼지 결정해 주세요.\n", strings.Join(names, ", "))
 	}
-	fmt.Fprintf(&b, "- 메일 제목(초안): %s\n\n", mailTitle)
-	b.WriteString("선택: 승인하면 고른 받는 사람에게 발송함을 거쳐 나갑니다(대기 시간 동안 취소 가능). 반려하면 보내지 않고 사유를 남깁니다.\n")
-	fmt.Fprintf(&b, "선택 화면: %s/admin/auto-response (대시보드에도 '승인 대기'로 표시)\n", s.publicBase())
-	s.deliver(Notice{Kind: "approval-needed", Audience: "internal", Repo: x.Repo, Tag: x.Tag,
-		Title: fmt.Sprintf("[TrustLink] 선택 필요 — %s %s · %s · %s", path.Base(x.Repo), x.Tag, x.VulnID, map[bool]string{true: "고객 통지 여부", false: "개발자 수정 요청 여부"}[patch]),
-		Body:  b.String()}, s.adminUsers(), nil)
-	_ = what
+	c.Facts = append(c.Facts, mailFact{K: "메일 제목(초안)", V: mailTitle})
+	if x.AIStatus != "" {
+		c.AI = &mailAI{Label: "AI 분석 — " + vexStateKo(x.AIStatus), Text: truncate(x.AISummary, 500), Model: x.AIModel}
+		fmt.Fprintf(&b, "AI 분석(AI 생성): %s — %s\n", vexStateKo(x.AIStatus), truncate(x.AISummary, 200))
+	}
+	fmt.Fprintf(&b, "선택 화면: %s/admin/auto-response\n", s.publicBase())
+	c.plain = b.String()
+	return c
 }
 
 // adminUsers: admins 그룹(활성) — 승인 요청 알림 대상.
@@ -701,7 +732,11 @@ func (s *Server) approveDevRequest(w http.ResponseWriter, cur autoRun, keys []st
 	var ids []string
 	allowed, _ := s.mail.filter(emails)
 	if s.mail.Configured() && len(allowed) > 0 {
-		it := s.enqueueMail("devreq", path.Base(cur.Repo)+" "+cur.Tag+" 수정 요청", cur.ID, actor, emails, cur.DevSubject, mailContent{Text: cur.DevBody}, delay, nil)
+		it := s.enqueueMail("devreq", path.Base(cur.Repo)+" "+cur.Tag+" 수정 요청", cur.ID, actor, emails, cur.DevSubject, s.renderMail(mailCard{Module: "자동 대응", Purpose: "수정 요청", Tone: "alert",
+			Title: strings.TrimSpace(strings.TrimPrefix(cur.DevSubject, "[TrustLink]")), Product: path.Base(cur.Repo), Version: cur.Tag, Ref: cur.ID,
+			Facts: []mailFact{{K: "취약점", V: cur.VulnID, Chips: []string{cur.Severity}}, {K: "구성요소", V: cur.Component}},
+			Body:  cur.DevBody, Action: "아티팩트 열기", URL: s.artifactURL(cur.Repo, cur.Tag),
+			Reason: "이 제품의 개발 담당 — 관리자 " + actor + " 승인"}), delay, nil)
 		ids = append(ids, it.ID)
 	}
 	msg := fmt.Sprintf("화면 알림 %d명", len(users))

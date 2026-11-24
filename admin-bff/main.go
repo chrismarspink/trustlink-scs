@@ -326,6 +326,9 @@ func main() {
 	mux.HandleFunc("POST /api/auto-response/{id}/reject", s.guard(s.apiAutoResponseDecide))  // 반려
 	mux.HandleFunc("GET /api/mail/templates", s.guard(s.apiMailTemplates))                   // 현황 메일 템플릿(기본 + 관리자 작성)
 	mux.HandleFunc("PUT /api/mail/templates", s.guard(s.apiMailTemplatesPut))                // 관리자 작성 템플릿 저장
+	mux.HandleFunc("PUT /api/mail/logo", s.guard(s.apiMailLogoPut))                          // 메일 맨 위 회사 로고(서버 데이터에만)
+	mux.HandleFunc("DELETE /api/mail/logo", s.guard(s.apiMailLogoDelete))
+	mux.HandleFunc("GET /api/mail/layout-preview", s.guard(s.apiMailLayoutPreview))         // 메일 틀 미리보기
 	mux.HandleFunc("GET /api/mail/outbox", s.guard(s.apiMailOutbox))                         // 발송함(기다리는 메일·최근 기록)
 	mux.HandleFunc("DELETE /api/mail/outbox/{id}", s.guard(s.apiMailOutboxCancel))           // 보내기 취소(기다리는 동안만)
 	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF))              // 규제 보고서 PDF(Gotenberg)
