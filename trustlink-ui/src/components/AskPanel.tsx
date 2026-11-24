@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircleQuestion, X, Send, Sparkles, ArrowRight } from 'lucide-react';
-import { ask, askSummary, getSession, type AskAnswer } from '@/lib/api';
+import { ask, askAction, askSummary, getSession, type AskAnswer } from '@/lib/api';
+import { A2UISurface, applyA2UI, type A2Action, type A2Surface } from '@/components/A2UISurface';
+import { HelpScene } from '@/components/HelpScene';
 import { AIBadge } from '@/components/AIBadge';
 import { cn } from '@/lib/utils';
 
 // 묻고 찾기: 로그인한 누구나 문장으로 묻고, 자기 권한 안의 기록에서 답을 받는다.
 // 답은 규칙으로 바로 나오고(조회 + 틀), AI 정리는 원할 때만 누른다(로컬 AI 는 20~30초).
-type Turn = { q: string; a?: AskAnswer; err?: string; ai?: { answer: string; model: string; ms: number }; aiBusy?: boolean; aiErr?: string };
+type Turn = {
+  q: string; a?: AskAnswer; err?: string; ai?: { answer: string; model: string; ms: number }; aiBusy?: boolean; aiErr?: string;
+  ui?: A2Surface; acting?: boolean; actErr?: string; // 행동 양식(A2UI)과 그 처리 상태
+};
 
 const TONE: Record<string, string> = { crit: 'border-l-red-400', warn: 'border-l-amber-400', ok: 'border-l-emerald-400' };
 const DEFAULTS = ['내 할 일은?', 'CVE-2026-123634 가 어디에 걸리나?', 'nginx 를 쓰는 제품은?'];
+const last = <T,>(xs: T[], f: (x: T) => T) => xs.map((x, i) => (i === xs.length - 1 ? f(x) : x));
 const clean = (e: unknown) => String(e).replace(/^(Api)?Error:\s*(\d{3}\s*)?/, '');
 
 export function AskPanel() {
@@ -21,8 +27,7 @@ export function AskPanel() {
   const [busy, setBusy] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { getSession().then((s) => setOn(!!s?.username)).catch(() => setOn(false)); }, []);
-  useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [turns, open]);
-  if (!on) return null;
+  useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [turns.length, open]);
 
   const send = async (text: string) => {
     const t = text.trim();
@@ -31,11 +36,30 @@ export function AskPanel() {
     setTurns((xs) => [...xs, { q: t }]);
     try {
       const a = await ask(t);
-      setTurns((xs) => xs.map((x, i) => (i === xs.length - 1 ? { ...x, a } : x)));
+      setTurns((xs) => last(xs, (x) => ({ ...x, a, ui: a.ui ? applyA2UI(undefined, a.ui) : undefined })));
     } catch (e) {
-      setTurns((xs) => xs.map((x, i) => (i === xs.length - 1 ? { ...x, err: clean(e) } : x)));
+      setTurns((xs) => last(xs, (x) => ({ ...x, err: clean(e) })));
     }
     setBusy(false);
+  };
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => { // 다른 화면의 단추(askOpen)로 열기
+    const h = (e: Event) => { setOpen(true); const q0 = (e as CustomEvent<{ q?: string }>).detail?.q; if (q0) sendRef.current(q0); };
+    window.addEventListener('tl-ask', h);
+    return () => window.removeEventListener('tl-ask', h);
+  }, []);
+  if (!on) return null;
+  const setData = (k: number, path: string, value: unknown) =>
+    setTurns((xs) => xs.map((x, i) => (i === k && x.ui ? { ...x, ui: applyA2UI(x.ui, [{ updateDataModel: { surfaceId: x.ui.id, path, value } }]) } : x)));
+  const act = async (k: number, action: A2Action) => {
+    setTurns((xs) => xs.map((x, i) => (i === k ? { ...x, acting: true, actErr: '' } : x)));
+    try {
+      const r = await askAction(action);
+      setTurns((xs) => xs.map((x, i) => (i === k ? { ...x, acting: false, ui: applyA2UI(x.ui, r.ui), a: x.a && r.lead ? { ...x.a, lead: r.lead } : x.a } : x)));
+    } catch (e) {
+      setTurns((xs) => xs.map((x, i) => (i === k ? { ...x, acting: false, actErr: clean(e) } : x)));
+    }
   };
   const summarize = async (k: number) => {
     const id = turns[k]?.a?.id;
@@ -64,15 +88,16 @@ export function AskPanel() {
             <MessageCircleQuestion size={17} className="text-primary" />
             <div className="flex-1 leading-tight">
               <div className="text-sm font-semibold">묻고 찾기</div>
-              <div className="text-[11px] text-muted-foreground">내 권한 안의 기록에서 찾아 답합니다</div>
+              <div className="text-[11px] text-muted-foreground">내 권한 안의 기록에서 찾고, 시킨 일은 양식으로 확인받습니다</div>
             </div>
+            <HelpScene topic="ask" title="묻고 찾기는 이렇게 동작합니다" />
             <button onClick={() => setOpen(false)} aria-label="닫기" className="rounded p-1 text-muted-foreground hover:bg-secondary"><X size={16} /></button>
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
             {turns.length === 0 && (
               <p className="text-xs leading-relaxed text-muted-foreground">
-                취약점 번호(CVE-…), 구성요소 이름, 할 일, 내 제품에 대해 물어보세요. 답은 기록에서 바로 찾아 드리고, 출처를 함께 보여 줍니다.
+                취약점 번호(CVE-…), 구성요소 이름, 할 일, 내 제품에 대해 물어보세요. "CVE-… 고객 통지 초안 만들어 줘", "CVE-… VEX 판정 초안", "미국 수출 규제 보고서 만들어 줘"처럼 일을 시킬 수도 있습니다. 보내거나 저장하는 일은 양식에서 확인하고 단추를 눌러야 실행됩니다.
               </p>
             )}
             {turns.map((t, k) => (
@@ -99,6 +124,13 @@ export function AskPanel() {
                       </ul>
                     )}
                     {!!t.a.more && <div className="text-xs text-muted-foreground">외 {t.a.more}건 — 해당 화면에서 전체를 볼 수 있습니다.</div>}
+                    {t.ui && (
+                      <div className="rounded-lg border border-primary/30 bg-primary/[0.03] p-3">
+                        <A2UISurface surface={t.ui} busy={t.acting} onData={(path, value) => setData(k, path, value)} onAction={(a) => act(k, a)} />
+                        {t.acting && <div className="mt-2 text-xs text-muted-foreground">처리하는 중…</div>}
+                        {t.actErr && <div className="mt-2 text-xs text-red-600">{t.actErr}</div>}
+                      </div>
+                    )}
                     {t.ai && (
                       <div className="rounded-md border border-violet-200 bg-violet-50/60 p-2 text-[13px] leading-relaxed">
                         <div className="mb-1 flex items-center gap-1.5"><AIBadge label="AI 생성" /><span className="text-[11px] text-muted-foreground">{t.ai.model} · {(t.ai.ms / 1000).toFixed(0)}초</span></div>

@@ -120,19 +120,8 @@ func (s *Server) apiVexAnalysis(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "project, component, vulnerability uuid 필수"})
 		return
 	}
-	payload := map[string]any{
-		"project":               in.Project,
-		"component":             in.Component,
-		"vulnerability":         in.Vulnerability,
-		"analysisState":         mapOr(vexStatusToDT, in.Status, "IN_TRIAGE"),
-		"analysisJustification": mapOr(vexJustToDT, in.Justification, "NOT_SET"),
-		"analysisDetails":       in.Details,
-		"comment":               in.Comment,
-		"suppressed":            in.Suppressed,
-	}
-	if dt := mapOr(vexResponseToDT, in.Response, ""); dt != "" {
-		payload["analysisResponse"] = dt
-	}
+	payload := vexPayload(in.Project, in.Component, in.Vulnerability, in.Status, in.Justification, in.Response, in.Details, in.Comment)
+	payload["suppressed"] = in.Suppressed
 	code, body, err := s.dtPutAnalysis(payload)
 	if err != nil {
 		writeJSON(w, 502, map[string]string{"error": err.Error()})
@@ -167,4 +156,27 @@ func (s *Server) apiVexExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=vex.cdx.json")
 	w.Write(data)
+}
+
+// vexPayload: CycloneDX 어휘의 판정을 분석 엔진(DT) 기록 형식으로.
+func vexPayload(project, component, vulnerability, status, justification, response, details, comment string) map[string]any {
+	p := map[string]any{
+		"project":               project,
+		"component":             component,
+		"vulnerability":         vulnerability,
+		"analysisState":         mapOr(vexStatusToDT, status, "IN_TRIAGE"),
+		"analysisJustification": mapOr(vexJustToDT, justification, "NOT_SET"),
+		"analysisDetails":       details,
+		"comment":               comment,
+		"suppressed":            false,
+	}
+	if dt := mapOr(vexResponseToDT, response, ""); dt != "" {
+		p["analysisResponse"] = dt
+	}
+	return p
+}
+
+// vexRecord: 판정을 기록한다(화면의 저장과 "묻고 찾기"의 저장이 같이 쓴다).
+func (s *Server) vexRecord(project, component, vulnerability, status, justification, response, details, comment string) (int, []byte, error) {
+	return s.dtPutAnalysis(vexPayload(project, component, vulnerability, status, justification, response, details, comment))
 }

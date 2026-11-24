@@ -17,6 +17,8 @@ import (
 //	CVE-2026-0002(LOW): 1.0 — 통지 수준(high) 미달
 //	CVE-2026-0003: 1.1 에서 NOT_AFFECTED — 영향 없음 확인서
 //	CVE-2026-0004(CRITICAL): 모든 태그 — 패치 버전 없음
+var custFakeAnalysis map[string]any // 가짜 분석 엔진이 마지막으로 받은 판정
+
 func custFakeDT(t *testing.T) *httptest.Server {
 	finding := func(id, sev, state, ver string) map[string]any {
 		return map[string]any{
@@ -47,6 +49,12 @@ func custFakeDT(t *testing.T) *httptest.Server {
 	mux.HandleFunc("GET /api/v1/component/project/{id}", func(w http.ResponseWriter, r *http.Request) {
 		v := comps[strings.TrimPrefix(r.PathValue("id"), "u-")]
 		json.NewEncoder(w).Encode([]map[string]any{{"name": "lib-a", "version": v, "purl": "pkg:maven/x/lib-a@" + v}, {"name": "other", "version": "1"}})
+	})
+	mux.HandleFunc("PUT /api/v1/analysis", func(w http.ResponseWriter, r *http.Request) { // 판정 기록(묻고 찾기의 VEX 저장)
+		var p map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&p)
+		custFakeAnalysis = p
+		w.Write([]byte(`{}`))
 	})
 	mux.HandleFunc("GET /api/v1/component/identity", func(w http.ResponseWriter, r *http.Request) { // 구성요소 검색(묻고 찾기)
 		out := []map[string]any{}

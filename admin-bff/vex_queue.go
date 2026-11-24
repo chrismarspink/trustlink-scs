@@ -45,6 +45,7 @@ var vexQueueCache struct {
 // vulnHit: 어느 제품·버전의 어느 구성요소에 그 취약점이 있는가.
 type vulnHit struct {
 	Repo, Tag, Component, Severity, State string
+	Project                               string // 분석 엔진의 프로젝트 UUID
 }
 
 // vexQueueRows: 전 제품 집계(1분 캐시). 권한 필터는 호출 쪽에서.
@@ -86,7 +87,7 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 			}
 			id := strings.ToUpper(f.Vulnerability.VulnID)
 			idx[id] = append(idx[id], vulnHit{Repo: repo, Tag: tag, Component: strings.TrimSpace(f.Component.Name + " " + f.Component.Version),
-				Severity: strings.ToUpper(f.Vulnerability.Severity), State: f.Analysis.State})
+				Severity: strings.ToUpper(f.Vulnerability.Severity), State: f.Analysis.State, Project: uuid})
 			row.Total++
 			if !pendingState(f.Analysis.State) {
 				row.Analyzed++

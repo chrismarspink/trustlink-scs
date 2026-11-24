@@ -318,6 +318,7 @@ func main() {
 	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                      // 본문 미리보기
 	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                      // 받는 사람·항목·첨부 추천(규칙 + AI)
 	mux.HandleFunc("POST /api/ask", s.guardSession(s.apiAsk))                                // 묻고 찾기(로그인한 누구나, 자기 권한 안에서)
+	mux.HandleFunc("POST /api/ask/action", s.guardSession(s.apiAskAction))                   // 양식의 단추(A2UI action) — 권한은 행동마다 다시 확인
 	mux.HandleFunc("POST /api/ask/{id}/summary", s.guardSession(s.apiAskSummary))            // 그 답의 AI 한 줄 정리
 	mux.HandleFunc("GET /api/inbox", s.guard(s.apiInbox))                                    // 승인 대기함: 사람이 결정할 일 모음
 	mux.HandleFunc("GET /api/auto-response", s.guard(s.apiAutoResponse))                     // 자동 대응 기록·설정

@@ -1,3 +1,4 @@
+import { AskChip } from '@/components/AskChip';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Workflow, ShieldQuestion, Landmark, CalendarClock, Send, ArrowRight, Inbox as InboxIcon } from 'lucide-react';
@@ -28,7 +29,7 @@ export default function Inbox() {
   }, []);
   return (
     <>
-      <PageHeader title="승인 대기함" description="TrustLink 는 신호를 모으고, 영향을 계산하고, 초안을 쓰고, 보내고, 기록합니다. 사람이 할 일은 여기서 결정하는 것뿐입니다." />
+      <PageHeader title="승인 대기함" actions={<AskChip q="오늘 승인할 것?" label="묻고 찾기로 요약" />} description="TrustLink 는 신호를 모으고, 영향을 계산하고, 초안을 쓰고, 보내고, 기록합니다. 사람이 할 일은 여기서 결정하는 것뿐입니다." />
       {err && <Alert tone="crit">{err}</Alert>}
       {!d ? <Loading /> : (
         <>

@@ -42,9 +42,14 @@ type askAnswer struct {
 	More    int      `json:"more,omitempty"` // 줄이느라 보여 주지 않은 건수
 	Sources []string `json:"sources"`        // 답의 출처(어느 기록에서 찾았나)
 	Suggest []string `json:"suggest,omitempty"`
-	CanAI   bool     `json:"canAI"` // AI 한 줄 정리를 요청할 수 있는가
+	CanAI   bool     `json:"canAI"`        // AI 한 줄 정리를 요청할 수 있는가
+	UI      []a2     `json:"ui,omitempty"` // 행동 양식(A2UI v0.9.1 메시지) — ask_action.go
 	facts   []aiFact
 	q, user string
+	pending *askPending
+	notice  *CustNotice
+	vex     *vexDraftResult
+	report  map[string][]string // 규제 보고서 양식의 처음 값
 }
 
 const askMaxRows = 12
@@ -89,7 +94,7 @@ func artifactLink(repo, tag string) string {
 func askExamples(sess Session, isCustomer bool) []string {
 	switch {
 	case contains(sess.Groups, "admins"):
-		return []string{"오늘 승인할 것?", "CVE-2026-123634 가 어디에 걸리나?", "nginx 를 쓰는 제품은?"}
+		return []string{"오늘 승인할 것?", "CVE-2026-123634 가 어디에 걸리나?", "미국 수출 규제 보고서 만들어 줘"}
 	case isCustomer:
 		return []string{"내가 조치할 게 있나?", "CVE-2026-123634 가 내 제품에 있나?"}
 	}
@@ -110,6 +115,18 @@ func (s *Server) apiAsk(w http.ResponseWriter, r *http.Request) {
 	a.q, a.user = in.Q, sess.Username
 	a.CanAI = len(a.facts) > 0 && aiEnabledFor("vex")
 	askKeep(a)
+	if a.pending != nil && a.UI == nil { // 양식은 답의 ID(= A2UI surfaceId)가 정해진 뒤에 만든다
+		switch a.pending.Kind {
+		case "notice":
+			a.UI = s.noticeForm(a, true)
+		case "vexpick":
+			a.UI = vexPickForm(a)
+		case "vex":
+			a.UI = vexForm(a, true)
+		case "report":
+			a.UI = reportForm(a)
+		}
+	}
 	if s.sor != nil {
 		_ = s.sor.append(SoREvent{Actor: sess.Username, Action: "ask", Status: a.Intent, Subject: a.ID,
 			Detail: map[string]any{"q": truncate(in.Q, 200), "rows": len(a.Rows) + a.More}})
@@ -122,6 +139,13 @@ func (s *Server) askAnswer(sess Session, q string) *askAnswer {
 	mine := s.myProducts(sess)
 	isCustomer := len(mine) > 0 && !contains(sess.Groups, "admins")
 	var a *askAnswer
+	if a = s.askAction(sess, q); a != nil { // 행동 요청(통지 초안·VEX 판정·규제 보고서)이면 양식을 붙여 답한다
+		if a.Rows == nil {
+			a.Rows = []askRow{}
+		}
+		a.Suggest = askExamples(sess, isCustomer)
+		return a
+	}
 	switch {
 	case askVulnRe.MatchString(q):
 		a = s.askVuln(sess, strings.ToUpper(askVulnRe.FindString(q)), mine, isCustomer)
@@ -142,6 +166,16 @@ func (s *Server) askAnswer(sess Session, q string) *askAnswer {
 		a.Rows = []askRow{}
 	}
 	a.Suggest = askExamples(sess, isCustomer)
+	if id := strings.ToUpper(askVulnRe.FindString(q)); a.Intent == "vuln" && len(a.Rows) > 0 && !isCustomer { // 찾은 취약점으로 이어서 할 일
+		next := []string{}
+		if canEditVex(sess) {
+			next = append(next, id+" VEX 판정 초안")
+		}
+		if contains(sess.Groups, "admins") {
+			next = append(next, id+" 고객 통지 초안 만들어 줘")
+		}
+		a.Suggest = append(next, a.Suggest...)
+	}
 	return a
 }
 

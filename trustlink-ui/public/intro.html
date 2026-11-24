@@ -494,12 +494,70 @@ const HELP_VEX = [
 },
 ];
 
-const HELP = { vex: [{ name: 'VEX 판단은 이렇게 동작합니다', scenes: HELP_VEX }] };
+// ── 묻고 찾기(묻고 맡기기) — 소개 탭과 도움말(?help=ask)에서 같이 쓴다 ──────────────
+const form = (x, y, w, title, lines, btn, d = 0) => `<g class="pop" style="animation-delay:${d}s"><rect x="${x}" y="${y}" width="${w}" height="${40 + lines.length * 20 + 30}" rx="9" fill="#fff" stroke="var(--tl)" stroke-width="2.2"/>
+  <text x="${x + 12}" y="${y + 20}" font-size="12" font-weight="800" fill="var(--ink)">${title}</text>
+  ${lines.map((l, i) => `<g><rect x="${x + 12}" y="${y + 31 + i * 20}" width="11" height="11" rx="2.5" fill="${l[1] ? 'var(--tl)' : '#fff'}" stroke="var(--tl)" stroke-width="1.4"/>${l[1] ? `<path d="M${x + 14.5} ${y + 37 + i * 20} l2.4 2.6 l4 -5" stroke="#fff" stroke-width="1.6" fill="none"/>` : ''}<text x="${x + 30}" y="${y + 41 + i * 20}" font-size="11" fill="#334155">${l[0]}</text></g>`).join('')}
+  <rect x="${x + 12}" y="${y + 38 + lines.length * 20}" width="${btn.length * 11 + 22}" height="22" rx="6" fill="var(--tl)"/><text x="${x + 12 + (btn.length * 11 + 22) / 2}" y="${y + 53 + lines.length * 20}" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${btn}</text></g>`;
+const ASK = [
+{
+  tab: '묻는다', kicker: '묻고 찾기 · 1', title: '문장으로 물으면, 기록에서 찾아 답합니다',
+  text: '취약점 번호를 물으면 어느 제품·버전에 있는지, 관리자에게는 그 버전을 쓰는 고객까지 한 번에 답합니다. 화면 세 개를 넘나들던 일이 한 문장이 됩니다.',
+  list: ['<b>취약점 번호</b> → 제품·버전·판단 상태·영향 고객', '<b>구성요소 이름</b> → 그것이 든 제품', '<b>할 일</b> → 승인 대기, 판단 대기, 내 제품', '답은 규칙으로 바로 — <b>출처</b>를 함께 보여 줍니다'],
+  svg: () => G +
+    fig(90, 300, 'var(--dev)', '관리자', 'point') +
+    bub(30, 96, 220, ['CVE-2026-123634 가', '어디에 걸리나?'], [100, 210], 'pop', .3) +
+    arrow(250, 180, 300, 180, 1.3) + TL(335, 180, 1) + arrow(370, 180, 410, 180, 1.9) +
+    card3(418, 92, 190, '제품 1개 · 버전 2개', ['제품 11.0 — 판단 대기', '제품 12.0 — 판단 대기'], 'var(--tl)', 2.3) +
+    card3(418, 176, 190, '영향 고객 3곳', ['이 버전을 설치한 고객'], 'var(--cus)', 2.9) +
+    tag(418, 240, '0.3초 · 출처 표시', 'var(--reg)', 3.5)
+},
+{
+  tab: '시킨다', kicker: '묻고 찾기 · 2', title: '일을 시키면, 초안과 양식을 만들어 옵니다',
+  text: '"고객 통지 초안 만들어 줘"라고 하면 영향 고객과 권장 버전을 찾아 메일 초안을 만들고, 받는 고객과 대기 시간을 고르는 양식을 대화 안에 띄웁니다.',
+  list: ['<b>고객 통지</b> — 영향 고객·권장 버전·메일 초안', '<b>VEX 판정</b> — 규칙 초안을 확인하고 고쳐서 저장', '<b>규제 보고서</b> — 지역·독자·제품을 골라 만들고 내려받기', '양식은 <b>A2UI</b> 규격 — 서버는 부품 목록만 보냅니다'],
+  svg: () => G +
+    fig(80, 300, 'var(--dev)', '관리자', 'point') +
+    bub(24, 110, 200, ['이 취약점 고객 통지', '초안 만들어 줘'], [92, 212], 'pop', .3) +
+    arrow(232, 180, 270, 180, 1.3) + TL(304, 180, 1) + arrow(338, 180, 372, 180, 1.9) +
+    form(380, 84, 232, '고객 보안 권고 — 초안', [['고객 A — 권장 12.0.1', 1], ['고객 B — 권장 11.1', 1], ['고객 C — 권장 11.1', 1], ['보내기 전 대기 30초', 0]], '승인하고 발송함으로', 2.3)
+},
+{
+  tab: '사람이 누른다', kicker: '묻고 찾기 · 3', title: '보내고 저장하는 것은 사람이 눌러야 합니다',
+  text: '"고객에게 보내"라고 적어도 바로 나가지 않습니다. 양식에서 받는 사람을 확인하고 단추를 눌러야 발송함으로 가고, 거기서도 잠깐은 취소할 수 있습니다.',
+  list: ['말로는 <b>초안까지</b>, 실행은 <b>단추</b>로', '고객 메일은 발송함을 거쳐 — 대기 중 <b>취소</b> 가능', '권한은 질문한 사람의 것 — 고객은 자기 제품만', '누가 무엇을 시켰는지 <b>감사 원장</b>에 기록'],
+  svg: () => G +
+    form(36, 96, 200, '고객 보안 권고 — 초안', [['고객 A', 1], ['고객 B', 1]], '승인하고 발송함으로', .2) +
+    `<g>${fig(262, 300, 'var(--dev)', '관리자', 'point', { flip: true })}</g>` +
+    `<g class="pop" style="animation-delay:1.4s"><rect x="42" y="170" width="146" height="30" rx="10" fill="none" stroke="var(--bad)" stroke-width="2.5"/><text x="115" y="218" font-size="10.5" text-anchor="middle" fill="var(--bad)" font-weight="700">눌러야 실행</text></g>` +
+    arrow(310, 150, 352, 150, 2.1) +
+    card3(360, 118, 120, '발송함', ['30초 대기', '취소 가능'], 'var(--tl)', 2.5) +
+    arrow(484, 150, 522, 150, 3.3, 'var(--cus)') + `<g class="pop" style="animation-delay:3.6s">${env(530, 140, 'var(--cus)')}</g>` +
+    fig(590, 300, 'var(--cus)', '고객', 'stand', { flip: true }) +
+    arrow(420, 200, 420, 222, 4, '#94a3b8') + `<g class="pop" style="animation-delay:4.2s">${doc(404, 228, '#475569')}<text x="420" y="288" class="sm">감사 원장</text></g>`
+},
+{
+  tab: '보고서', kicker: '묻고 찾기 · 4', title: '"미국 수출 규제 보고서 만들어 줘"',
+  text: '지역·읽는 사람·제품·언어를 양식에서 확인하고 단추를 누르면, 규제 카탈로그와 그 제품의 증빙으로 보고서를 만들어 내려받기 단추를 돌려줍니다.',
+  list: ['말에서 <b>지역</b>(미국)과 <b>용도</b>(수출)를 읽어 양식을 미리 채움', '제품을 고르면 그 버전의 <b>SBOM·VEX 증빙 점검</b> 포함', '만든 보고서는 <b>보고서함</b>에 판 번호와 함께 보관', '법률 자문이 아닌 참고 자료임을 함께 표시'],
+  svg: () => G +
+    fig(80, 300, 'var(--dev)', '관리자', 'point') +
+    bub(24, 110, 196, ['이 제품 미국 수출 규제', '보고서 만들어 줘'], [92, 212], 'pop', .3) +
+    arrow(226, 180, 256, 180, 1.2) +
+    form(262, 92, 176, '규제 보고서 만들기', [['지역: 미국', 1], ['읽는 사람: 영업', 1], ['제품: 최신 버전', 1]], '보고서 만들기', 1.6) +
+    arrow(444, 180, 478, 180, 3) +
+    `<g class="pop" style="animation-delay:3.4s">${doc(500, 128, 'var(--tl)')}<text x="516" y="186" class="sm">PDF</text></g>` +
+    `<g class="pop" style="animation-delay:4s"><rect x="470" y="204" width="96" height="24" rx="7" fill="var(--tl)"/><text x="518" y="220" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">PDF 내려받기</text></g>`
+},
+];
+
+const HELP = { vex: [{ name: 'VEX 판단은 이렇게 동작합니다', scenes: HELP_VEX }], ask: [{ name: '묻고 찾기는 이렇게 동작합니다', scenes: ASK }] };
 const STORIES = HELP[new URLSearchParams(location.search).get('help')] || [
   { name: 'TrustLink 란', scenes: LEDGER },
   { name: '공급망 보안 흐름', scenes: FLOW },
   { name: '출시된 구버전도 계속 검증', scenes: LEGACY },
   { name: '고객 관리', scenes: CUSTOMER },
+  { name: '묻고 맡기기', scenes: ASK },
 ];
 
 // ── 재생 ───────────────────────────────────────────────────────────────────

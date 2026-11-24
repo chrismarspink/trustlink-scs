@@ -1,3 +1,4 @@
+import { AskChip } from '@/components/AskChip';
 import { useEffect, useMemo, useState } from 'react';
 import { Busy, DownloadLink } from '@/components/Progress';
 import { Link } from 'react-router-dom';
@@ -307,7 +308,7 @@ export default function Reports() {
     <>
       <PageHeader title="보고서함"
         description="발행한 문서를 한곳에 모읍니다 — 규제 대응 보고서(한글·영문, 판별)와 체크리스트 점검 보고서. 실시간 현황은 대시보드, 규제 관리는 규제 카탈로그에서 합니다."
-        actions={<Button size="sm" variant="outline" onClick={() => setN(n + 1)}><RefreshCw size={14} /> 새로고침</Button>} />
+        actions={<><AskChip q="미국 수출 규제 보고서 만들어 줘" label="묻고 찾기로 만들기" /><Button size="sm" variant="outline" onClick={() => setN(n + 1)}><RefreshCw size={14} /> 새로고침</Button></>} />
       <div className="mb-4 flex gap-1 border-b">
         {([['library', '발행 문서함', Archive], ['new', '새 보고서', FilePlus2]] as const).map(([k, l, I]) => (
           <button key={k} onClick={() => setTab(k)} className={cn('-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm', tab === k ? 'border-primary font-medium' : 'border-transparent text-muted-foreground hover:text-foreground')}>

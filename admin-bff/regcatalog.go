@@ -1004,6 +1004,17 @@ func (s *Server) apiRegReport(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "제품을 고르면 버전도 필요합니다"})
 		return
 	}
+	user := w.Header().Get("X-User")
+	rep, err := s.makeRegReport(in.Audience, in.Regions, in.Repo, in.Tag, user, in.Lang, in.AI)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, rep)
+}
+
+// makeRegReport: 규제 보고서를 만들어 저장한다(화면과 "묻고 찾기"가 같이 쓴다). ai 면 요약을 뒤에서 채운다.
+func (s *Server) makeRegReport(audience string, regions []string, repo, tag, user, lang string, ai bool) (*regReport, error) {
 	regMu.Lock()
 	c, err := loadCatalog()
 	var cc regCatalog
@@ -1013,35 +1024,36 @@ func (s *Server) apiRegReport(w http.ResponseWriter, r *http.Request) {
 	}
 	regMu.Unlock()
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": err.Error()})
-		return
+		return nil, err
 	}
-	user := w.Header().Get("X-User")
 	regReportMu.Lock() // 판 번호·보고서 ID 가 겹치지 않게(한글·영문을 연달아 요청하는 경우)
-	rep := s.buildRegReport(&cc, in.Audience, in.Regions, in.Repo, in.Tag, user, in.Lang)
+	rep := s.buildRegReport(&cc, audience, regions, repo, tag, user, lang)
 	path := filepath.Join(regDir(), "reports", rep.ID+".json")
 	for i := 2; fileExists(path); i++ {
 		rep.ID = "rr-" + time.Now().UTC().Format("20060102-150405") + "-" + itoa(i)
 		path = filepath.Join(regDir(), "reports", rep.ID+".json")
 	}
 	rep.State = "done"
-	useAI := in.AI && aiEnabledFor("report")
+	useAI := ai && aiEnabledFor("report")
 	if useAI {
 		rep.State = "running"
 	}
 	_ = os.MkdirAll(filepath.Join(regDir(), "reports"), 0o750)
 	_ = writeJSONFile(path, rep)
 	regReportMu.Unlock()
-	_ = s.sor.append(SoREvent{Actor: user, Action: "reg-report", Status: in.Audience, Repo: in.Repo, Tag: in.Tag,
-		Detail: map[string]any{"id": rep.ID, "docNo": rep.DocNo, "lang": rep.Lang, "edition": rep.Edition, "regions": in.Regions, "catalogVersion": cc.Version, "ai": useAI}})
-	writeJSON(w, 200, rep)
-	if useAI { // AI 요약은 수 초~수 분 — 뒤에서 채우고 화면은 다시 읽는다
+	if s.sor != nil {
+		_ = s.sor.append(SoREvent{Actor: user, Action: "reg-report", Status: audience, Repo: repo, Tag: tag,
+			Detail: map[string]any{"id": rep.ID, "docNo": rep.DocNo, "lang": rep.Lang, "edition": rep.Edition, "regions": regions, "catalogVersion": cc.Version, "ai": useAI}})
+	}
+	out := *rep // 호출한 쪽에는 지금 상태의 사본을(뒤에서 AI 가 rep 를 고친다)
+	if useAI {  // AI 요약은 수 초~수 분 — 뒤에서 채우고 화면은 다시 읽는다
 		go func() {
 			s.regReportAI(rep)
 			rep.State = "done"
 			_ = writeJSONFile(path, rep)
 		}()
 	}
+	return &out, nil
 }
 
 var regReportMu sync.Mutex
