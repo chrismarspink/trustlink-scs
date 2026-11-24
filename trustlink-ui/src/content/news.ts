@@ -30,6 +30,10 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.24.2', date: '2026-11-24', title: '결정함 정리',
+    items: [{ kind: '개선', text: '결정함의 자동 대응 묶음도 8건만 보이고 나머지는 "외 N건"으로' }],
+  },
+  {
     version: '2.24.1', date: '2026-11-24', title: '빌드 수정',
     items: [{ kind: '수정', text: '2.24.0 서버 빌드 실패(발송함 종류 타입) 수정 — 2.24.0 내용이 이 버전으로 배포됨' }],
   },

@@ -58,9 +58,11 @@ func (s *Server) apiInbox(w http.ResponseWriter, r *http.Request) {
 				it.Detail += " · 사용 고객 " + joinMax(x.Customers, 3)
 			}
 		}
-		g.Items = append(g.Items, it)
+		g.Count++
+		if len(g.Items) < 8 {
+			g.Items = append(g.Items, it)
+		}
 	}
-	g.Count = len(g.Items)
 	groups = append(groups, g)
 
 	// ② VEX 판단 대기(대기열 캐시 사용)
