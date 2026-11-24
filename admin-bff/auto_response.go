@@ -57,6 +57,7 @@ type autoRun struct {
 	AIStatus    string      `json:"aiStatus,omitempty"` // affected / not_affected / under_investigation ...
 	AISummary   string      `json:"aiSummary,omitempty"`
 	AIModel     string      `json:"aiModel,omitempty"`
+	AIMethod    string      `json:"aiMethod,omitempty"` // rule / rule+card / ai-slim / ai-full
 	FixTag      string      `json:"fixTag,omitempty"`
 	FixComp     string      `json:"fixComp,omitempty"`
 	Upstream    string      `json:"upstream,omitempty"` // 구성요소 자체의 수정 버전(OSV 등)
@@ -255,12 +256,16 @@ func (s *Server) runAutoResponse(r autoRun) autoRun {
 
 	// ② AI 분석
 	autoUpdate(id, func(x *autoRun) {
-		stage(x, "ai", "active", "AI 가 영향 여부를 분석하는 중(로컬 AI 는 1~2분)")
+		stage(x, "ai", "active", "영향 여부를 분석하는 중(규칙 판정 + AI 권고문 요약)")
 	})
 	upstream := ""
 	if aiEnabledFor("vex") {
 		done := aiInteractive()
-		d, err := s.vexDraftFor(autoActor, r.Repo, r.Tag, f, "자동 대응: 새로 발견된 취약점의 영향 여부와 대응을 판단")
+		actx := "자동 대응: 새로 발견된 취약점의 영향 여부와 대응을 판단"
+		if vexFastOn() { // 사람이 적은 사용 맥락이 아니므로 규칙 판정으로(맥락으로 넘기면 '영향 없음' 근거로 쓰일 수 있다)
+			actx = ""
+		}
+		d, err := s.vexDraftFor(autoActor, r.Repo, r.Tag, f, actx)
 		done()
 		if err != nil {
 			autoUpdate(id, func(x *autoRun) {
@@ -272,7 +277,7 @@ func (s *Server) runAutoResponse(r autoRun) autoRun {
 			}
 			sum := truncate(firstNonEmpty(d.Draft.Detail, d.Draft.Justification), 300)
 			x := autoUpdate(id, func(x *autoRun) {
-				x.AIStatus, x.AISummary, x.AIModel, x.Upstream = d.Draft.Status, sum, d.Meta.Model, upstream
+				x.AIStatus, x.AISummary, x.AIModel, x.Upstream, x.AIMethod = d.Draft.Status, sum, d.Meta.Model, upstream, d.Meta.Method
 				stage(x, "ai", "done", fmt.Sprintf("판정 초안: %s(신뢰도 %s)", vexStateKo(d.Draft.Status), firstNonEmpty(d.Draft.Confidence, "—")))
 			})
 			if x.AIStatus == "not_affected" || x.AIStatus == "false_positive" {
@@ -517,6 +522,10 @@ func (s *Server) approvalCard(x autoRun, mailTitle string) mailCard {
 	c.Facts = append(c.Facts, mailFact{K: "메일 제목(초안)", V: mailTitle})
 	if x.AIStatus != "" {
 		c.AI = &mailAI{Label: "AI 분석 — " + vexStateKo(x.AIStatus), Text: truncate(x.AISummary, 500), Model: x.AIModel}
+		if strings.HasPrefix(x.AIMethod, "rule") { // 판정은 규칙, 권고문 요약만 AI(카드가 있을 때)
+			c.AI.Label, c.AI.Rule = "판정 초안 — "+vexStateKo(x.AIStatus), true
+			c.AI.Model = strings.TrimPrefix(strings.TrimPrefix(x.AIModel, "규칙"), " + ")
+		}
 		fmt.Fprintf(&b, "AI 분석(AI 생성): %s — %s\n", vexStateKo(x.AIStatus), truncate(x.AISummary, 200))
 	}
 	fmt.Fprintf(&b, "선택 화면: %s/admin/auto-response\n", s.publicBase())

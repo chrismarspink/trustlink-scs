@@ -41,6 +41,9 @@ type aiMeta struct {
 	ElapsedMs   int64  `json:"elapsedMs"`
 	Use         string `json:"use,omitempty"`      // vex / report
 	Provider    string `json:"provider,omitempty"` // llama / anthropic / openai
+	Method      string `json:"method,omitempty"`   // VEX 초안을 만든 방식: rule(규칙) / rule+card(규칙 + AI 권고문 요약) / ai-slim(축약 AI) / ai-full(전체 AI)
+	Cached      bool   `json:"cached,omitempty"`   // 저장해 둔 결과를 다시 씀
+	usage       aiUsage
 }
 
 var (
@@ -96,6 +99,12 @@ func (s *Server) aiDraft(facts []aiFact, task string, schema map[string]any, max
 // aiDraftFor: 사실 + 작업 지시 → 스키마에 맞는 JSON(out 에 디코드). use: vex / report, lang: ko / en.
 // 반환: 메타(원장 기록용).
 func (s *Server) aiDraftFor(use, lang string, facts []aiFact, task string, schema map[string]any, maxTokens int, out any) (aiMeta, error) {
+	return s.aiDraftOpt(use, lang, facts, task, schema, maxTokens, out, false)
+}
+
+// aiDraftOpt: taskFirst 면 고정 문구(규칙 + 작업 지시)를 앞에, 건마다 바뀌는 사실을 뒤에 둔다.
+// 로컬 LLM(llama.cpp)은 앞부분이 직전 요청과 같으면 그 부분을 다시 읽지 않으므로(접두 캐시) 읽는 시간이 준다.
+func (s *Server) aiDraftOpt(use, lang string, facts []aiFact, task string, schema map[string]any, maxTokens int, out any, taskFirst bool) (aiMeta, error) {
 	meta := aiMeta{FactsSHA256: factsHash(facts), Use: use}
 	e := aiConf().endpoint(use)
 	if !e.ready() {
@@ -113,9 +122,17 @@ func (s *Server) aiDraftFor(use, lang string, facts []aiFact, task string, schem
 	if lang == "en" {
 		sys, user = aiSystemEn, "Facts:\n"+factsBlock(facts, lang)+"\nTask:\n"+task
 	}
+	if taskFirst {
+		if lang == "en" {
+			sys, user = aiSystemEn+"\n\nTask:\n"+task, "Facts:\n"+factsBlock(facts, lang)
+		} else {
+			sys, user = aiSystem+"\n\n작업:\n"+task, "사실:\n"+factsBlock(facts, lang)
+		}
+	}
 	t0 := time.Now()
 	content, model, finish, usage, err := aiChatU(e, sys, user, schema, maxTokens, 6*time.Minute)
 	meta.ElapsedMs = time.Since(t0).Milliseconds()
+	meta.usage = usage
 	rec.fill(model, meta.ElapsedMs, usage, finish, err)
 	if err != nil {
 		recordAICall(rec)

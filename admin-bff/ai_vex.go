@@ -419,6 +419,14 @@ type vexDraftResult struct {
 
 // vexDraftFor: 한 건의 판정·대응 초안(규칙 신호 + AI 초안 + 안전장치 + 원장 기록).
 func (s *Server) vexDraftFor(actor, repo, tag string, f dtFindingFull, context string) (*vexDraftResult, error) {
+	return s.vexDraftMode(actor, repo, tag, f, context, true)
+}
+
+// vexDraftMode: 빠른 경로(기본)면 규칙·요약 카드·축약 AI 로, VEX_DRAFT_MODE=full 이면 예전처럼 전체를 AI 로.
+func (s *Server) vexDraftMode(actor, repo, tag string, f dtFindingFull, context string, waitCard bool) (*vexDraftResult, error) {
+	if vexFastOn() {
+		return s.vexFastDraftFor(actor, repo, tag, f, context, waitCard)
+	}
 	sig := vexSignalsFor(f)
 	facts := vexFacts(f, context, sig)
 	var d vexDraft
@@ -426,7 +434,7 @@ func (s *Server) vexDraftFor(actor, repo, tag string, f dtFindingFull, context s
 	if err != nil {
 		return nil, err
 	}
-	meta.Snapshot = s.mirrorSnapshot()
+	meta.Snapshot, meta.Method = s.mirrorSnapshot(), "ai-full"
 	warn := guardVexDraft(&d, facts, sig)
 	ob, _ := json.Marshal(d)
 	s.aiRecord(actor, "vex", repo, tag, meta, sha256hex(ob),
@@ -644,7 +652,7 @@ func (s *Server) runVexBatch(b *vexBatch, picks []dtFindingFull, context string)
 		b.Current = f.Vulnerability.VulnID + " · " + f.Component.Name
 		vexBatchMu.Unlock()
 		aiYield(b) // 사람이 직접 요청한 AI 가 기다리면 먼저 보낸다
-		res, err := s.vexDraftFor(b.Actor, b.Repo, b.Tag, f, context)
+		res, err := s.vexDraftMode(b.Actor, b.Repo, b.Tag, f, context, false) // 빠른 경로: 요약 카드는 기다리지 않는다(아래에서 보강)
 		key := f.Component.UUID + "|" + f.Vulnerability.UUID
 		vexBatchMu.Lock()
 		if err != nil {
@@ -657,6 +665,7 @@ func (s *Server) runVexBatch(b *vexBatch, picks []dtFindingFull, context string)
 		b.save()
 		vexBatchMu.Unlock()
 	}
+	s.vexBatchEnrich(b, picks, context)
 	vexBatchMu.Lock()
 	if b.State == "running" {
 		b.State = "done"
@@ -701,4 +710,40 @@ func (s *Server) apiAIVexBatchGet(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(body)
+}
+
+// vexBatchEnrich: 빠른 경로의 2단계 — 판정은 이미 다 나왔고, 권고문 요약 카드가 없던 건만 카드를 만들어 초안에 덧붙인다.
+func (s *Server) vexBatchEnrich(b *vexBatch, picks []dtFindingFull, context string) {
+	if !vexFastOn() {
+		return
+	}
+	for i, f := range picks {
+		key := f.Component.UUID + "|" + f.Vulnerability.UUID
+		vexBatchMu.Lock()
+		cur := b.Results[key]
+		stop := b.cancel || b.State != "running"
+		if !stop && cur != nil && cur.Meta.Method == "rule" && f.Vulnerability.Description != "" {
+			b.Current = "권고문 요약 보강 중(" + itoa(i+1) + "/" + itoa(len(picks)) + ") — 판정은 이미 나와 있습니다 · " + f.Vulnerability.VulnID
+		} else {
+			cur = nil
+		}
+		vexBatchMu.Unlock()
+		if stop {
+			return
+		}
+		if cur == nil {
+			continue
+		}
+		aiYield(b)
+		if _, err := s.cardMake(f); err != nil {
+			continue
+		}
+		if res, err := s.vexDraftMode(b.Actor, b.Repo, b.Tag, f, context, false); err == nil {
+			vexBatchMu.Lock()
+			res.Auto = b.Trigger == "auto"
+			b.Results[key] = res
+			b.save()
+			vexBatchMu.Unlock()
+		}
+	}
 }

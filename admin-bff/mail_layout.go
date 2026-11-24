@@ -27,6 +27,7 @@ type mailAI struct {
 	Label string // 예: "AI 분석 — 조사 필요"
 	Text  string
 	Model string
+	Rule  bool // 판정은 규칙으로 냈다(Model 이 있으면 권고문 요약만 AI)
 }
 
 type mailCard struct {
@@ -126,7 +127,11 @@ func (s *Server) renderMail(c mailCard) mailContent {
 		}
 	}
 	if c.AI != nil {
-		fmt.Fprintf(&tx, "\n■ %s (AI 생성%s — 사람의 확인이 필요합니다)\n%s\n", c.AI.Label, map[bool]string{true: " · " + c.AI.Model, false: ""}[c.AI.Model != ""], c.AI.Text)
+		how := "AI 생성" + map[bool]string{true: " · " + c.AI.Model, false: ""}[c.AI.Model != ""]
+		if c.AI.Rule {
+			how = "규칙 판정" + map[bool]string{true: " · 권고문 요약은 AI 생성(" + c.AI.Model + ")", false: ""}[c.AI.Model != ""]
+		}
+		fmt.Fprintf(&tx, "\n■ %s (%s — 사람의 확인이 필요합니다)\n%s\n", c.AI.Label, how, c.AI.Text)
 	}
 	if c.Body != "" {
 		if c.BodyAI != "" {
@@ -204,11 +209,19 @@ func (s *Server) renderMail(c mailCard) mailContent {
 		return mailPill("✦ "+t, "#6d28d9", "#ede9fe")
 	}
 	if c.AI != nil {
+		badge, note := aiBadge(c.AI.Model), "AI 가 작성한 분석입니다."
+		if c.AI.Rule {
+			badge, note = mailPill("규칙 판정", "#334155", "#e2e8f0"), "미러 데이터(OSV·KEV·익스플로잇)에 규칙을 적용한 판정입니다."
+			if c.AI.Model != "" {
+				badge += " " + mailPill("✦ 권고문 요약 AI 생성 · "+c.AI.Model, "#6d28d9", "#ede9fe")
+				note = "판정은 규칙으로, 권고문 요약은 AI 가 작성했습니다."
+			}
+		}
 		fmt.Fprintf(&hb, `<tr><td style="padding:16px 28px 4px"><div style="border:1px solid #ddd6fe;background:#faf5ff;border-radius:8px;padding:14px 16px">`+
 			`<div style="font-size:13px;font-weight:700;color:%s">%s &nbsp;%s</div>`+
 			`<div style="font-size:13px;line-height:1.75;color:%s;margin-top:8px">%s</div>`+
-			`<div style="font-size:11px;color:%s;margin-top:8px">AI 가 작성한 분석입니다. 결정 전에 사람의 확인이 필요합니다.</div></div></td></tr>`,
-			cText, e(c.AI.Label), aiBadge(c.AI.Model), cSub, br(c.AI.Text), cMuted)
+			`<div style="font-size:11px;color:%s;margin-top:8px">%s 결정 전에 사람의 확인이 필요합니다.</div></div></td></tr>`,
+			cText, e(c.AI.Label), badge, cSub, br(c.AI.Text), cMuted, note)
 	}
 	if c.Body != "" {
 		head := ""

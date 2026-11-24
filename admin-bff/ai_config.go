@@ -221,6 +221,7 @@ func openaiChat(e aiEndpoint, system, user string, schema map[string]any, maxTok
 	}
 	if e.Kind == "local" { // llama.cpp·vLLM: 생각(thinking) 출력 끄기. 외부 API 는 모르는 필드를 거부할 수 있어 넣지 않음
 		req["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
+		req["cache_prompt"] = true // 앞부분이 직전 요청과 같으면 다시 읽지 않는다
 	}
 	body, _ := json.Marshal(req)
 	hr, _ := http.NewRequest("POST", aiAPIBase(e)+"/chat/completions", bytes.NewReader(body))
@@ -252,6 +253,8 @@ func openaiChat(e aiEndpoint, system, user string, schema map[string]any, maxTok
 		Timings *struct { // llama.cpp 만 준다
 			PromptMs    float64 `json:"prompt_ms"`
 			PredictedMs float64 `json:"predicted_ms"`
+			PromptN     int     `json:"prompt_n"`
+			CacheN      int     `json:"cache_n"`
 		} `json:"timings"`
 	}
 	if err := json.Unmarshal(rb, &cr); err != nil || len(cr.Choices) == 0 {
@@ -260,6 +263,7 @@ func openaiChat(e aiEndpoint, system, user string, schema map[string]any, maxTok
 	u.PromptTok, u.GenTok = cr.Usage.Prompt, cr.Usage.Completion
 	if cr.Timings != nil {
 		u.PromptMs, u.GenMs = cr.Timings.PromptMs, cr.Timings.PredictedMs
+		u.EvalTok, u.CacheTok = cr.Timings.PromptN, cr.Timings.CacheN
 	}
 	model := firstNonEmpty(cr.Model, e.Model)
 	if strings.HasSuffix(model, ".gguf") { // llama.cpp 는 모델 파일 경로를 돌려준다 → 이름만

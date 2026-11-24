@@ -368,6 +368,8 @@ func main() {
 	mux.HandleFunc("POST /api/sbom/generate", vexEdit(s.apiSBOMGenerate)) // syft SBOM 생성·부착(제품 쓰기 권한, self 는 admins)
 	mux.HandleFunc("GET /api/vex/queue", vexEdit(s.apiVexQueue))          // VEX 판단 대기열(전 제품)
 	mux.HandleFunc("GET /api/vex/kev", vexEdit(s.apiVexKEV))              // KEV 등재 여부(미러 사본) — 우선순위 정렬용
+	mux.HandleFunc("POST /api/ai-perf/vex-bench", s.guard(s.apiVexBench))  // VEX 판정 방식별 속도 측정(관리자)
+	mux.HandleFunc("GET /api/ai-perf/vex-bench", s.guard(s.apiVexBench))
 	mux.HandleFunc("POST /api/ai/vex-draft", vexEdit(s.apiAIVexDraft))    // AI VEX 판정·대응 초안(저장은 사람이)
 	mux.HandleFunc("POST /api/ai/vex-batch", vexEdit(s.apiAIVexBatch))    // 미분석 항목 일괄 초안(비동기)·취소
 	mux.HandleFunc("GET /api/ai/vex-batch", vexEdit(s.apiAIVexBatchGet))  // 일괄 초안 진행·결과
