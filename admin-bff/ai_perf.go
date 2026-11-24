@@ -70,7 +70,7 @@ func round1(f float64) float64 { return float64(int64(f*10+0.5)) / 10 }
 
 // 기능 이름: 호출한 소스 파일로 정한다(호출부마다 이름을 넘기지 않아도 되게).
 var aiFeatureByFile = map[string]string{
-	"ai_vex.go": "VEX 판단", "vex_fast.go": "VEX 판단", "vex_card.go": "권고문 요약", "vex_bench.go": "VEX 속도 측정", "custnotify.go": "고객 통지 문안", "compliance.go": "규제 대응 검증",
+	"ai_vex.go": "VEX 판단", "vex_fast.go": "VEX 판단", "vex_card.go": "권고문 요약", "vex_bench.go": "VEX 속도 측정", "ask.go": "묻고 찾기", "custnotify.go": "고객 통지 문안", "compliance.go": "규제 대응 검증",
 	"mail_suggest.go": "현황 메일 제안", "regcatalog.go": "규제 보고서", "regdiscover.go": "규제 탐색",
 	"reglaw.go": "국내 법규 분석", "upstream_api.go": "공개 저장소 분석", "ai_perf.go": "성능 측정",
 }

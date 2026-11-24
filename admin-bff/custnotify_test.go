@@ -48,6 +48,15 @@ func custFakeDT(t *testing.T) *httptest.Server {
 		v := comps[strings.TrimPrefix(r.PathValue("id"), "u-")]
 		json.NewEncoder(w).Encode([]map[string]any{{"name": "lib-a", "version": v, "purl": "pkg:maven/x/lib-a@" + v}, {"name": "other", "version": "1"}})
 	})
+	mux.HandleFunc("GET /api/v1/component/identity", func(w http.ResponseWriter, r *http.Request) { // 구성요소 검색(묻고 찾기)
+		out := []map[string]any{}
+		if strings.Contains("lib-a", r.URL.Query().Get("name")) {
+			for v, cv := range comps {
+				out = append(out, map[string]any{"name": "lib-a", "group": "x", "version": cv, "project": map[string]string{"name": "prod", "version": v}})
+			}
+		}
+		json.NewEncoder(w).Encode(out)
+	})
 	mux.HandleFunc("GET /v2/products/prod/tags/list", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"tags":["1.0","1.1","1.2","2.0","latest"]}`))
 	})

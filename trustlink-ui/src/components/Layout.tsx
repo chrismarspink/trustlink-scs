@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar, navTrail } from '@/components/Sidebar';
 import { NotificationBell } from '@/components/NotificationBell';
+import { AskPanel } from '@/components/AskPanel';
 
 // 통합 셸: 사이드바(브랜드·메뉴·사용자) + 경로 표시줄 + 본문. 제품/관리 모두 이 셸을 쓴다.
 export function Layout({ children }: { children: ReactNode }) {
@@ -21,6 +22,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </header>
         <main className="max-w-[1280px] px-8 py-6">{children}</main>
       </div>
+      <AskPanel />
     </div>
   );
 }

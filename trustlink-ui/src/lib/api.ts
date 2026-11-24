@@ -885,3 +885,13 @@ export const adminAutoReject = (id: string, reason: string) => aj<AutoRun>(`/api
 export type InboxItem = { kind: 'auto-customer' | 'auto-dev' | 'vex' | 'reg' | 'expiry' | 'outbox'; title: string; detail?: string; link: string; urgent?: boolean; at?: string; ref?: string };
 export type InboxGroup = { key: 'auto' | 'vex' | 'reg' | 'expiry' | 'outbox'; label: string; count: number; link: string; items: InboxItem[] };
 export const adminInbox = () => aj<{ groups: InboxGroup[]; decisions: number; generated: string }>('/api/inbox');
+
+// ---------- 묻고 찾기(로그인한 누구나, 자기 권한 안에서) ----------
+export type AskRow = { title: string; detail?: string; link?: string; tone?: 'crit' | 'warn' | 'ok' | '' };
+export type AskAnswer = {
+  id: string; intent: 'vuln' | 'component' | 'my' | 'todo' | 'help'; title: string; lead: string;
+  rows: AskRow[]; more?: number; sources: string[]; suggest?: string[]; canAI: boolean;
+};
+export const ask = (q: string) => aj<AskAnswer>('/api/ask', jsonInit('POST', { q }));
+export const askSummary = (id: string) =>
+  aj<{ answer: string; model: string; provider?: string; elapsedMs: number }>(`/api/ask/${encodeURIComponent(id)}/summary`, jsonInit('POST', {}));

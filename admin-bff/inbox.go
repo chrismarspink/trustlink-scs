@@ -34,6 +34,12 @@ type inboxGroup struct {
 
 // GET /api/inbox
 func (s *Server) apiInbox(w http.ResponseWriter, r *http.Request) {
+	groups, total := s.inboxGroups()
+	writeJSON(w, 200, map[string]any{"groups": groups, "decisions": total, "generated": time.Now().UTC().Format(time.RFC3339)})
+}
+
+// inboxGroups: 사람이 결정할 일 묶음과 그 합계(화면과 "묻고 찾기"가 같이 쓴다).
+func (s *Server) inboxGroups() ([]inboxGroup, int) {
 	groups := []inboxGroup{}
 
 	// ① 자동 대응 승인 대기
@@ -147,7 +153,7 @@ func (s *Server) apiInbox(w http.ResponseWriter, r *http.Request) {
 			total += x.Count
 		}
 	}
-	writeJSON(w, 200, map[string]any{"groups": groups, "decisions": total, "generated": time.Now().UTC().Format(time.RFC3339)})
+	return groups, total
 }
 
 func joinMax(l []string, n int) string {

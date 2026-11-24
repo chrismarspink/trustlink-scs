@@ -274,6 +274,11 @@ type myCustomer struct {
 // GET /api/my/products — 로그인 사용자의 고객사 그룹에 연결된 고객만(guardSession).
 func (s *Server) apiMyProducts(w http.ResponseWriter, r *http.Request) {
 	sess, _ := s.sessionOf(r)
+	writeJSON(w, 200, map[string]any{"customers": s.myProducts(sess), "user": sess.Username})
+}
+
+// myProducts: 로그인 사용자의 고객사 그룹에 연결된 고객의 제품·설치 버전·취약점·받은 통지.
+func (s *Server) myProducts(sess Session) []myCustomer {
 	c := s.cust()
 	d := c.snapshot()
 	now := c.now()
@@ -341,5 +346,5 @@ func (s *Server) apiMyProducts(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, mc)
 	}
-	writeJSON(w, 200, map[string]any{"customers": out, "user": sess.Username})
+	return out
 }

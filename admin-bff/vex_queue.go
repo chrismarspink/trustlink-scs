@@ -39,6 +39,12 @@ var vexQueueCache struct {
 	sync.Mutex
 	at   time.Time
 	rows []vexQueueRow
+	idx  map[string][]vulnHit // 취약점 ID(대문자) → 그 취약점이 있는 제품·버전("묻고 찾기"용)
+}
+
+// vulnHit: 어느 제품·버전의 어느 구성요소에 그 취약점이 있는가.
+type vulnHit struct {
+	Repo, Tag, Component, Severity, State string
 }
 
 // vexQueueRows: 전 제품 집계(1분 캐시). 권한 필터는 호출 쪽에서.
@@ -59,6 +65,7 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 	}
 	kev, _, _ := kevIndex()
 	rows := []vexQueueRow{}
+	idx := map[string][]vulnHit{}
 	for key, repo := range projects {
 		name, tag, ok := strings.Cut(key, "@")
 		if !ok {
@@ -77,6 +84,9 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 			if f.Analysis.IsSuppressed {
 				continue
 			}
+			id := strings.ToUpper(f.Vulnerability.VulnID)
+			idx[id] = append(idx[id], vulnHit{Repo: repo, Tag: tag, Component: strings.TrimSpace(f.Component.Name + " " + f.Component.Version),
+				Severity: strings.ToUpper(f.Vulnerability.Severity), State: f.Analysis.State})
 			row.Total++
 			if !pendingState(f.Analysis.State) {
 				row.Analyzed++
@@ -129,7 +139,7 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 		}
 		return a.Repo+a.Tag < b.Repo+b.Tag
 	})
-	vexQueueCache.rows, vexQueueCache.at = rows, time.Now()
+	vexQueueCache.rows, vexQueueCache.at, vexQueueCache.idx = rows, time.Now(), idx
 	return rows
 }
 
