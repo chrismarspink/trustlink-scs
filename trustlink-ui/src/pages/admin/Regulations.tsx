@@ -175,7 +175,7 @@ function AnalysisBody({ a }: { a: RegAnalysis }) {
       <div>
         <div className="mb-0.5 font-medium">근거 조문</div>
         {a.articles.length === 0 ? <p className="text-muted-foreground">근거 법령 조문 없음(법령이 아닌 기준)</p> : (
-          <table className="w-full">
+          <table className="w-full max-lg:block max-lg:overflow-x-auto">
             <tbody>
               {a.articles.map((x, i) => (
                 <tr key={i} className="border-t align-top">
@@ -203,7 +203,7 @@ function AnalysisBody({ a }: { a: RegAnalysis }) {
       <div><div className="mb-0.5 font-medium">위반 시 제재·불이익</div><p>{a.sanctions}</p></div>
       <div>
         <div className="mb-0.5 font-medium">역할별 대응 방안</div>
-        <table className="w-full">
+        <table className="w-full max-lg:block max-lg:overflow-x-auto">
           <thead><tr className="text-left text-muted-foreground"><th className="w-28 py-1">역할</th>{STAGES.map(([k, l]) => <th key={k}>{l}</th>)}</tr></thead>
           <tbody>
             {AUD.filter((r) => a.plans[r.v]?.length).map((r) => (
@@ -346,7 +346,7 @@ function RegCard({ r, info, onEdit, onChanged }: { r: Regulation; info: RegsInfo
             <a key={i} href={s.url} target="_blank" rel="noreferrer" className="mr-3 inline-flex items-center gap-1 text-xs text-primary underline">{s.title} <ExternalLink size={11} /></a>
           ))}
           {r.note && <div className="text-xs text-amber-800">메모: {r.note}</div>}
-          <table className="w-full text-xs">
+          <table className="w-full text-xs max-lg:block max-lg:overflow-x-auto">
             <thead><tr className="text-left text-muted-foreground"><th className="w-32 py-1">조항</th><th>요구</th><th className="w-[38%]">역할별 할 일</th><th className="w-40">자동 점검</th></tr></thead>
             <tbody>
               {r.requirements.map((q) => (

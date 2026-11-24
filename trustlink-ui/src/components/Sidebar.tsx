@@ -161,7 +161,7 @@ function SectionLabel({ children }: { children: string }) {
 // 제품·관리 공용 사이드바 — 아티팩트와 관리 콘솔 항목을 한 곳에 함께 노출(트리 구조).
 // 관리 섹션은 admins 로 확인된 경우에만 노출(외부 고객 화면에 관리 메뉴가 보이지 않게).
 // 제품 화면으로만 로그인해 관리 콘솔 세션이 없으면 숨김 → 관리자는 /admin 으로 진입(SSO), 이후 노출. 실제 접근은 /admin 게이트가 강제.
-export function Sidebar() {
+export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
   const [sess, setSess] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
@@ -189,7 +189,10 @@ export function Sidebar() {
   const product = [ARTIFACTS_ITEM, ...(sess ? [MY_ITEM] : []), ...(sess?.canEditVex ? [VEX_ITEM] : []), APIKEY_ITEM];
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-sidebar">
+    <>
+    {open && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={onClose} aria-hidden="true" />}
+    <aside className={cn('fixed inset-y-0 left-0 z-50 flex h-dvh w-64 max-w-[85vw] shrink-0 flex-col border-r bg-sidebar transition-transform lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-60 lg:translate-x-0',
+      open ? 'translate-x-0 shadow-xl' : 'invisible -translate-x-full lg:visible')}>
       <Link to="/" className="flex h-14 select-none items-center gap-2.5 border-b px-4">
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <ShieldCheck size={15} />
@@ -229,5 +232,6 @@ export function Sidebar() {
         </div>
       )}
     </aside>
+    </>
   );
 }

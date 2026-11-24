@@ -78,8 +78,8 @@ export function AskPanel() {
     <>
       {!open && (
         <button onClick={() => setOpen(true)} title="묻고 찾기 — 취약점 번호, 구성요소 이름, 할 일을 물어보세요"
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg hover:opacity-90">
-          <MessageCircleQuestion size={18} /> 묻고 찾기
+          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg hover:opacity-90 sm:px-4 sm:py-2.5" aria-label="묻고 찾기">
+          <MessageCircleQuestion size={18} /> <span className="hidden sm:inline">묻고 찾기</span>
         </button>
       )}
       {open && (

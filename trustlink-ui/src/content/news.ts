@@ -30,6 +30,15 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.32.0',
+    date: '2026-11-25',
+    title: '휴대폰 화면',
+    items: [
+      { kind: '개선', text: '휴대폰 폭에서는 사이드바를 접어 두고 왼쪽 위 메뉴 단추로 엶. 메뉴에서 화면을 고르면 저절로 닫힘' },
+      { kind: '개선', text: '좁은 화면에서 표가 글자 단위로 찌그러지지 않고 표만 옆으로 밀림. 본문 여백과 제목 줄, 알림 창, 묻고 찾기 단추를 휴대폰 폭에 맞춤' },
+    ],
+  },
+  {
     version: '2.31.0',
     date: '2026-11-24',
     title: '영향 지도',

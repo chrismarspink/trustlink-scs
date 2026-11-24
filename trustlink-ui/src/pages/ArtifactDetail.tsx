@@ -143,7 +143,7 @@ function Table({ title, head, rows }: { title: string; head: string[]; rows: str
   return (
     <div>
       <p className="mb-1 text-sm font-semibold">{title}</p>
-      <table className="w-full border-collapse text-xs">
+      <table className="w-full border-collapse text-xs max-lg:block max-lg:overflow-x-auto">
         <thead>
           <tr>
             {head.map((h) => (

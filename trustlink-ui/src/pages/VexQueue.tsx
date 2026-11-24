@@ -55,7 +55,7 @@ export default function VexQueue() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-5 flex flex-wrap items-start gap-3">
-        <div className="flex-1">
+        <div className="basis-full sm:flex-1 sm:basis-0">
           <h1 className="flex items-center gap-2 text-2xl font-bold"><ShieldQuestion size={22} /> VEX 판단</h1>
           <p className="mt-1 text-sm text-muted-foreground">감시 중인 모든 제품·버전의 판단 안 된 취약점을 급한 순(실제 악용 KEV → 치명 → 높음)으로 모았습니다. 판단과 VEX 발행은 각 제품 화면에서 합니다.</p>
         </div>
@@ -103,7 +103,7 @@ export default function VexQueue() {
       {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
       {q && !q.dt && <div className="text-sm text-muted-foreground">Dependency-Track 미설정 — 분석 기능이 꺼져 있습니다.</div>}
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-secondary/50 text-left text-xs text-muted-foreground">
             <tr>

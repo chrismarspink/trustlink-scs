@@ -129,7 +129,7 @@ function Library({ reload }: { reload: number }) {
       </div>
 
       {(kind === 'all' || kind === 'reg') && (
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border bg-card">
           <div className="flex items-center gap-2 border-b bg-secondary/40 px-3 py-2 text-sm font-medium"><Landmark size={15} /> 규제 대응 보고서 <span className="text-xs font-normal text-muted-foreground">같은 조건으로 다시 만들면 판이 올라갑니다 · 한글/영문은 한 줄에</span></div>
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-muted-foreground"><th className="px-3 py-1.5">문서</th><th className="px-3 py-1.5">대상</th><th className="px-3 py-1.5">제품</th><th className="px-3 py-1.5">판</th><th className="px-3 py-1.5">언어</th><th className="px-3 py-1.5">최근 발행</th></tr></thead>
@@ -142,7 +142,7 @@ function Library({ reload }: { reload: number }) {
       )}
 
       {(kind === 'all' || kind === 'check') && (
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border bg-card">
           <div className="flex items-center gap-2 border-b bg-secondary/40 px-3 py-2 text-sm font-medium"><ClipboardCheck size={15} /> 체크리스트 점검 보고서 <span className="text-xs font-normal text-muted-foreground">업로드한 공급망 체크리스트로 제품 릴리스를 점검한 결과(내부용 — 체크리스트 원본은 서버에만 보관)</span></div>
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-muted-foreground"><th className="px-3 py-1.5">제품</th><th className="px-3 py-1.5">공급자 미충족</th><th className="px-3 py-1.5">일부</th><th className="px-3 py-1.5">AI 요약</th><th className="px-3 py-1.5">시각</th><th /></tr></thead>
@@ -164,7 +164,7 @@ function Library({ reload }: { reload: number }) {
       )}
 
       {(kind === 'all' || kind === 'up') && (
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border bg-card">
           <div className="flex items-center gap-2 border-b bg-secondary/40 px-3 py-2 text-sm font-medium"><GitBranch size={15} /> 공개 저장소 분석 보고서 <span className="text-xs font-normal text-muted-foreground">제품 구성요소의 상류 오픈소스 건강도 · 단건 저장소 점검(분석할 때마다 저장)</span></div>
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-muted-foreground"><th className="px-3 py-1.5">대상</th><th className="px-3 py-1.5">구성요소</th><th className="px-3 py-1.5">위험</th><th className="px-3 py-1.5">주의</th><th className="px-3 py-1.5">AI 요약</th><th className="px-3 py-1.5">시각</th><th /></tr></thead>

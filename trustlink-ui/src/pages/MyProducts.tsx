@@ -56,7 +56,7 @@ function Install({ i }: { i: MyInstall }) {
         </span>
       </div>
       {show && shown.length > 0 && (
-        <table className="mt-2 w-full text-xs">
+        <table className="mt-2 w-full text-xs max-lg:block max-lg:overflow-x-auto">
           <thead><tr className="text-left text-muted-foreground"><th className="py-1">취약점</th><th>구성요소</th><th>판정(VEX)</th><th>권장 패치 버전</th></tr></thead>
           <tbody>
             {shown.map((v) => (
