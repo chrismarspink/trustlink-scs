@@ -30,6 +30,14 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.28.3',
+    date: '2026-11-24',
+    title: '바로 끝난 일괄 판정도 결과 안내',
+    items: [
+      { kind: '수정', text: 'VEX 판단 목록에서 일괄 판정이 몇 초 만에 끝나면 "시작" 문구만 남던 문제 — 완료 건수·걸린 시간을 알려 주고, 줄에 마지막 실행 시각 표시' },
+    ],
+  },
+  {
     version: '2.28.2',
     date: '2026-11-24',
     title: 'VEX 판단 목록에서 진행 상황 보기',

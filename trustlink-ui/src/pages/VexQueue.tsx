@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ShieldQuestion, RefreshCw, ListChecks } from 'lucide-react';
 import { AIBadge, AIIcon } from '@/components/AIBadge';
 import { HelpScene } from '@/components/HelpScene';
-import { vexQueue, aiVexBatchStart, aiStatus, type VexQueue as Q, type VexQueueRow, type VexQueueRowAuto, type AIStatus } from '@/lib/api';
+import { vexQueue, aiVexBatch, aiVexBatchStart, aiStatus, type VexQueue as Q, type VexQueueRow, type VexQueueRowAuto, type AIStatus } from '@/lib/api';
 import { SourceBadge } from '@/components/SourceBadge';
 import { Badge, Button, Card } from '@/components/ui/primitives';
 
@@ -33,7 +33,18 @@ export default function VexQueue() {
     setBusy(r.project); setMsg('');
     try {
       const b = await aiVexBatchStart({ project: r.project, repo: r.repo, tag: r.tag, limit: 20 });
-      setMsg(b.state === 'done' && !b.total ? `${r.repo}:${r.tag} — 미판단 항목이 없습니다` : `${r.repo}:${r.tag} — AI 일괄 판정 시작(우선순위 순 최대 20건)`);
+      if (b.state === 'done' && !b.total) setMsg(`${r.repo}:${r.tag} — 미판단 항목이 없습니다`);
+      else {
+        setMsg(`${r.repo}:${r.tag} — 일괄 판정 시작(우선순위 순 최대 20건)`);
+        // 판정은 규칙이라 금방 끝난다. 권고문 요약까지 저장돼 있으면 진행 표시가 뜰 새도 없이 끝나므로, 결과를 바로 알려 준다
+        await new Promise((ok) => setTimeout(ok, 1500));
+        const cur = await aiVexBatch(r.project).catch(() => null);
+        if (cur?.state === 'done') {
+          const n = Object.keys(cur.results || {}).length;
+          const sec = cur.started && cur.finished ? Math.max(1, Math.round((new Date(cur.finished).getTime() - new Date(cur.started).getTime()) / 1000)) : 0;
+          setMsg(`${r.repo}:${r.tag} — 일괄 판정 완료: 초안 ${n}건${sec ? `(${sec}초)` : ''}. 권고문 요약은 저장해 둔 것을 다시 써서 바로 끝났습니다. "판단하기"에서 확인·저장하세요.`);
+        }
+      }
       load(true);
     } catch (e) { setMsg(String(e).replace(/^(Api)?Error:\s*(\d{3}\s*)?/, '')); load(true); }
     setBusy('');
@@ -126,7 +137,7 @@ export default function VexQueue() {
                       {r.batchState === 'running' ? (r.batchPhase === 'enrich'
                         ? <><span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800" title="판정 초안은 모두 나왔습니다 — 지금 확인·저장할 수 있습니다">판정 완료 {r.batchDone}건</span><AIBadge pulse label={`요약 보강 ${r.enrichDone ?? 0}/${r.enrichTotal ?? 0}`} /></>
                         : <AIBadge pulse label={`판정 중 ${r.batchDone}/${r.batchTotal}`} />)
-                        : r.batchState ? <span className="text-muted-foreground" title={fmt(r.batchAt)}>초안 {r.batchDrafts ?? 0}건{r.batchState === 'cancelled' ? ' (중지)' : ''}</span> : '—'}
+                        : r.batchState ? <span className="text-muted-foreground" title={fmt(r.batchAt)}>초안 {r.batchDrafts ?? 0}건{r.batchState === 'cancelled' ? ' (중지)' : ''}{r.batchAt ? ` · ${fmt(r.batchAt)}` : ''}</span> : '—'}
                       {!!r.batchAuto && <span title="새 취약점 통보 직후 KEV·치명 항목에 자동으로 만든 초안(확인·저장 대기)"><AIBadge label={`자동 초안 ${r.batchAuto}`} className="from-fuchsia-600 to-rose-500" /></span>}
                     </div>
                   </td>
