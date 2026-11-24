@@ -30,6 +30,15 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.27.0',
+    date: '2026-11-24',
+    title: '메일 다시 보내기',
+    items: [
+      { kind: '신규', text: '발송함에서 "다시 보내기" — 메일 서버 오류나 재시작으로 못 나간 메일, 받지 못했다는 메일을 같은 내용·같은 받는 사람으로 다시 보냄(최근 30건, 30초 대기 중 취소 가능)' },
+      { kind: '개선', text: '재시작으로 못 보낸 메일도 내용이 남아 다시 보낼 수 있음' },
+    ],
+  },
+  {
     version: '2.26.0',
     date: '2026-11-24',
     title: '자동 메일을 새 틀로',

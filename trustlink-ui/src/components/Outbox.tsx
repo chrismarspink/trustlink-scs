@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DELAYS } from '@/lib/sendDelay';
-import { Undo2, Clock3 } from 'lucide-react';
-import { adminOutbox, adminOutboxCancel, type OutboxItem } from '@/lib/api';
+import { Undo2, Clock3, RotateCw } from 'lucide-react';
+import { adminOutbox, adminOutboxCancel, adminOutboxResend, type OutboxItem } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { selectCls } from '@/pages/admin/_ui';
 
@@ -41,6 +41,12 @@ export function OutboxPanel({ ids, kind, refreshKey = 0, onChange, compact }: { 
   }, [ids?.join(','), kind, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!pending) onChange?.(); }, [pending]); // eslint-disable-line react-hooks/exhaustive-deps
   const cancel = async (id: string) => { setErr(''); try { await adminOutboxCancel(id); setItems((xs) => xs.map((x) => (x.id === id ? { ...x, status: 'cancelled' } : x))); onChange?.(); } catch (e) { setErr(String(e)); } };
+  const resend = async (it: OutboxItem) => {
+    const why = it.status === 'sent' ? '이미 보낸 메일입니다. 같은 내용이 한 번 더 갑니다.\n\n' : '';
+    if (!window.confirm(`${why}다시 보낼까요?\n\n${it.subject}\n→ ${it.recipients.join(', ')}\n\n30초 동안 발송함에서 기다리며, 그 사이 취소할 수 있습니다.`)) return;
+    setErr('');
+    try { const n = await adminOutboxResend(it.id); setItems((xs) => [n, ...xs.map((x) => (x.id === it.id ? { ...x, canResend: false, resentAs: n.id } : x))]); onChange?.(); } catch (e) { setErr(String(e)); }
+  };
   if (!items.length) return err ? <p className="text-xs text-red-600">{err}</p> : null;
   const shown = compact ? items.slice(0, 8) : items;
   return (
@@ -56,6 +62,13 @@ export function OutboxPanel({ ids, kind, refreshKey = 0, onChange, compact }: { 
               <Undo2 size={12} />보내기 취소
             </button>
           )}
+          {it.canResend && (
+            <button onClick={() => resend(it)} title="보관해 둔 내용 그대로 같은 받는 사람에게 다시 보냅니다(최근 메일만 가능)" className={cn('inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 font-semibold hover:bg-slate-50', it.status !== 'sent' && 'border-red-300 text-red-700')}>
+              <RotateCw size={12} />다시 보내기
+            </button>
+          )}
+          {it.resendOf && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800">다시 보냄</span>}
+          {it.resentAs && <span className="text-muted-foreground">다시 보냄 →</span>}
           {it.error && <span className="w-full text-red-600">{it.error}</span>}
         </div>
       ))}

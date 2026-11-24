@@ -157,9 +157,10 @@ func (s *Server) expiryMail(cu Customer, aud string, to []string, subject, body 
 		r.Error = "메일 서버 미설정(SMTP_HOST)"
 	default:
 		reason := map[string]string{"customer": "고객사 담당자", "internal": "이 고객의 영업·지원 담당"}[aud]
-		sent, dropped, err := s.mail.SendRich(to, subject, s.renderMail(mailCard{Module: "계약·지원 만료 관리", Purpose: "만료 안내", Tone: "info",
-			Title: strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(subject, "[TrustLink]"), "[안내]")), Body: body, Reason: reason, Ref: cu.ID}))
-		outboxRecord("expiry", cu.Name+" · 만료 안내", cu.ID, to, subject, sent, dropped, err)
+		mc := s.renderMail(mailCard{Module: "계약·지원 만료 관리", Purpose: "만료 안내", Tone: "info",
+			Title: strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(subject, "[TrustLink]"), "[안내]")), Body: body, Reason: reason, Ref: cu.ID})
+		sent, dropped, err := s.mail.SendRich(to, subject, mc)
+		outboxRecord("expiry", cu.Name+" · 만료 안내", cu.ID, to, subject, mc, sent, dropped, err)
 		r.Sent, r.Dropped, r.Error = sent, dropped, errString(err)
 	}
 	return r

@@ -335,9 +335,10 @@ export type MailCompose = { recipients: string[]; sections: string[]; reports: s
 // 발송함: 보내기 전 잠깐 기다리고(취소 가능) 보낸다
 export type OutboxItem = {
   id: string; kind: 'digest' | 'custnotify' | 'devreq' | 'notify' | 'expiry'; label: string; ref?: string; recipients: string[]; subject: string; createdBy: string; createdAt: string; sendAt: string;
-  status: 'pending' | 'sent' | 'blocked' | 'failed' | 'cancelled' | 'lost'; sent?: string[]; dropped?: string[]; error?: string; doneAt?: string; doneBy?: string; attachments?: number;
+  status: 'pending' | 'sent' | 'blocked' | 'failed' | 'cancelled' | 'lost'; sent?: string[]; dropped?: string[]; error?: string; doneAt?: string; doneBy?: string; attachments?: number; resendOf?: string; resentAs?: string; canResend?: boolean;
 };
 export const adminOutbox = () => aj<{ items: OutboxItem[]; now: string }>('/api/mail/outbox');
+export const adminOutboxResend = (id: string) => aj<OutboxItem>(`/api/mail/outbox/${encodeURIComponent(id)}/resend`, jsonInit('POST', {}));
 export const adminOutboxCancel = (id: string) => aj<OutboxItem>(`/api/mail/outbox/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export type MailTemplate = { id: string; name: string; subject: string; note: string; sections: string[]; builtin?: boolean; updatedBy?: string; updatedAt?: string };
 export const adminMailTemplates = () => aj<MailTemplate[]>('/api/mail/templates');

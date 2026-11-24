@@ -10,8 +10,12 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"sync"
 	"time"
@@ -34,6 +38,9 @@ type outboxItem struct {
 	DoneAt     string   `json:"doneAt,omitempty"`
 	DoneBy     string   `json:"doneBy,omitempty"` // 취소한 사람
 	Attach     int      `json:"attachments,omitempty"`
+	ResendOf   string   `json:"resendOf,omitempty"`  // 이 메일이 다시 보낸 것이라면 원래 메일
+	ResentAs   string   `json:"resentAs,omitempty"`  // 이 메일을 다시 보낸 새 메일
+	CanResend  bool     `json:"canResend,omitempty"` // 목록을 줄 때 계산(내용이 남아 있고 보냄·실패·재시작으로 못 보냄)
 }
 
 type outboxJob struct {
@@ -51,6 +58,51 @@ var outbox = struct {
 }{jobs: map[string]*outboxJob{}}
 
 const outboxKeep = 200
+
+// 다시 보내기용 내용 보관: 최근 outboxBodyKeep 건의 본문·첨부를 서버 데이터에 둔다(그보다 오래된 것은 지움).
+const (
+	outboxBodyKeep = 30
+	outboxBodyMax  = 8 << 20 // 이보다 큰 메일은 보관하지 않음(다시 보내기 불가)
+)
+
+var outboxIDRe = regexp.MustCompile(`^m-[0-9a-f]{12}$`)
+
+func outboxBodyDir() string { return filepath.Join(filepath.Dir(aiConfigPath()), "mail-outbox-body") }
+func outboxBodyPath(id string) string {
+	return filepath.Join(outboxBodyDir(), id+".json")
+}
+
+func outboxKeepBody(id string, c mailContent) {
+	b, err := json.Marshal(c)
+	if err != nil || len(b) > outboxBodyMax {
+		return
+	}
+	if os.MkdirAll(outboxBodyDir(), 0o750) == nil {
+		_ = os.WriteFile(outboxBodyPath(id), b, 0o640)
+	}
+}
+
+// outboxPruneBodies: 최근 outboxBodyKeep 건 밖의 보관 내용을 지운다. outbox 잠근 채로.
+func outboxPruneBodies() {
+	keep := map[string]bool{}
+	for i := len(outbox.items) - 1; i >= 0 && len(keep) < outboxBodyKeep; i-- {
+		keep[outbox.items[i].ID+".json"] = true
+	}
+	es, _ := os.ReadDir(outboxBodyDir())
+	for _, e := range es {
+		if !keep[e.Name()] {
+			_ = os.Remove(filepath.Join(outboxBodyDir(), e.Name()))
+		}
+	}
+}
+
+func outboxCanResend(it outboxItem) bool {
+	if it.Status != "sent" && it.Status != "failed" && it.Status != "lost" {
+		return false
+	}
+	_, err := os.Stat(outboxBodyPath(it.ID))
+	return err == nil
+}
 
 // 기다리는 시간(초): 0(바로), 10, 30, 60, 120
 func outboxDelay(sec int) time.Duration {
@@ -77,7 +129,7 @@ func outboxLoad() { // outbox 잠근 채로
 	_ = readJSONFile(outbox.path, &outbox.items)
 	for i := range outbox.items {
 		if outbox.items[i].Status == "pending" {
-			outbox.items[i].Status, outbox.items[i].Error = "lost", "기다리는 중에 서버가 다시 시작되어 보내지 않았습니다 — 다시 보내 주세요"
+			outbox.items[i].Status, outbox.items[i].Error = "lost", "기다리는 중에 서버가 다시 시작되어 보내지 않았습니다 — '다시 보내기'를 눌러 주세요"
 			outbox.items[i].DoneAt = time.Now().UTC().Format(time.RFC3339)
 		}
 	}
@@ -95,6 +147,7 @@ func outboxSaveLocked() {
 		outbox.items = keep
 	}
 	_ = writeJSONFile(outbox.path, outbox.items)
+	outboxPruneBodies()
 }
 
 func outboxSet(id string, fn func(it *outboxItem)) (outboxItem, bool) { // outbox 잠근 채로
@@ -112,6 +165,7 @@ func (s *Server) enqueueMail(kind, label, ref, actor string, to []string, subjec
 	now := time.Now().UTC()
 	it := outboxItem{ID: newOutboxID(), Kind: kind, Label: label, Ref: ref, Recipients: to, Subject: subject, CreatedBy: actor,
 		CreatedAt: now.Format(time.RFC3339), SendAt: now.Add(delay).Format(time.RFC3339), Status: "pending", Attach: len(content.Attachments)}
+	outboxKeepBody(it.ID, content)
 	outbox.Lock()
 	outboxLoad()
 	outbox.items = append(outbox.items, it)
@@ -165,6 +219,9 @@ func (s *Server) apiMailOutbox(w http.ResponseWriter, r *http.Request) {
 	if len(items) > 50 {
 		items = items[:50]
 	}
+	for i := range items {
+		items[i].CanResend = items[i].ResentAs == "" && outboxCanResend(items[i])
+	}
 	writeJSON(w, 200, map[string]any{"items": items, "now": time.Now().UTC().Format(time.RFC3339)})
 }
 
@@ -200,7 +257,7 @@ func (s *Server) apiMailOutboxCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 // outboxRecord: 기다리지 않고 바로 보낸 자동 메일(내부 통보·만료 안내)도 발송함 기록에 남긴다 — 모든 나간 메일을 한 목록에서.
-func outboxRecord(kind, label, ref string, to []string, subject string, sent, dropped []string, err error) {
+func outboxRecord(kind, label, ref string, to []string, subject string, content mailContent, sent, dropped []string, err error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	st := "sent"
 	switch {
@@ -209,10 +266,59 @@ func outboxRecord(kind, label, ref string, to []string, subject string, sent, dr
 	case len(sent) == 0:
 		st = "blocked"
 	}
+	id := newOutboxID()
+	outboxKeepBody(id, content)
 	outbox.Lock()
 	outboxLoad()
-	outbox.items = append(outbox.items, outboxItem{ID: newOutboxID(), Kind: kind, Label: label, Ref: ref, Recipients: to, Subject: subject,
+	outbox.items = append(outbox.items, outboxItem{ID: id, Kind: kind, Label: label, Ref: ref, Recipients: to, Subject: subject,
 		CreatedBy: "trustlink", CreatedAt: now, SendAt: now, Status: st, Sent: sent, Dropped: dropped, Error: errString(err), DoneAt: now})
 	outboxSaveLocked()
 	outbox.Unlock()
+}
+
+// POST /api/mail/outbox/{id}/resend {delay} — 다시 보내기. 보관해 둔 내용 그대로, 같은 받는 사람에게 발송함을 거쳐(취소 가능) 보낸다.
+// 일시적인 메일 서버 오류·재시작으로 못 나간 메일, 받지 못했다는 메일에 쓴다. 최근 outboxBodyKeep 건만 가능.
+func (s *Server) apiMailOutboxResend(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	actor := w.Header().Get("X-User")
+	var in struct {
+		Delay *int `json:"delay"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<10)).Decode(&in)
+	delay := 30
+	if in.Delay != nil {
+		delay = *in.Delay
+	}
+	if !outboxIDRe.MatchString(id) {
+		writeJSON(w, 404, map[string]string{"error": "발송함에 없는 메일"})
+		return
+	}
+	outbox.Lock()
+	outboxLoad()
+	cur, ok := outboxSet(id, func(x *outboxItem) {})
+	outbox.Unlock()
+	switch {
+	case !ok:
+		writeJSON(w, 404, map[string]string{"error": "발송함에 없는 메일"})
+		return
+	case cur.ResentAs != "":
+		writeJSON(w, 409, map[string]string{"error": "이미 다시 보낸 메일입니다(" + cur.ResentAs + ")"})
+		return
+	case !outboxCanResend(cur):
+		writeJSON(w, 409, map[string]string{"error": "다시 보낼 수 없습니다 — 보냄·실패·재시작으로 못 보낸 메일 중 최근 " + itoa(outboxBodyKeep) + "건만 가능합니다"})
+		return
+	}
+	var c mailContent
+	if b, err := os.ReadFile(outboxBodyPath(id)); err != nil || json.Unmarshal(b, &c) != nil {
+		writeJSON(w, 409, map[string]string{"error": "보관된 내용을 읽지 못했습니다"})
+		return
+	}
+	it := s.enqueueMail(cur.Kind, cur.Label, cur.Ref, actor, cur.Recipients, cur.Subject, c, outboxDelay(delay), nil)
+	outbox.Lock()
+	it, _ = outboxSet(it.ID, func(x *outboxItem) { x.ResendOf = id })
+	outboxSet(id, func(x *outboxItem) { x.ResentAs = it.ID })
+	outboxSaveLocked()
+	outbox.Unlock()
+	_ = s.sor.append(SoREvent{Actor: actor, Action: "mail-resend", Subject: it.ID, Detail: map[string]any{"of": id, "kind": cur.Kind, "ref": cur.Ref, "to": cur.Recipients, "subject": cur.Subject, "was": cur.Status}})
+	writeJSON(w, 202, it)
 }
