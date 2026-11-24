@@ -1,3 +1,4 @@
+import { HelpScene } from '@/components/HelpScene';
 import { useEffect, useState } from 'react';
 import { Busy } from '@/components/Progress';
 import { ShieldQuestion, RefreshCw, UploadCloud, Lock, ChevronDown, ChevronRight, Sparkles, ListChecks, Square } from 'lucide-react';
@@ -133,7 +134,7 @@ function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
     if (r.remedy.dueBy) lines.push(`KEV 조치 기한: ${r.remedy.dueBy}`);
     onApply({
       status: d.status, just: d.justification, response: d.response, details: lines.join('\n'),
-      comment: `AI 초안(${r.meta.model}, 근거 ${d.citations.join(',')}) 검토 후 저장`
+      comment: `판정 초안(${r.meta.model}, 근거 ${d.citations.join(',')}) 검토 후 저장`
     });
   }
   return (
@@ -160,7 +161,7 @@ function AIDraftBox({ uuid, f, repo, tag, initial, onApply }: {
             {res.draft.justification && <Badge variant="muted">{labelOf(JUSTIFICATIONS, res.draft.justification)}</Badge>}
             {res.draft.response && <Badge variant="muted">대응: {labelOf(RESPONSES, res.draft.response)}</Badge>}
             <span className="text-muted-foreground">
-              {CONF_LABEL[res.draft.confidence]} · {res.meta.model} · {(res.meta.elapsedMs / 1000).toFixed(0)}초
+              {CONF_LABEL[res.draft.confidence]} · {({ rule: '규칙 판정', 'rule+card': '규칙 판정 + AI 권고문 요약', 'ai-slim': 'AI 판정(사용 맥락 반영)', 'ai-full': 'AI 판정' } as Record<string, string>)[res.meta.method || ''] || res.meta.model}{res.meta.cached ? ' · 저장된 판정' : ''} · {(res.meta.elapsedMs / 1000).toFixed(res.meta.elapsedMs < 10000 ? 1 : 0)}초
               {res.at ? ` · ${new Date(res.at).toLocaleString()}` : ''}
             </span>
           </div>
@@ -414,6 +415,7 @@ export default function VexPanel({ repo, tag }: { repo: string; tag: string }) {
               <span className="text-xs text-muted-foreground">DT 프로젝트: {project} @ {tag}</span>
               {data && <span className="text-xs text-muted-foreground">· 우선순위 순 정렬 {kev?.available ? `(KEV 사본 ${kev.asOf?.slice(0, 10)})` : '(KEV 사본 없음 — 미러 확인)'}</span>}
               {ai && <AIBadge label="AI 판정 사용 가능" />}
+              <span className="ml-auto"><HelpScene topic="vex" title="VEX 판단은 이렇게 동작합니다" /></span>
             </div>
             {!ai && (
               <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-violet-300 bg-violet-50/30 p-2 text-xs text-violet-900">

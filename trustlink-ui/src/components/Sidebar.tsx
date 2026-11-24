@@ -36,7 +36,7 @@ const MY_ITEM: Item = { to: '/my', label: '내 제품', icon: PackageCheck };
 //   결정(사람이 할 일) · 릴리스(무엇을 줬나) · 고객(누가 쓰나) · 신호(무엇이 바뀌었나) · 전달·기록(누구에게 알렸나) · 설정.
 // 주소는 그대로 두고 위치와 이름만 바꾼다(기존 링크가 깨지지 않게).
 const DECIDE: Item[] = [
-  { to: '/admin/inbox', label: '결정함', icon: Inbox },
+  { to: '/admin/inbox', label: '승인 대기함', icon: Inbox },
   { to: '/admin', label: '대시보드', icon: LayoutDashboard, end: true },
 ];
 const RELEASE: Item[] = [
@@ -74,7 +74,7 @@ const SETTINGS: Item[] = [
   { to: '/admin/ai', label: 'AI 연결', icon: Sparkles },
   { to: '/admin/storage', label: '설정·스토리지', icon: Database }
 ];
-const ADMIN_SECTIONS: [string, Item[]][] = [['결정', DECIDE], ['릴리스', RELEASE], ['고객', CUSTOMER], ['신호', SIGNAL], ['전달·기록', DELIVER], ['설정', SETTINGS]];
+const ADMIN_SECTIONS: [string, Item[]][] = [['승인·판단', DECIDE], ['릴리스', RELEASE], ['고객', CUSTOMER], ['취약점·규제 대응', SIGNAL], ['전달·기록', DELIVER], ['설정', SETTINGS]];
 
 const matches = (pathname: string, it: Sub) => (it.end ? pathname === it.to : pathname === it.to || pathname.startsWith(it.to + '/'));
 

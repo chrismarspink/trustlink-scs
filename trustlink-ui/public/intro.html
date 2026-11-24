@@ -396,7 +396,7 @@ const LEDGER = [
 {
   tab: '하나의 흐름', kicker: '모든 변화는', title: '같은 다섯 단계를 지나고, 사람은 결정만 합니다',
   text: '새 취약점이든, 규제 개정이든, 계약·EOS 만료든 처리 방법은 하나입니다. 신호를 받으면 영향받는 릴리스와 고객을 계산하고, 사람이 결정하면, 전달하고, 기록으로 남깁니다. 새 종류의 변화가 생겨도 화면이 아니라 이 표에 한 줄이 늘 뿐입니다.',
-  list: ['<b>신호</b>: DT 새 취약점·주기 검색, 규제 탐색, 만료 도래', '<b>영향</b>: 어느 릴리스, 어느 고객 — 패치 버전까지', '<b>결정</b>: 사람만 하는 단계 — 결정함 한 곳에서', '<b>전달·기록</b>: 발송함 한 길로 나가고, 감사 기록에 남음'],
+  list: ['<b>신호</b>: DT 새 취약점·주기 검색, 규제 탐색, 만료 도래', '<b>영향</b>: 어느 릴리스, 어느 고객 — 패치 버전까지', '<b>결정</b>: 사람만 하는 단계 — 승인 대기함 한 곳에서', '<b>전달·기록</b>: 발송함 한 길로 나가고, 감사 기록에 남음'],
   svg: () => {
     const st = ['신호', '영향', '결정 (사람)', '전달', '기록'];
     const lanes = [['취약점', [['DT 새 취약점', '주기 검색'], ['영향 릴리스', '패치·고객'], ['고객 통지', '개발 요청·VEX'], ['보안 권고', '수정 요청'], ['감사 원장', '통지 이력']]],
@@ -409,18 +409,18 @@ const LEDGER = [
       lanes.map(([name, cells], k) => `<text x="8" y="${ys[k] + 33}" font-size="12.5" font-weight="700" fill="var(--ink)">${name}</text>` +
         cells.map(([a, b], i) => `<g class="pop" style="animation-delay:${d(i, k + 1)}s"><rect x="${X(i)}" y="${ys[k]}" width="${W}" height="56" rx="8" fill="${i === 2 ? '#f5f3ff' : '#f1f5f9'}" stroke="${i === 2 ? 'var(--tl)' : 'none'}"/><text x="${X(i) + W / 2}" y="${ys[k] + 24}" font-size="10.5" text-anchor="middle" fill="#334155">${a}</text><text x="${X(i) + W / 2}" y="${ys[k] + 40}" font-size="10.5" text-anchor="middle" fill="#334155">${b}</text></g>`).join('')).join('') +
       `<rect class="blink" style="animation-delay:3.4s" x="${X(2) - 6}" y="40" width="${W + 12}" height="262" rx="12" fill="none" stroke="var(--tl)" stroke-width="2" stroke-dasharray="6 5"/>` +
-      `<text class="sm fade" x="320" y="330" style="animation-delay:3.4s">신호·영향·전달·기록은 TrustLink 가 — 결정은 결정함 한 곳에서 사람이</text>`;
+      `<text class="sm fade" x="320" y="330" style="animation-delay:3.4s">신호·영향·전달·기록은 TrustLink 가 — 결정은 승인 대기함 한 곳에서 사람이</text>`;
   }
 },
 {
   tab: '사람은 세 가지만', kicker: '단순하게', title: '올리고, 결정하고, 받습니다',
-  text: '개발자는 릴리스를 올리고, 관리자는 결정함 한 곳에서 결정하고, 고객과 이해관계자는 받습니다. 수집·대조·AI 분석·메일 초안·발송·기록은 TrustLink 가 합니다.',
-  list: ['<b>개발자</b>: 바이너리 + SBOM + 서명을 올린다', '<b>관리자</b>: 결정함에서 승인·반려 — 고객 메일도 개발 요청도 승인해야 나감', '<b>고객·경영진·감독기관</b>: 메일, 내 제품 화면, 보고서로 받는다', '보낸 뒤에도 잠깐은 <b>보내기 취소</b>, 모든 결정은 기록'],
+  text: '개발자는 릴리스를 올리고, 관리자는 승인 대기함 한 곳에서 결정하고, 고객과 이해관계자는 받습니다. 수집·대조·AI 분석·메일 초안·발송·기록은 TrustLink 가 합니다.',
+  list: ['<b>개발자</b>: 바이너리 + SBOM + 서명을 올린다', '<b>관리자</b>: 승인 대기함에서 승인·반려 — 고객 메일도 개발 요청도 승인해야 나감', '<b>고객·경영진·감독기관</b>: 메일, 내 제품 화면, 보고서로 받는다', '보낸 뒤에도 잠깐은 <b>보내기 취소</b>, 모든 결정은 기록'],
   svg: () => G +
     fig(100, 300, 'var(--dev)', '개발자', 'up') + `<g class="bob">${vbox(77, 150, '3.1', 'var(--ok)', '#dcfce7')}</g>` +
     `<text x="100" y="130" class="lbl" fill="var(--dev)">① 올린다</text>` +
     `<text x="320" y="52" class="lbl" fill="var(--tl)">② 결정한다</text>` +
-    `<g transform="translate(210,64)"><rect width="220" height="150" rx="10" fill="#fff" stroke="var(--tl)" stroke-width="2.5"/><text x="110" y="24" class="lbl" fill="var(--tl)">결정함</text>
+    `<g transform="translate(210,64)"><rect width="220" height="150" rx="10" fill="#fff" stroke="var(--tl)" stroke-width="2.5"/><text x="110" y="24" class="lbl" fill="var(--tl)">승인 대기함</text>
       ${[['고객 통지 11.0→11.1', 'var(--cus)'], ['개발 요청 12.0 패치 없음', 'var(--dev)'], ['규제 후보 채택?', 'var(--reg)']].map((r, i) => `<g transform="translate(12,${40 + i * 34})"><rect width="196" height="26" rx="6" fill="#f8fafc" stroke="#e2e8f0"/><circle cx="12" cy="13" r="4" fill="${r[1]}"/><text x="22" y="17" font-size="10" fill="#334155">${r[0]}</text></g>`).join('')}</g>` +
     `<g class="pop" style="animation-delay:1.6s"><g transform="translate(374,108)"><rect width="40" height="18" rx="4" fill="var(--ok)"/><text x="20" y="13" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">승인</text></g></g>` +
     fig(320, 300, 'var(--tl)', '관리자', 'point') +
@@ -430,7 +430,72 @@ const LEDGER = [
 },
 ];
 
-const STORIES = [
+// ── 도움말: VEX 판단 동작 원리 (주소 끝 ?help=vex 로 이 이야기만 보여 준다) ──────────
+const card3 = (x, y, w, title, lines, c, d = 0) => `<g class="pop" style="animation-delay:${d}s"><rect x="${x}" y="${y}" width="${w}" height="${26 + lines.length * 16}" rx="8" fill="#fff" stroke="${c}" stroke-width="2"/>
+  <text x="${x + w / 2}" y="${y + 18}" font-size="12" font-weight="800" text-anchor="middle" fill="${c}">${title}</text>
+  ${lines.map((l, i) => `<text x="${x + w / 2}" y="${y + 36 + i * 16}" font-size="11" text-anchor="middle" fill="#334155">${l}</text>`).join('')}</g>`;
+const arrow = (x1, y1, x2, y2, d = 0, c = '#94a3b8') => `<g class="fade" style="animation-delay:${d}s"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="2.5"/><path d="M${x2} ${y2} l-8 -5 v10z" fill="${c}"/></g>`;
+const HELP_VEX = [
+{
+  tab: '무엇을 하나', kicker: 'VEX 판단이란', title: '"이 취약점, 우리 제품에 영향이 있나?"에 답하는 일입니다',
+  text: '분석기는 구성요소 버전만 보고 취약점을 찾습니다. 하지만 그 기능을 쓰지 않으면 실제 영향은 없습니다. 영향이 있는지 판단해 고객에게 알려 주는 문서가 VEX 입니다.',
+  list: ['<b>영향 있음</b> — 고쳐야 함(업데이트·임시 완화)', '<b>영향 없음</b> — 근거를 남기고 닫음', '<b>조사 중</b> — 아직 확인이 필요함', '최종 판단은 언제나 <b>사람</b>이 저장합니다'],
+  svg: () => G +
+    vbox(70, 232, '3.0') + bolt(105, 170, .4) + `<text class="sm pop" x="95" y="160" style="animation-delay:.6s">취약점 98건</text>` +
+    fig(300, 300, 'var(--dev)', '보안 담당', 'point', { sad: true }) +
+    bub(215, 70, 200, ['이게 다 우리 제품에', '영향이 있는 걸까…?'], [290, 200], 'pop', 1.2) +
+    card3(450, 96, 150, '영향 있음', ['고친다'], 'var(--bad)', 2.4) + card3(450, 156, 150, '영향 없음', ['근거를 남긴다'], 'var(--ok)', 2.9) + card3(450, 216, 150, '조사 중', ['더 확인한다'], '#b45309', 3.4)
+},
+{
+  tab: '자료 모으기', kicker: '1 · 사실', title: '먼저 서버 안의 자료에서 사실만 모읍니다',
+  text: 'TrustLink 는 매일 새벽 취약점 DB 를 서버 안에 받아 둡니다. 판단할 때는 이 사본에서 구성요소·영향 범위·수정 버전·실제 악용 여부를 찾아 번호를 붙인 사실 목록으로 만듭니다.',
+  list: ['<b>OSV</b> — 영향받는 버전 범위와 수정 버전', '<b>KEV</b> — 실제 악용이 확인된 취약점', '<b>익스플로잇</b> — 공개된 공격 코드', '분석 내용은 서버 밖으로 나가지 않습니다'],
+  svg: () => G +
+    `<g transform="translate(40,120)"><rect width="150" height="150" rx="8" fill="#fff" stroke="var(--reg)" stroke-width="2.5"/><text x="75" y="-10" class="lbl" fill="var(--reg)">서버 안 취약점 DB</text>
+      ${['OSV', 'KEV', '익스플로잇', 'EPSS'].map((t, i) => `<g class="pop" style="animation-delay:${.3 + i * .3}s"><rect x="18" y="${16 + i * 32}" width="114" height="24" rx="5" fill="#f0fdfa" stroke="var(--reg)"/><text x="75" y="${33 + i * 32}" font-size="11" text-anchor="middle" fill="var(--reg)" font-weight="700">${t}</text></g>`).join('')}</g>` +
+    arrow(200, 195, 270, 195, 1.8) + TL(310, 195, 1) + arrow(350, 195, 410, 195, 2.4) +
+    `<g transform="translate(420,96)"><rect width="190" height="196" rx="8" fill="#fff" stroke="var(--tl)" stroke-width="2.5"/><text x="95" y="-10" class="lbl" fill="var(--tl)">사실 목록</text>
+      ${[['C1', '구성요소 nginx 1.28.0'], ['V1', '취약점 · 심각도'], ['V3', '권고문 설명'], ['X2', 'KEV 등재 여부'], ['R1', '영향 범위 · 수정 버전']].map((r, i) => `<g class="pop" style="animation-delay:${2.8 + i * .35}s"><rect x="12" y="${14 + i * 35}" width="30" height="20" rx="4" fill="var(--tl)"/><text x="27" y="${28 + i * 35}" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">${r[0]}</text><text x="50" y="${28 + i * 35}" font-size="11" fill="#334155">${r[1]}</text></g>`).join('')}</g>`
+},
+{
+  tab: '규칙 판정', kicker: '2 · 규칙', title: '판정은 규칙이 냅니다 — 바로 나옵니다',
+  text: '버전이 영향 범위에 드는지, 수정 버전이 있는지는 계산으로 정해집니다. 그래서 이 단계는 AI 를 쓰지 않고, 누가 언제 돌려도 같은 결과가 나옵니다.',
+  list: ['범위 <b>밖</b> → 영향 없음(취약한 코드 없음)', '범위 <b>안</b> + 수정 버전 있음 → 영향 있음 · 업데이트', '그 밖(확인 불가·수정 버전 없음) → 조사 중', 'KEV·익스플로잇이 있으면 계획 첫 줄에 <b>긴급</b> 표시'],
+  svg: () => G +
+    `<g transform="translate(40,150)"><rect width="120" height="60" rx="8" fill="#fff" stroke="var(--tl)" stroke-width="2.5"/><text x="60" y="26" class="lbl" fill="var(--tl)">사실 목록</text><text x="60" y="46" class="sm">R1 영향 범위</text></g>` +
+    arrow(165, 180, 225, 180, .6) +
+    `<g class="pop" style="animation-delay:1s"><path d="M290 130 l60 50 l-60 50 l-60 -50z" fill="#fff" stroke="#475569" stroke-width="2.5"/><text x="290" y="176" font-size="11" text-anchor="middle" font-weight="700" fill="#334155">범위 안?</text><text x="290" y="192" font-size="11" text-anchor="middle" font-weight="700" fill="#334155">수정 버전?</text></g>` +
+    arrow(350, 165, 425, 110, 1.8, 'var(--ok)') + arrow(352, 180, 425, 180, 2.3, 'var(--bad)') + arrow(350, 195, 425, 250, 2.8, '#b45309') +
+    card3(432, 84, 170, '영향 없음', ['범위 밖'], 'var(--ok)', 2) + card3(432, 154, 170, '영향 있음 · 업데이트', ['범위 안 + 수정 버전'], 'var(--bad)', 2.5) + card3(432, 224, 170, '조사 중', ['확인 불가 · 수정 버전 없음'], '#b45309', 3) +
+    tag(240, 262, '즉시 · AI 없음', 'var(--reg)', 3.6)
+},
+{
+  tab: 'AI 의 역할', kicker: '3 · AI', title: 'AI 는 두 가지만 돕습니다',
+  text: 'AI 는 판정을 대신하지 않습니다. 영어 권고문을 한국어로 요약하고, 담당자가 "우리는 이 기능을 쓰지 않는다" 같은 사용 맥락을 적었을 때 그 내용을 반영한 판정 초안을 냅니다.',
+  list: ['<b>권고문 요약</b> — 취약점마다 한 번만 만들어 모든 제품이 같이 씀', '<b>사용 맥락 반영</b> — 맥락을 적은 건만 AI 가 판정 초안을 냄', 'AI 는 사실 목록에 있는 내용만 쓰고, 근거 번호를 붙임', 'AI 가 쓴 글에는 <b>AI 생성</b> 표시가 붙습니다'],
+  svg: () => G +
+    doc(60, 110, '#475569') + `<text class="sm" x="76" y="170">영어 권고문</text>` + arrow(100, 132, 180, 132, .5, 'var(--ai)') +
+    `<g class="pop" style="animation-delay:.9s"><circle cx="215" cy="132" r="24" fill="var(--ai)"/><text x="215" y="137" font-size="13" fill="#fff" text-anchor="middle" font-weight="800">AI</text></g>` +
+    arrow(245, 132, 320, 132, 1.4, 'var(--ai)') + card3(328, 100, 270, '권고문 요약(한국어)', ['한 번 만들어 저장 → 다음부터는 즉시'], 'var(--ai)', 1.8) +
+    fig(90, 300, 'var(--dev)', '담당자', 'point') + bub(118, 196, 176, ['이 기능은 설정에서', '꺼 두었습니다(사용 맥락)'], [104, 236], 'pop', 2.8) +
+    arrow(300, 250, 330, 250, 3.6, 'var(--ai)') + `<g class="pop" style="animation-delay:3.9s"><circle cx="360" cy="250" r="24" fill="var(--ai)"/><text x="360" y="255" font-size="13" fill="#fff" text-anchor="middle" font-weight="800">AI</text></g>` +
+    arrow(390, 250, 425, 250, 4.3, 'var(--ai)') + card3(432, 220, 170, '영향 없음(초안)', ['이유 한 문장 + 근거 [U1]'], 'var(--ok)', 4.7)
+},
+{
+  tab: '사람이 확정', kicker: '4 · 확인', title: '안전장치를 거쳐, 사람이 확정합니다',
+  text: '초안은 초안일 뿐입니다. 근거 없이 "영향 없음"이면 "조사 중"으로 낮추고, 자료에 없는 버전 번호가 있으면 경고합니다. 담당자가 읽고 저장해야 판정이 되고, 발행해야 고객에게 나갑니다.',
+  list: ['근거 없는 "영향 없음" → <b>조사 중</b>으로 낮춤', '자료에 없는 버전 표기 → <b>경고</b>', 'KEV 취약점의 "영향 없음" → 2인 검토 권장', '저장·발행 기록은 감사 원장에 남습니다'],
+  svg: () => G +
+    card3(40, 110, 150, '판정 초안', ['규칙 + AI 요약'], 'var(--tl)', .2) + arrow(195, 138, 245, 138, .8) +
+    `<g class="pop" style="animation-delay:1.1s"><rect x="250" y="96" width="130" height="84" rx="8" fill="#fff" stroke="#475569" stroke-width="2.5"/><text x="315" y="118" font-size="12" font-weight="800" text-anchor="middle" fill="#334155">안전장치</text><text x="315" y="138" font-size="10.5" text-anchor="middle" fill="#334155">근거 없는 판정 낮춤</text><text x="315" y="154" font-size="10.5" text-anchor="middle" fill="#334155">지어낸 버전 경고</text><text x="315" y="170" font-size="10.5" text-anchor="middle" fill="#334155">근거 번호 확인</text></g>` +
+    arrow(385, 138, 440, 180, 2) + fig(480, 300, 'var(--dev)', '담당자', 'hold') + doc(506, 232, 'var(--tl)') + check(545, 236, 'var(--ok)', 3) +
+    bub(400, 70, 190, ['읽고, 고치고, 저장합니다'], [470, 205], 'pop', 2.6) +
+    arrow(540, 262, 590, 262, 3.8, 'var(--cus)') + `<g class="pop" style="animation-delay:4.1s">${env(594, 252, 'var(--cus)')}</g><text class="sm fade" x="596" y="290" style="animation-delay:4.3s">VEX 발행</text>`
+},
+];
+
+const HELP = { vex: [{ name: 'VEX 판단은 이렇게 동작합니다', scenes: HELP_VEX }] };
+const STORIES = HELP[new URLSearchParams(location.search).get('help')] || [
   { name: 'TrustLink 란', scenes: LEDGER },
   { name: '공급망 보안 흐름', scenes: FLOW },
   { name: '출시된 구버전도 계속 검증', scenes: LEGACY },

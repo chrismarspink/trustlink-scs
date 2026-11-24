@@ -529,7 +529,7 @@ export type VexRemedy = {
 export type VexDraftResult = {
   component: string; vulnerability: string; vulnId: string; at: string;
   draft: VexDraft; remedy: VexRemedy; facts: AIFact[]; warnings: string[]; kev: boolean;
-  meta: { model: string; factsSha256: string; dbSnapshot?: string; elapsedMs: number };
+  meta: { model: string; factsSha256: string; dbSnapshot?: string; elapsedMs: number; method?: 'rule' | 'rule+card' | 'ai-slim' | 'ai-full'; cached?: boolean };
 };
 export const aiStatus = (use?: 'report') => aj<AIStatus>('/api/ai/status' + (use ? `?use=${use}` : ''));
 // AI 연결 설정(관리자). 로컬·외부 LLM 을 함께 등록하고 용도(VEX / 보고서)별로 고른다. 키는 다시 내려오지 않는다(hasKey·keyHint 만).
@@ -879,7 +879,7 @@ export const adminAutoRun = (repo: string, tag: string, vulnId: string) => aj<Au
 export const adminAutoApprove = (id: string, keys: string[], delay: number) => aj<{ run: AutoRun }>(`/api/auto-response/${encodeURIComponent(id)}/approve`, jsonInit('POST', { keys, delay }));
 export const adminAutoReject = (id: string, reason: string) => aj<AutoRun>(`/api/auto-response/${encodeURIComponent(id)}/reject`, jsonInit('POST', { reason }));
 
-// ---------- 결정함(사람이 결정할 일 모음) ----------
+// ---------- 승인 대기함(사람이 결정할 일 모음) ----------
 export type InboxItem = { kind: 'auto-customer' | 'auto-dev' | 'vex' | 'reg' | 'expiry' | 'outbox'; title: string; detail?: string; link: string; urgent?: boolean; at?: string; ref?: string };
 export type InboxGroup = { key: 'auto' | 'vex' | 'reg' | 'expiry' | 'outbox'; label: string; count: number; link: string; items: InboxItem[] };
 export const adminInbox = () => aj<{ groups: InboxGroup[]; decisions: number; generated: string }>('/api/inbox');

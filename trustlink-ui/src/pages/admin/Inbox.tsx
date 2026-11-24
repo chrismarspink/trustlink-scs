@@ -6,7 +6,7 @@ import { adminInbox, type InboxGroup } from '@/lib/api';
 import { PageHeader, Alert, Loading } from './_ui';
 import { cn } from '@/lib/utils';
 
-// 관리 › 결정함: 신호 → 영향 → **결정** → 전달 → 기록 중 사람이 하는 "결정"을 한 곳에.
+// 관리 › 승인 대기함: 신호 → 영향 → **결정** → 전달 → 기록 중 사람이 하는 "결정"을 한 곳에.
 // 흩어진 대기열(자동 대응 승인·VEX 판단·규제 후보·만료·발송 대기)을 모아 보여 주고 원래 화면으로 보낸다.
 
 const META: Record<InboxGroup['key'], { icon: LucideIcon; cls: string; hint: string }> = {
@@ -28,7 +28,7 @@ export default function Inbox() {
   }, []);
   return (
     <>
-      <PageHeader title="결정함" description="TrustLink 는 신호를 모으고, 영향을 계산하고, 초안을 쓰고, 보내고, 기록합니다. 사람이 할 일은 여기서 결정하는 것뿐입니다." />
+      <PageHeader title="승인 대기함" description="TrustLink 는 신호를 모으고, 영향을 계산하고, 초안을 쓰고, 보내고, 기록합니다. 사람이 할 일은 여기서 결정하는 것뿐입니다." />
       {err && <Alert tone="crit">{err}</Alert>}
       {!d ? <Loading /> : (
         <>

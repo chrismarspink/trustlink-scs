@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldQuestion, RefreshCw, ListChecks } from 'lucide-react';
 import { AIBadge, AIIcon } from '@/components/AIBadge';
+import { HelpScene } from '@/components/HelpScene';
 import { vexQueue, aiVexBatchStart, aiStatus, type VexQueue as Q, type VexQueueRow, type VexQueueRowAuto, type AIStatus } from '@/lib/api';
 import { SourceBadge } from '@/components/SourceBadge';
 import { Badge, Button, Card } from '@/components/ui/primitives';
@@ -47,6 +48,7 @@ export default function VexQueue() {
           <h1 className="flex items-center gap-2 text-2xl font-bold"><ShieldQuestion size={22} /> VEX 판단</h1>
           <p className="mt-1 text-sm text-muted-foreground">감시 중인 모든 제품·버전의 판단 안 된 취약점을 급한 순(실제 악용 KEV → 치명 → 높음)으로 모았습니다. 판단과 VEX 발행은 각 제품 화면에서 합니다.</p>
         </div>
+        <HelpScene topic="vex" title="VEX 판단은 이렇게 동작합니다" />
         <Button variant="outline" onClick={() => { setQ(null); load(true); }}><RefreshCw size={14} /> 새로 집계</Button>
       </div>
 

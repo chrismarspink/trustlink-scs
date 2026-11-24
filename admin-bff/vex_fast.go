@@ -137,13 +137,13 @@ func vexRuleDraft(f dtFindingFull, sig vexSignals, facts []aiFact, card *vulnCar
 
 // ---------- ③ 축약 AI 판정(사용 맥락이 있을 때) ----------
 
-const vexSlimTask = `담당자가 적은 사용 맥락(U1)을 반영해, 위 취약점이 이 제품에 영향을 주는지 VEX 판정을 고른다.
-- status: under_investigation / not_affected / affected / fixed 중 하나.
-- not_affected 는 사용 맥락(U1)이나 "OSV 영향 범위 밖"(R1)이 근거일 때만 고르고 justification 을 반드시 채운다. 그 외에는 justification 을 빈 문자열로 둔다.
-- justification: 취약한 함수·기능을 쓰지 않거나 버전이 범위 밖 → vulnerable_code_not_present, 코드는 있으나 실행되지 않음 → vulnerable_code_not_in_execute_path, 외부 입력이 닿지 않음 → vulnerable_code_cannot_be_controlled_by_adversary, 별도 방어 장치가 있음 → inline_mitigations_already_exist, 구성요소가 제품에 없음 → component_not_present.
-- response: affected 일 때만. R1 에 최소 수정 버전이 있으면 update, 없고 임시 완화가 가능하면 workaround_available, 둘 다 없으면 can_not_fix. 그 외에는 빈 문자열.
-- detail: 판단 이유 한 문장(80자 안팎). 결론은 status 와 같아야 하고, 끝에 근거 사실 ID 를 [U1] 처럼 붙인다. 사실에 없는 버전·설정 값을 지어내지 않는다.
-- confidence: 근거가 충분하면 high, 일부만 있으면 medium, 부족하면 low.`
+const vexSlimTask = `담당자가 적은 사용 맥락(U1)을 반영해 이 취약점이 제품에 영향을 주는지 VEX 판정을 고른다.
+- status: under_investigation / not_affected / affected / fixed.
+- not_affected 는 U1 이나 "OSV 영향 범위 밖"(R1)이 근거일 때만 고르고 justification 을 채운다. 그 외에는 justification 은 빈 문자열.
+- justification: 취약한 기능을 쓰지 않거나 버전이 범위 밖 → vulnerable_code_not_present, 코드는 있으나 꺼져 있거나 실행되지 않음 → vulnerable_code_not_in_execute_path, 외부 입력이 닿지 않음 → vulnerable_code_cannot_be_controlled_by_adversary, 별도 방어 장치 → inline_mitigations_already_exist, 구성요소 자체가 제품에 없음 → component_not_present.
+- response: affected 일 때만. R1 에 수정 버전이 있으면 update, 없고 임시 완화가 가능하면 workaround_available, 둘 다 없으면 can_not_fix. 그 외에는 빈 문자열.
+- detail: 판단 이유 한 문장(80자 안팎), 끝에 근거 사실 ID 를 [U1] 처럼 붙인다. 사실에 없는 버전·설정 값을 쓰지 않는다.
+- confidence: 근거가 충분하면 high, 일부면 medium, 부족하면 low.`
 
 var vexSlimSchema = map[string]any{
 	"type": "object",

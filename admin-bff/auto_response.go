@@ -485,7 +485,7 @@ func (s *Server) approvalCard(x autoRun, mailTitle string) mailCard {
 	sevKo := map[string]string{"CRITICAL": "치명적(CRITICAL)", "HIGH": "높음(HIGH)"}[x.Severity]
 	c := mailCard{Module: "자동 대응", Purpose: "결정 요청", Tone: "decide", Product: prod, Version: x.Tag, Ref: x.ID,
 		Reason: "관리자(admins) 그룹 — 고객·개발자에게 나가는 메일은 관리자 승인이 있어야 발송됩니다",
-		Action: "승인·반려 화면 열기", URL: s.publicBase() + "/admin/auto-response", Alt: "결정함에서 보기", AltURL: s.publicBase() + "/admin/inbox"}
+		Action: "승인·반려 화면 열기", URL: s.publicBase() + "/admin/auto-response", Alt: "승인 대기함에서 보기", AltURL: s.publicBase() + "/admin/inbox"}
 	c.Facts = []mailFact{{K: "취약점", V: x.VulnID, Chips: chips}, {K: "구성요소", V: x.Component}}
 	trig := map[string]string{"auto": "새 취약점 알림(Dependency-Track)", "sweep": "주기 검색", "manual": "수동 실행", "patch": "수정 버전 확인(이어 가기)"}[x.Trigger]
 	if trig != "" {

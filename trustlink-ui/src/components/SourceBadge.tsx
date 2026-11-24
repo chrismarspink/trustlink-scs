@@ -22,7 +22,7 @@ export function SourceBadge({ src, label, title, className }: { src: string; lab
   const s = SRC[k] || { label: src, icon: Database, cls: 'bg-slate-100 text-slate-700', title: src };
   const Icon = s.icon;
   return (
-    <span title={title || s.title} className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', s.cls, className)}>
+    <span title={title || s.title} className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold', s.cls, className)}>
       <Icon size={11} /> {label || s.label}
     </span>
   );
