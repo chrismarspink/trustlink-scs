@@ -30,6 +30,14 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.32.1',
+    date: '2026-11-25',
+    title: '휴대폰에서 쓰기 소개',
+    items: [
+      { kind: '신규', text: '소개 자료에 "휴대폰에서" 장면 3컷 — 집에서 승인 요청을 받고, 휴대폰으로 받는 사람을 확인해 승인하고, 같은 화면이 휴대폰 폭에 맞게 접히는 모습' },
+    ],
+  },
+  {
     version: '2.32.0',
     date: '2026-11-25',
     title: '휴대폰 화면',

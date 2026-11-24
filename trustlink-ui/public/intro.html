@@ -551,13 +551,78 @@ const ASK = [
 },
 ];
 
-const HELP = { vex: [{ name: 'VEX 판단은 이렇게 동작합니다', scenes: HELP_VEX }], ask: [{ name: '묻고 찾기는 이렇게 동작합니다', scenes: ASK }] };
+// ── 휴대폰에서 ─────────────────────────────────────────────────────────────
+// 휴대폰 틀: 안쪽 그림은 (0,0)~(w,h) 좌표로 그린다
+const phone = (x, y, w, h, inner, d = 0) => `<g class="pop" style="animation-delay:${d}s"><g transform="translate(${x},${y})"><rect x="-5" y="-14" width="${w + 10}" height="${h + 26}" rx="14" fill="#1e1b4b"/><rect width="${w}" height="${h}" rx="5" fill="#fff"/><rect x="${w / 2 - 12}" y="-9" width="24" height="4" rx="2" fill="#6366f1"/>${inner}</g></g>`;
+const bars = (x, y, c = '#1e1b4b') => `<g stroke="${c}" stroke-width="2" stroke-linecap="round"><line x1="${x}" y1="${y}" x2="${x + 12}" y2="${y}"/><line x1="${x}" y1="${y + 4.5}" x2="${x + 12}" y2="${y + 4.5}"/><line x1="${x}" y1="${y + 9}" x2="${x + 12}" y2="${y + 9}"/></g>`;
+// 소파에 누운 사람(휴대폰을 들고 있다)
+const lying = (x, y, c) => `<g transform="translate(${x},${y})">
+  <rect x="-14" y="-6" width="236" height="40" rx="10" fill="#e0e7ff" stroke="#6366f1" stroke-width="2"/><rect x="-26" y="-34" width="30" height="68" rx="10" fill="#c7d2fe" stroke="#6366f1" stroke-width="2"/><rect x="208" y="-22" width="24" height="56" rx="9" fill="#c7d2fe" stroke="#6366f1" stroke-width="2"/>
+  <rect x="10" y="-22" width="34" height="16" rx="7" fill="#fff" stroke="#94a3b8" stroke-width="1.5"/>
+  <g class="fig" stroke="${c}"><circle class="head" cx="34" cy="-30" r="11"/><path d="M30 -27 q4 4 9 1" stroke-width="2"/><line x1="45" y1="-26" x2="116" y2="-18"/><path d="M116 -18 L152 -40 L186 -16"/><line x1="116" y1="-18" x2="190" y2="-12"/><path d="M58 -24 L74 -52 L92 -62"/><path d="M62 -24 L84 -44 L96 -60"/></g>
+  <g class="bob"><rect x="88" y="-84" width="18" height="28" rx="3" fill="#1e1b4b"/><rect x="90.5" y="-81" width="13" height="21" rx="1.5" fill="#ede9fe"/><circle class="pop" style="animation-delay:2.4s" cx="106" cy="-84" r="6" fill="var(--bad)"/></g>
+  <text class="lbl" x="100" y="56" fill="${c}">관리자 · 집</text></g>`;
+const MOBILE = [
+{
+  tab: '알림', kicker: '휴대폰에서 · 1', title: '밤 11시, 소파에 누워 있는데 승인 요청이 옵니다',
+  text: '실제 악용되는 취약점이 납품한 버전에서 잡히면 TrustLink 가 영향 분석과 고객 통지 초안까지 만들어 두고 관리자의 승인을 기다립니다. 이제 그 화면을 휴대폰으로 엽니다.',
+  list: ['탐지 · AI 분석 · 패치 확인은 <b>자동</b>', '사람이 할 일은 <b>받는 사람 확인과 승인</b>', '노트북을 켜지 않아도 <b>휴대폰 브라우저</b>로', '앱 설치 없이 같은 주소 · 같은 계정'],
+  svg: () => G +
+    `<g class="fade" style="animation-delay:.1s"><path d="M52 30 a20 20 0 1 0 22 30 a16 16 0 1 1 -22 -30z" fill="#fde68a" stroke="#ca8a04" stroke-width="1.5"/><text x="92" y="42" font-size="12" font-weight="700" fill="#64748b">밤 11시</text></g>` +
+    lying(48, 262, 'var(--dev)') +
+    bolt(560, 40, .5) + `<text x="548" y="98" class="sm fade" style="animation-delay:.6s">실제 악용 취약점</text>` +
+    arrow(528, 70, 482, 100, 1) + TL(452, 118, 1) +
+    card3(360, 176, 186, '고객 통지 초안 준비됨', ['영향 고객 3곳', '수정 버전 있음 · 승인 대기'], 'var(--tl)', 1.5) +
+    arrow(352, 206, 168, 190, 2.1, 'var(--bad)') +
+    bub(150, 96, 150, ['승인 요청 1건?', '지금 바로 보자'], [128, 172], 'pop', 2.9)
+},
+{
+  tab: '승인', kicker: '휴대폰에서 · 2', title: '휴대폰에서 받는 사람을 확인하고 승인합니다',
+  text: '자동 대응 화면이 휴대폰 폭에 맞게 한 줄로 쌓입니다. AI 분석 요약과 받는 고객을 확인하고 단추를 누르면 발송함으로 가고, 대기 시간 안에는 취소할 수 있습니다.',
+  list: ['<b>승인 대기함</b> — 오늘 결정할 일을 한 화면에', '<b>자동 대응</b> — 고객 통지 · 개발자 수정 요청 승인', '<b>VEX 판단</b> — 일괄 판정 진행 상황 확인', '<b>묻고 찾기</b> — 취약점 번호로 영향 범위 묻기'],
+  svg: () => G +
+    phone(46, 34, 168, 256,
+      bars(10, 12) + `<text x="30" y="21" font-size="11" font-weight="700" fill="#1e1b4b">자동 대응</text><line x1="0" y1="32" x2="168" y2="32" stroke="#e2e8f0"/>
+      <rect x="8" y="40" width="152" height="204" rx="8" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+      <rect x="16" y="48" width="92" height="15" rx="4" fill="#fef3c7"/><text x="62" y="59" font-size="9" font-weight="700" fill="#92400e" text-anchor="middle">고객 통지 — 승인 대기</text>
+      <text x="16" y="80" font-size="11" font-weight="800" fill="#1e1b4b">CVE-2026-…</text><rect x="92" y="70" width="30" height="13" rx="4" fill="#fee2e2"/><text x="107" y="80" font-size="8.5" font-weight="700" fill="#b91c1c" text-anchor="middle">KEV</text>
+      <rect x="16" y="90" width="136" height="38" rx="6" fill="#fdf4ff" stroke="var(--ai)" stroke-width="1.2"/><text x="23" y="104" font-size="9" font-weight="700" fill="var(--ai)">✦ AI 분석</text><text x="23" y="119" font-size="9" fill="#334155">영향 있음 · 수정 버전 권장</text>
+      ${[['고객 A', 0], ['고객 B', 1], ['고객 C', 2]].map(([n, i]) => `<g transform="translate(16,${136 + i * 19})"><rect width="13" height="13" rx="3" fill="var(--tl)"/><path d="M3 6.5 l2.5 3 l4.5 -5.5" stroke="#fff" stroke-width="1.8" fill="none"/><text x="20" y="10.5" font-size="10" fill="#1e1b4b">${n}</text></g>`).join('')}
+      <rect x="16" y="200" width="136" height="32" rx="8" fill="#1e1b4b"/><text x="84" y="220" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">승인·발송 (3곳)</text>`, .2) +
+    `<g class="pop" style="animation-delay:1.8s"><rect x="56" y="228" width="148" height="44" rx="12" fill="none" stroke="var(--bad)" stroke-width="2.5"/><text x="262" y="254" font-size="11" font-weight="700" fill="var(--bad)" text-anchor="middle">엄지로 승인</text></g>` +
+    arrow(296, 150, 330, 150, 2.5) +
+    card3(338, 118, 120, '발송함', ['30초 대기', '취소 가능'], 'var(--tl)', 2.9) +
+    arrow(462, 150, 500, 150, 3.6, 'var(--cus)') + `<g class="pop" style="animation-delay:3.9s">${env(508, 140, 'var(--cus)')}</g>` +
+    fig(590, 300, 'var(--cus)', '고객', 'stand', { flip: true }) + check(560, 124, 'var(--ok)', 4.4)
+},
+{
+  tab: '화면', kicker: '휴대폰에서 · 3', title: '같은 화면이 휴대폰 폭에 맞게 접힙니다',
+  text: '사이드바는 접혀 왼쪽 위 메뉴 단추가 되고, 본문은 화면 폭을 다 씁니다. 표는 칸이 찌그러지지 않고 표만 옆으로 밀립니다. 데스크톱 화면은 그대로입니다.',
+  list: ['<b>메뉴 단추</b> — 화면을 고르면 메뉴가 저절로 닫힘', '<b>표</b> — 글자가 세로로 쪼개지지 않고 옆으로 밀기', '<b>묻고 찾기</b> — 휴대폰에서는 작은 단추로', '큰 표와 영향 지도는 <b>옆으로 밀어서</b> 봅니다'],
+  svg: () => G +
+    `<g class="fade" style="animation-delay:.1s"><rect x="30" y="70" width="250" height="160" rx="8" fill="#fff" stroke="#1e1b4b" stroke-width="3"/><rect x="130" y="230" width="50" height="22" fill="#cbd5e1"/><rect x="100" y="252" width="110" height="8" rx="4" fill="#94a3b8"/>
+      <rect x="34" y="74" width="62" height="152" rx="4" fill="#ede9fe"/>${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="42" y="${88 + i * 20}" width="${i % 2 ? 38 : 46}" height="7" rx="3.5" fill="#a5b4fc"/>`).join('')}
+      <rect x="106" y="86" width="90" height="10" rx="4" fill="#1e1b4b"/><rect x="106" y="108" width="78" height="46" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/><rect x="192" y="108" width="78" height="46" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/><rect x="106" y="164" width="164" height="52" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <text x="155" y="282" class="sm">데스크톱 — 그대로</text></g>` +
+    arrow(296, 150, 344, 150, 1.2, 'var(--tl)') + `<text x="320" y="138" class="sm fade" style="animation-delay:1.2s">같은 주소</text>` +
+    phone(372, 42, 130, 236,
+      `<rect x="4" y="5" width="24" height="22" rx="6" fill="#ede9fe"/>` + bars(10, 11.5, 'var(--tl)') + `<rect x="36" y="11" width="56" height="9" rx="4" fill="#1e1b4b"/><line x1="0" y1="32" x2="130" y2="32" stroke="#e2e8f0"/>
+      <rect x="8" y="42" width="114" height="40" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/><rect x="8" y="90" width="114" height="40" rx="5" fill="#f1f5f9" stroke="#cbd5e1"/>
+      <rect x="8" y="140" width="114" height="64" rx="5" fill="#fff" stroke="#cbd5e1"/>${[0, 1, 2].map((i) => `<line x1="8" y1="${158 + i * 15}" x2="122" y2="${158 + i * 15}" stroke="#e2e8f0"/><rect x="14" y="${146 + i * 15}" width="44" height="6" rx="3" fill="#a5b4fc"/><rect x="66" y="${146 + i * 15}" width="50" height="6" rx="3" fill="#cbd5e1"/>`).join('')}
+      <path d="M40 220 h50 m-8 -5 l8 5 l-8 5 M48 215 l-8 5 l8 5" stroke="var(--tl)" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="112" cy="218" r="11" fill="#1e1b4b"/><text x="112" y="222" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">?</text>`, 1.6) +
+    `<g class="pop" style="animation-delay:2.6s"><rect x="372" y="44" width="32" height="28" rx="9" fill="none" stroke="var(--bad)" stroke-width="2.5"/><text x="560" y="62" font-size="11" font-weight="700" fill="var(--bad)" text-anchor="middle">사이드바 → 메뉴 단추</text></g>` +
+    `<text x="566" y="266" font-size="11" font-weight="700" fill="var(--tl)" text-anchor="middle" class="fade" style="animation-delay:3.2s">표는 옆으로 밀기</text>`
+},
+];
+
+const HELP = { vex: [{ name: 'VEX 판단은 이렇게 동작합니다', scenes: HELP_VEX }], ask: [{ name: '묻고 찾기는 이렇게 동작합니다', scenes: ASK }], mobile: [{ name: '휴대폰에서 쓰기', scenes: MOBILE }] };
 const STORIES = HELP[new URLSearchParams(location.search).get('help')] || [
   { name: 'TrustLink 란', scenes: LEDGER },
   { name: '공급망 보안 흐름', scenes: FLOW },
   { name: '출시된 구버전도 계속 검증', scenes: LEGACY },
   { name: '고객 관리', scenes: CUSTOMER },
   { name: '묻고 맡기기', scenes: ASK },
+  { name: '휴대폰에서', scenes: MOBILE },
 ];
 
 // ── 재생 ───────────────────────────────────────────────────────────────────
