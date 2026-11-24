@@ -30,6 +30,16 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.28.2',
+    date: '2026-11-24',
+    title: 'VEX 판단 목록에서 진행 상황 보기',
+    items: [
+      { kind: '개선', text: 'VEX 판단 목록 위에 "지금 진행 중" — 어느 제품이 판정·요약 보강 중 어느 단계인지 건수와 진행 막대로 표시' },
+      { kind: '수정', text: '재시작으로 끊긴 일괄 판정이 목록에서 계속 "진행"으로 보이던 문제' },
+      { kind: '수정', text: '이미 진행 중일 때 뜨던 오류 문구를 읽기 쉽게, 안내 문구의 "건당 1~2분"을 현재 속도로' },
+    ],
+  },
+  {
     version: '2.28.1',
     date: '2026-11-24',
     title: '일괄 판정 진행 표시를 두 단계로',

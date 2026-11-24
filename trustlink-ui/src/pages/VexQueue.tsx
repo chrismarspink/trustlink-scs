@@ -35,7 +35,7 @@ export default function VexQueue() {
       const b = await aiVexBatchStart({ project: r.project, repo: r.repo, tag: r.tag, limit: 20 });
       setMsg(b.state === 'done' && !b.total ? `${r.repo}:${r.tag} — 미판단 항목이 없습니다` : `${r.repo}:${r.tag} — AI 일괄 판정 시작(우선순위 순 최대 20건)`);
       load(true);
-    } catch (e) { setMsg(String(e)); }
+    } catch (e) { setMsg(String(e).replace(/^(Api)?Error:\s*(\d{3}\s*)?/, '')); load(true); }
     setBusy('');
   };
 
@@ -64,11 +64,30 @@ export default function VexQueue() {
       <div className={`mb-4 flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm ${aiOn ? 'border-violet-200 bg-violet-50/50' : 'border-dashed'}`}>
         <AIIcon size={22} />
         {aiOn ? (
-          <span>AI 판단 초안 사용 가능 — <b>{ai?.model}</b>{ai?.mode === 'local' ? ' (서버 내부 LLM, 외부 전송 없음 · 건당 1~2분)' : ''}. 초안은 저장되지 않으며 제품 화면에서 확인 후 저장합니다.{s.drafts ? ` 저장 대기 초안 ${s.drafts}건.` : ''}</span>
+          <span>AI 판단 초안 사용 가능 — <b>{ai?.model}</b>{ai?.mode === 'local' ? ' (서버 내부 LLM, 외부 전송 없음). 판정은 규칙으로 바로 나오고, AI 는 권고문 요약을 건당 20~30초에 덧붙입니다' : ''}. 초안은 저장되지 않으며 제품 화면에서 확인 후 저장합니다.{s.drafts ? ` 저장 대기 초안 ${s.drafts}건.` : ''}</span>
         ) : (
           <span className="text-muted-foreground">AI 연결(VEX 용도)이 꺼져 있습니다. 켜지면 여기서 제품별 AI 일괄 판정을 걸 수 있습니다.</span>
         )}
       </div>
+      {/* 지금 돌고 있는 일괄 판정 — 어느 제품이, 어느 단계까지 왔는지 */}
+      {(q?.rows || []).filter((r) => r.batchState === 'running').map((r) => {
+        const enrich = r.batchPhase === 'enrich';
+        const d = enrich ? r.enrichDone ?? 0 : r.batchDone ?? 0, t = enrich ? r.enrichTotal ?? 0 : r.batchTotal ?? 0;
+        return (
+          <div key={r.project} className="mb-3 rounded-md border border-violet-300 bg-white p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-fuchsia-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-fuchsia-500" /></span>
+              <span className="font-semibold">지금 진행 중 — {r.repo}:{r.tag}</span>
+              <span className="text-xs text-muted-foreground">{enrich ? `① 판정 완료 ${r.batchDone}건 → ② 권고문 요약 보강 ${d}/${t}건` : `① 판정 ${d}/${t}건`}</span>
+              <Link to={`/artifact/${encodeURIComponent(r.repo)}/${encodeURIComponent(r.tag)}`} className="ml-auto text-xs text-primary hover:underline">진행 화면 열기(중지·확인) →</Link>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-100">
+              <div className="h-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all duration-700" style={{ width: `${Math.max(t ? Math.round((d / t) * 100) : 0, 3)}%` }} />
+            </div>
+            {enrich && <p className="mt-1.5 text-[11px] text-muted-foreground">판정 초안은 모두 나와 있어 지금 확인·저장할 수 있습니다. AI 가 영어 권고문의 한국어 요약을 덧붙이는 중입니다(건당 20~30초).</p>}
+          </div>
+        );
+      })}
       {msg && <div className="mb-3 text-sm text-violet-800">{msg}</div>}
       {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
       {q && !q.dt && <div className="text-sm text-muted-foreground">Dependency-Track 미설정 — 분석 기능이 꺼져 있습니다.</div>}
@@ -104,7 +123,9 @@ export default function VexQueue() {
                   <td className="px-3 py-2 tabular-nums">{r.affected ? <Badge variant="warn">{r.affected}</Badge> : '—'}</td>
                   <td className="px-3 py-2 text-xs">
                     <div className="flex flex-wrap items-center gap-1">
-                      {r.batchState === 'running' ? <AIBadge pulse label={`진행 ${r.batchDone}/${r.batchTotal}`} />
+                      {r.batchState === 'running' ? (r.batchPhase === 'enrich'
+                        ? <><span className="whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800" title="판정 초안은 모두 나왔습니다 — 지금 확인·저장할 수 있습니다">판정 완료 {r.batchDone}건</span><AIBadge pulse label={`요약 보강 ${r.enrichDone ?? 0}/${r.enrichTotal ?? 0}`} /></>
+                        : <AIBadge pulse label={`판정 중 ${r.batchDone}/${r.batchTotal}`} />)
                         : r.batchState ? <span className="text-muted-foreground" title={fmt(r.batchAt)}>초안 {r.batchDrafts ?? 0}건{r.batchState === 'cancelled' ? ' (중지)' : ''}</span> : '—'}
                       {!!r.batchAuto && <span title="새 취약점 통보 직후 KEV·치명 항목에 자동으로 만든 초안(확인·저장 대기)"><AIBadge label={`자동 초안 ${r.batchAuto}`} className="from-fuchsia-600 to-rose-500" /></span>}
                     </div>

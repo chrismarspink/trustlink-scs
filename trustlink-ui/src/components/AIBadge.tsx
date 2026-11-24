@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 // AI 기능 표시 — 어디서든 같은 모양(보라→자홍 그라데이션 + 반짝임)으로 "AI 가 한 일/할 수 있는 일"을 알린다.
 export function AIBadge({ label = 'AI 판정', className, pulse }: { label?: string; className?: string; pulse?: boolean }) {
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm', className)}>
+    <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm', className)}>
       <Sparkles size={11} className={pulse ? 'animate-pulse' : undefined} /> {label}
     </span>
   );

@@ -27,6 +27,9 @@ type vexQueueRow struct {
 	BatchState  string `json:"batchState,omitempty"`
 	BatchDone   int    `json:"batchDone,omitempty"`
 	BatchTotal  int    `json:"batchTotal,omitempty"`
+	BatchPhase  string `json:"batchPhase,omitempty"` // enrich = 판정은 끝났고 권고문 요약을 덧붙이는 중
+	EnrichDone  int    `json:"enrichDone,omitempty"`
+	EnrichTotal int    `json:"enrichTotal,omitempty"`
 	BatchDrafts int    `json:"batchDrafts,omitempty"` // 저장 대기 중인 AI 초안 수
 	BatchAt     string `json:"batchAt,omitempty"`
 	BatchAuto   int    `json:"batchAuto,omitempty"` // 그중 자동 초안(KEV·치명) 수
@@ -95,6 +98,9 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 		}
 		if b := vexBatchGet(uuid); b != nil {
 			row.BatchState, row.BatchDone, row.BatchTotal = b.State, b.Done, b.Total
+			if b.State == "running" && b.Phase == "enrich" {
+				row.BatchPhase, row.EnrichDone, row.EnrichTotal = "enrich", b.EnrichDone, b.EnrichTotal
+			}
 			row.BatchDrafts, row.BatchAt = len(b.Results), firstNonEmpty(b.Finished, b.Started)
 			vexBatchMu.Lock() // 진행 중인 일괄 판정이 Results 에 쓰는 중일 수 있다
 			for _, r := range b.Results {
@@ -137,6 +143,9 @@ func vexBatchGet(project string) *vexBatch {
 	}
 	var fb vexBatch
 	if readJSONFile(vexBatchPath(project), &fb) == nil {
+		if fb.State == "running" { // 메모리에 없는데 파일이 "진행 중" = 재시작으로 끊긴 작업. 계속 진행 중으로 보이지 않게 한다
+			fb.State, fb.Error = "cancelled", "서비스 재시작으로 중단됨"
+		}
 		return &fb
 	}
 	return nil

@@ -571,6 +571,7 @@ export type VexQueueRow = {
   repo: string; tag: string; project: string; total: number; analyzed: number; pending: number;
   pendCritical: number; pendHigh: number; pendKev: number; affected: number;
   batchState?: string; batchDone?: number; batchTotal?: number; batchDrafts?: number; batchAt?: string;
+  batchPhase?: 'enrich'; enrichDone?: number; enrichTotal?: number;
 };
 export type VexQueue = { dt: boolean; rows: VexQueueRow[]; summary?: Record<string, number>; ai?: boolean; generated?: string };
 export const vexQueue = (refresh = false) => aj<VexQueue>(`/api/vex/queue${refresh ? '?refresh=1' : ''}`);
