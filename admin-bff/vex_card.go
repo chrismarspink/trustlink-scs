@@ -158,3 +158,20 @@ func cardQueueLen() int {
 	defer cardQ.Unlock()
 	return len(cardQ.items)
 }
+
+const cardWaitMax = 24 * time.Second
+
+// cardWait: 카드를 만들되 max 까지만 기다린다. 넘으면 nil 을 돌려주고, 만들던 카드는 끝까지 만들어 저장한다.
+func (s *Server) cardWait(f dtFindingFull, max time.Duration) *vulnCard {
+	ch := make(chan *vulnCard, 1)
+	go func() {
+		c, _ := s.cardMake(f)
+		ch <- c
+	}()
+	select {
+	case c := <-ch:
+		return c
+	case <-time.After(max):
+		return nil
+	}
+}

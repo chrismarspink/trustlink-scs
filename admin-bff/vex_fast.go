@@ -137,13 +137,12 @@ func vexRuleDraft(f dtFindingFull, sig vexSignals, facts []aiFact, card *vulnCar
 
 // ---------- ③ 축약 AI 판정(사용 맥락이 있을 때) ----------
 
-const vexSlimTask = `담당자가 적은 사용 맥락(U1)을 반영해 이 취약점이 제품에 영향을 주는지 VEX 판정을 고른다.
+const vexSlimTask = `담당자의 사용 맥락(U1)을 반영해 VEX 판정을 고른다.
 - status: under_investigation / not_affected / affected / fixed.
-- not_affected 는 U1 이나 "OSV 영향 범위 밖"(R1)이 근거일 때만 고르고 justification 을 채운다. 그 외에는 justification 은 빈 문자열.
-- justification: 취약한 기능을 쓰지 않거나 버전이 범위 밖 → vulnerable_code_not_present, 코드는 있으나 꺼져 있거나 실행되지 않음 → vulnerable_code_not_in_execute_path, 외부 입력이 닿지 않음 → vulnerable_code_cannot_be_controlled_by_adversary, 별도 방어 장치 → inline_mitigations_already_exist, 구성요소 자체가 제품에 없음 → component_not_present.
-- response: affected 일 때만. R1 에 수정 버전이 있으면 update, 없고 임시 완화가 가능하면 workaround_available, 둘 다 없으면 can_not_fix. 그 외에는 빈 문자열.
-- detail: 판단 이유 한 문장(80자 안팎), 끝에 근거 사실 ID 를 [U1] 처럼 붙인다. 사실에 없는 버전·설정 값을 쓰지 않는다.
-- confidence: 근거가 충분하면 high, 일부면 medium, 부족하면 low.`
+- not_affected 는 U1 이나 "OSV 영향 범위 밖"(R1)이 근거일 때만. 이때 justification: 취약한 기능을 쓰지 않음·버전이 범위 밖 → vulnerable_code_not_present, 꺼져 있거나 실행되지 않음 → vulnerable_code_not_in_execute_path, 외부 입력이 닿지 않음 → vulnerable_code_cannot_be_controlled_by_adversary, 별도 방어 장치 → inline_mitigations_already_exist, 구성요소가 제품에 없음 → component_not_present. 그 외에는 빈 문자열.
+- response: affected 일 때만. 수정 버전(R1)이 있으면 update, 없고 완화가 가능하면 workaround_available, 둘 다 없으면 can_not_fix. 그 외에는 빈 문자열.
+- detail: 판단 이유 한 문장(60자 안팎), 끝에 근거 사실 ID 를 [U1] 처럼 붙인다.
+- confidence: high / medium / low.`
 
 var vexSlimSchema = map[string]any{
 	"type": "object",
@@ -151,7 +150,7 @@ var vexSlimSchema = map[string]any{
 		"status":        map[string]any{"type": "string", "enum": vexStates},
 		"justification": map[string]any{"type": "string", "enum": vexJusts},
 		"response":      map[string]any{"type": "string", "enum": vexResponses},
-		"detail":        map[string]any{"type": "string", "maxLength": 160},
+		"detail":        map[string]any{"type": "string", "maxLength": 120},
 		"confidence":    map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
 	},
 	"required": []string{"status", "justification", "response", "detail", "confidence"},
@@ -271,7 +270,7 @@ func (s *Server) vexFastDraftFor(actor, repo, tag string, f dtFindingFull, conte
 	card := cardGet(f)
 	if card == nil && f.Vulnerability.Description != "" {
 		if waitCard {
-			card, _ = s.cardMake(f) // 실패해도 규칙 초안은 낸다
+			card = s.cardWait(f, cardWaitMax) // 상한 안에 못 만들면 규칙 초안만 먼저 낸다(카드는 뒤에서 마저 만들어 저장)
 		} else {
 			s.cardQueue(f)
 		}
