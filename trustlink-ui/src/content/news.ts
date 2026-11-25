@@ -30,6 +30,14 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.44.1',
+    date: '2026-11-26',
+    title: 'AI 답변 장면과 도움말을 같은 틀로',
+    items: [
+      { kind: '개선', text: 'AI 답변 장면("장면으로 보기")과 도움말 장면이 완전히 같은 창 틀과 같은 재생기를 쓰도록 정리 — 보는 느낌이 일관됩니다' },
+    ],
+  },
+  {
     version: '2.44.0',
     date: '2026-11-26',
     title: 'AI 장면 답변 속도 — 규칙이 구조를 만들고 AI 는 짧은 글만, 캐시로 즉시',
