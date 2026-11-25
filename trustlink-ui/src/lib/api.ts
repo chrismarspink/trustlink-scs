@@ -900,6 +900,8 @@ export type AskAnswer = {
 export const ask = (q: string) => aj<AskAnswer>('/api/ask', jsonInit('POST', { q }));
 export const askSummary = (id: string) =>
   aj<{ answer: string; model: string; provider?: string; elapsedMs: number; steps?: { tool: string; arg?: string; lead: string }[] }>(`/api/ask/${encodeURIComponent(id)}/summary`, jsonInit('POST', {}));
+// 그 답을 AI 가 막대 인형 장면으로 풀어 설명(틀의 빈칸만 채운다)
+export const askScene = (id: string) => aj<{ scenes: import('@/lib/scenes').SceneSpec[]; model: string; elapsedMs: number }>(`/api/ask/${encodeURIComponent(id)}/scene`, jsonInit('POST', {}));
 // 양식의 단추가 눌렸을 때: A2UI 클라이언트 → 서버 action 메시지. 답으로 같은 화면을 갱신할 메시지가 온다.
 export const askAction = (action: { name: string; surfaceId: string; sourceComponentId: string; timestamp: string; context: Record<string, unknown> }) =>
   aj<{ ui: Record<string, unknown>[]; lead?: string }>('/api/ask/action', jsonInit('POST', { version: 'v0.9.1', action }));

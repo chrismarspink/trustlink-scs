@@ -97,3 +97,24 @@ func TestAskPlanAndTasks(t *testing.T) {
 		t.Errorf("설정: %s", body)
 	}
 }
+
+// 장면 답변: AI 가 고른 틀과 채운 글자를 서버가 다듬어 돌려준다. 틀이 아니거나 빈칸이 모자란 장면은 버린다.
+func TestAskScene(t *testing.T) {
+	s := agentServer(t)
+	llm := fakeLLM(t, `{"scenes":[{"layout":"ask","title":"네 버전에 걸립니다","text":"설명","who":"관리자","say":"어디에 걸리나?","cards":[{"title":"prod 1.0","line":"판단 대기"}]},{"layout":"svg","title":"x","text":"y"},{"layout":"steps","title":"다음","text":"t","steps":["하나"]},{"layout":"steps","title":"다음 할 일","text":"t","steps":["초안 준비","검토","저장"]}]}`, nil)
+	defer llm.Close()
+	t.Setenv("AI_URL", llm.URL)
+	admin := Session{Username: "admin1", Groups: []string{"admins"}}
+	_, body := agentCall(t, s, admin, s.apiAsk, "POST", "", `{"q":"CVE-2026-0004 가 어디에 걸리나?"}`)
+	var a struct{ ID string }
+	_ = json.Unmarshal([]byte(body), &a)
+	code, body := agentCall(t, s, admin, s.apiAskScene, "POST", a.ID, "")
+	var out struct{ Scenes []sceneSpec }
+	_ = json.Unmarshal([]byte(body), &out)
+	if code != 200 || len(out.Scenes) != 2 || out.Scenes[0].Layout != "ask" || out.Scenes[0].Cards[0].Lines[0] != "판단 대기" || out.Scenes[1].Layout != "steps" || len(out.Scenes[1].Steps) != 3 || out.Scenes[0].Tag != "AI 생성" {
+		t.Fatalf("장면: %d %s", code, body)
+	}
+	if code, _ := agentCall(t, s, Session{Username: "other", Groups: []string{"developers"}}, s.apiAskScene, "POST", a.ID, ""); code != 404 {
+		t.Errorf("남의 질문으로 장면: %d", code)
+	}
+}

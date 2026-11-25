@@ -323,6 +323,7 @@ func main() {
 	mux.HandleFunc("POST /api/ask", s.guardSession(s.apiAsk))                     // 묻고 찾기(로그인한 누구나, 자기 권한 안에서)
 	mux.HandleFunc("POST /api/ask/action", s.guardSession(s.apiAskAction))        // 양식의 단추(A2UI action) — 권한은 행동마다 다시 확인
 	mux.HandleFunc("POST /api/ask/{id}/summary", s.guardSession(s.apiAskSummary)) // 그 답의 AI 한 줄 정리
+	mux.HandleFunc("POST /api/ask/{id}/scene", s.guardSession(s.apiAskScene))     // 그 답을 막대 인형 장면으로(AI 는 틀의 빈칸만 채운다)
 	// MCP 서버(시범): AI 도구가 연결 토큰으로 조회 — mcp.go
 	mux.HandleFunc("POST /api/mcp", s.apiMcp) // 인증은 Bearer 연결 토큰(쿠키 아님)
 	mux.HandleFunc("GET /api/mcp", func(w http.ResponseWriter, r *http.Request) {

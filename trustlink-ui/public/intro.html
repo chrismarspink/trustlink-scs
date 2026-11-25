@@ -665,7 +665,61 @@ const MCP = [
 ];
 
 const HELP = { vex: [{ name: 'VEX 판단은 이렇게 동작합니다', scenes: HELP_VEX }], ask: [{ name: '묻고 찾기는 이렇게 동작합니다', scenes: ASK }], mobile: [{ name: '휴대폰에서 쓰기', scenes: MOBILE }], mcp: [{ name: 'AI 도구 연결(MCP)은 이렇게 동작합니다', scenes: MCP }] };
-const STORIES = HELP[new URLSearchParams(location.search).get('help')] || [
+
+// ── 자료로 만든 장면 ─────────────────────────────────────────────────────────
+// 화면이 넘겨준 자료(새 버전 소식, 질문의 답, AI 가 쓴 설명)를 정해진 틀로 그린다. 그림 코드를 받지 않고 글자만 받아 여기서 그린다.
+//   틀: ask(묻고 답) · new(새 기능) · improve(전→지금) · fix(고침) · warn(알림) · steps(순서)
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// 한글은 1칸, 그 밖은 0.55칸으로 세어 줄을 나눈다(띄어쓰기에서 끊고, 넘치면 … 로 줄인다)
+function wrap(text, units, max = 3) {
+  const w = (ch) => (/[ᄀ-ￜ]/.test(ch) ? 1 : 0.55), len = (t) => [...t].reduce((n, c) => n + w(c), 0);
+  const out = []; let line = '';
+  for (const word of String(text || '').trim().split(/\s+/)) {
+    if (!word) continue;
+    if (len(line) + len(word) + (line ? 0.55 : 0) <= units) { line += (line ? ' ' : '') + word; continue; }
+    if (line) out.push(line);
+    line = word;
+    while (len(line) > units) { let cut = '', n = 0; for (const c of line) { if (n + w(c) > units) break; cut += c; n += w(c); } out.push(cut); line = line.slice(cut.length); }
+  }
+  if (line) out.push(line);
+  if (out.length > max) { out.length = max; out[max - 1] = out[max - 1].replace(/.$/, '…'); }
+  return out.map(esc);
+}
+const WHO = { '관리자': 'var(--dev)', '담당자': 'var(--dev)', '개발사': 'var(--dev)', '고객': 'var(--cus)', '나': 'var(--dev)' };
+function cardsCol(x, y, w, cards, c, d0) {
+  let yy = y, out = '';
+  (cards || []).slice(0, 3).forEach((cd, i) => {
+    const lines = (cd.lines || []).flatMap((l) => wrap(l, (w - 22) / 11.5, 3)).slice(0, 3);
+    out += card3(x, yy, w, wrap(cd.title, (w - 22) / 12.5, 1)[0] || '', lines, i ? 'var(--cus)' : c, d0 + i * 0.6);
+    yy += 26 + lines.length * 16 + 12;
+  });
+  return out;
+}
+function specScene(sp) {
+  const who = WHO[sp.who] ? sp.who : '담당자', col = WHO[who], say = wrap(sp.say || sp.title, 16, 3);
+  const draw = {
+    ask: () => G + fig(90, 300, col, who, 'point') + bub(30, 96, 220, say, [100, 210], 'pop', .3) +
+      arrow(250, 180, 300, 180, 1.3) + TL(335, 180, 1) + arrow(370, 180, 410, 180, 1.9) +
+      cardsCol(418, 84, 196, sp.cards, 'var(--tl)', 2.3) + (sp.tag ? tag(418, 262, esc(sp.tag).slice(0, 22), 'var(--reg)', 3.6) : ''),
+    new: () => G + TL(110, 170, 1.25) + tag(72, 226, esc(sp.tag || '새 기능'), 'var(--tl)', .4) +
+      fig(250, 300, col, who, 'up', { cls: 'bob' }) + bub(196, 70, 190, say, [252, 196], 'pop', .9) +
+      cardsCol(408, 96, 206, sp.cards, 'var(--tl)', 1.7) + check(600, 96, 'var(--ok)', 2.6),
+    improve: () => G + fig(110, 300, '#94a3b8', '전', 'stand', { sad: true }) + card3(34, 92, 200, '전', wrap(sp.before || '손으로 확인', 15, 3), '#94a3b8', .3) +
+      arrow(256, 200, 326, 200, 1.3, 'var(--tl)') + TL(291, 150, .7) +
+      fig(520, 300, col, who, 'up', { cls: 'bob' }) + card3(396, 92, 214, '지금', wrap(sp.after || sp.title, 16, 3), 'var(--ok)', 1.9) + check(606, 92, 'var(--ok)', 2.7),
+    fix: () => G + fig(120, 300, col, who, 'point') + cross(300, 150, .4) + arrow(326, 150, 386, 150, 1.2) + check(412, 150, 'var(--ok)', 1.8) +
+      card3(210, 190, 300, '고쳤습니다', wrap(sp.after || sp.title, 24, 3), 'var(--ok)', 2.2),
+    warn: () => G + bolt(120, 110, .3) + TL(120, 220, 1) + arrow(160, 200, 230, 200, 1.1, 'var(--bad)') +
+      cardsCol(240, 96, 220, sp.cards, 'var(--bad)', 1.5) + fig(540, 300, col, who, 'point', { flip: true }) + bub(430, 60, 190, say, [530, 200], 'pop', 2.4),
+    steps: () => { const st = (sp.steps || []).slice(0, 4), n = st.length || 1, w = Math.min(150, (520 - (n - 1) * 26) / n);
+      return G + fig(54, 300, col, who, 'point') + st.map((t, i) => { const x = 104 + i * (w + 26);
+        return card3(x, 120, w, String(i + 1), wrap(t, (w - 18) / 11.5, 4), i === n - 1 ? 'var(--ok)' : 'var(--tl)', .4 + i * .7) + (i < n - 1 ? arrow(x + w + 3, 160, x + w + 23, 160, .8 + i * .7) : ''); }).join(''); },
+  }[sp.layout] || null;
+  const list = (sp.list || []).slice(0, 5).map(esc);
+  return { tab: esc(sp.tab || '장면'), kicker: esc(sp.kicker || ''), title: esc(sp.title), text: esc(sp.text || ''), list, svg: draw || (() => G + TL(320, 180, 1.4)) };
+}
+
+let STORIES = HELP[new URLSearchParams(location.search).get('help')] || [
   { name: 'TrustLink 란', scenes: LEDGER },
   { name: '공급망 보안 흐름', scenes: FLOW },
   { name: '출시된 구버전도 계속 검증', scenes: LEGACY },
@@ -722,14 +776,29 @@ function pickStory(k) {
   [...tabs.children].forEach((b, j) => { b.classList.toggle('on', j === story); b.setAttribute('aria-selected', j === story); });
   buildBar(); render(0);
 }
-STORIES.forEach((st, k) => {
-  const b = btn('', '', () => pickStory(k), tabs);
-  b.setAttribute('role', 'tab');
-  b.innerHTML = `${st.name}<span class="n" aria-hidden="true">${'<i></i>'.repeat(st.scenes.length)}</span>`;
-  b.title = `장면 ${st.scenes.length}개`;
-});
+function buildTabs() {
+  tabs.innerHTML = '';
+  STORIES.forEach((st, k) => {
+    const b = btn('', '', () => pickStory(k), tabs);
+    b.setAttribute('role', 'tab');
+    b.innerHTML = `${st.name}<span class="n" aria-hidden="true">${'<i></i>'.repeat(st.scenes.length)}</span>`;
+    b.title = `장면 ${st.scenes.length}개`;
+  });
+}
 addEventListener('keydown', e => { if (e.key === 'ArrowRight') render(cur + 1); if (e.key === 'ArrowLeft') render(cur - 1); });
-pickStory(story); raf = requestAnimationFrame(tick);
+// 화면(부모 창)이 넘겨주는 이야기: { type: 'tl-scenes', mode: 'prepend' | 'replace', stories: [{ name, scenes: [틀에 채울 글자] }] } — 같은 사이트에서 온 것만 받는다
+const BASE = STORIES;
+addEventListener('message', (e) => {
+  const d = e.data;
+  if (e.origin !== location.origin || !d || d.type !== 'tl-scenes' || !Array.isArray(d.stories)) return;
+  const dyn = d.stories.filter((st) => st && Array.isArray(st.scenes) && st.scenes.length).slice(0, 8)
+    .map((st) => ({ name: esc(st.name), scenes: st.scenes.slice(0, 8).map(specScene) }));
+  if (!dyn.length) return;
+  STORIES = d.mode === 'replace' ? dyn : [...dyn, ...BASE];
+  buildTabs(); pickStory(0);
+});
+buildTabs(); pickStory(story); raf = requestAnimationFrame(tick);
+if (new URLSearchParams(location.search).get('wait') && parent !== window) parent.postMessage({ type: 'tl-scenes-ready' }, location.origin);
 </script>
 </body>
 </html>

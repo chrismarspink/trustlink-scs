@@ -1,20 +1,32 @@
-import { useEffect, useState } from 'react';
+import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   Package, PackageCheck, ShieldQuestion, Rocket, Download, Bug, KeyRound, ExternalLink,
-  LayoutDashboard, Bell, Archive, ClipboardCheck, Megaphone, Sparkles, X, ArrowRight, MessageCircleQuestion,
+  LayoutDashboard, Bell, Archive, ClipboardCheck, Megaphone, ArrowRight, MessageCircleQuestion, Zap,
 } from 'lucide-react';
-import { adminInbox, getSession, vexQueue, type InboxGroup, type Session } from '@/lib/api';
+import { agentRun, getSession, type Session } from '@/lib/api';
+import { useAgent } from '@/components/Agent';
 import { askOpen } from '@/lib/askOpen';
 import { EXT_LINKS, NOTICES, RELEASES } from '@/content/news';
 import { cn } from '@/lib/utils';
 
 declare const __APP_VERSION__: string;
+const Dashboard = lazy(() => import('@/pages/admin/Dashboard'));
 
-// 첫 화면(홈): 소개 자료 · 공지 · 버전별 새 소식 · 바로 가기.
-// "새 버전" 띠는 이 브라우저에서 마지막으로 본 버전보다 새 버전일 때만 보인다.
-const SEEN = 'tl.home.seenVersion';
+// 아래 현황이 오류를 내도 오늘 할 일과 나머지 홈은 그대로 보이게 한다
+class Safe extends Component<{ children: ReactNode }, { bad: boolean }> {
+  state = { bad: false };
+  static getDerivedStateFromError() { return { bad: true }; }
+  render() {
+    return this.state.bad
+      ? <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">전체 현황을 불러오지 못했습니다. <Link to="/admin" className="text-primary hover:underline">대시보드</Link>에서 다시 열어 보세요.</div>
+      : this.props.children;
+  }
+}
+
+// 첫 화면(홈): 오늘 할 일(에이전트 제안) · 묻기 · 전체 현황(관리자: 대시보드) · 공지 · 버전별 새 소식 · 바로 가기.
+// 제품 소개와 "이번에 바뀐 것"은 접속할 때 뜨는 안내 장면(IntroPopup)과 상단 도움말 아이콘으로 본다.
 
 type L = { to: string; label: string; desc: string; icon: LucideIcon; ext?: boolean };
 const LINKS: L[] = [
@@ -37,13 +49,6 @@ const ADMIN_LINKS: L[] = [
 
 const kindCls = { 신규: 'bg-violet-100 text-violet-700', 개선: 'bg-sky-100 text-sky-700', 수정: 'bg-amber-100 text-amber-800' } as const;
 const isRecent = (d: string) => Date.now() - new Date(d).getTime() < 7 * 864e5;
-// "2.13.0" < "2.14.0" 비교(숫자 단위)
-const older = (a: string, b: string) => {
-  const x = a.split('.').map(Number), y = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
-  return false;
-};
-
 function LinkTile({ l }: { l: L }) {
   const inner = (
     <>
@@ -60,41 +65,48 @@ function LinkTile({ l }: { l: L }) {
     : <Link to={l.to} className={cls}>{inner}</Link>;
 }
 
-// 오늘 결정할 일: 로그인하면 가장 먼저 보이는 것. 관리자는 승인 대기함의 묶음, 개발·보안은 판단 대기 취약점.
+// 오늘 할 일: 로그인하면 가장 먼저 보이는 것. 에이전트의 제안 가운데 급한 것 세 건을 보여 주고, 그 자리에서 실행하거나 에이전트를 연다.
 const ASKS = ['오늘 승인할 것?', '급한 것부터', '취약점 몇 건이야?'];
-function Today({ sess }: { sess: Session }) {
-  const admin = !!sess.groups?.includes('admins');
-  const [groups, setGroups] = useState<InboxGroup[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [vex, setVex] = useState<{ pending: number; kev: number } | null>(null);
+const openAgent = () => window.dispatchEvent(new Event('tl-agent'));
+function Today() {
+  const { d, load } = useAgent();
   const [q, setQ] = useState('');
-  useEffect(() => {
-    if (admin) adminInbox().then((r) => { setGroups(r.groups); setTotal(r.decisions); }).catch(() => setGroups([]));
-    else if (sess.canEditVex) vexQueue().then((r) => setVex({ pending: r.summary?.pending || 0, kev: r.summary?.pendKev || 0 })).catch(() => {});
-  }, [admin, sess.canEditVex]);
-  if (!admin && !sess.canEditVex) return null;
-  const cards = admin
-    ? (groups || []).filter((g) => g.count > 0).slice(0, 3).map((g) => ({ key: g.key, n: g.count, title: g.label, hint: g.items[0]?.title || '', to: g.key === 'vex' ? '/vex' : '/admin/inbox', go: g.key === 'vex' ? '급한 순으로 판정' : '한 건씩 보기' }))
-    : vex && vex.pending > 0 ? [{ key: 'vex', n: vex.pending, title: '취약점 영향 판정하기', hint: vex.kev ? `실제 악용 ${vex.kev}건 포함` : '규칙 초안을 확인하고 저장합니다', to: '/vex', go: '급한 순으로 판정' }] : [];
-  const loaded = admin ? groups !== null : vex !== null;
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!d) return null;
+  const top = [...d.tasks].sort((a, b) => Number(!!b.urgent) - Number(!!a.urgent)).slice(0, 3);
+  const run = async (id: string) => {
+    setBusy(true);
+    try { const r = await agentRun([id]); setMsg(r.results[0]?.result || '실행했습니다.'); } catch (e) { setMsg(String(e)); }
+    setBusy(false); load();
+  };
+  const b = 'inline-flex h-9 items-center gap-1 rounded-md border bg-white px-3 text-sm hover:border-violet-400 disabled:opacity-50';
   return (
-    <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 lg:p-5" aria-label="오늘 결정할 일">
-      <h2 className="text-xl font-bold">{!loaded ? '할 일을 세는 중…' : cards.length ? (admin ? `오늘 결정할 일이 ${total}건 있습니다` : `판단을 기다리는 취약점이 ${vex?.pending}건 있습니다`) : '지금 결정할 일이 없습니다'}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">TrustLink 가 찾고 계산해 둔 것입니다. 사람은 고르기만 하면 됩니다.</p>
-      {cards.length > 0 && (
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          {cards.map((c) => (
-            <Link key={c.key} to={c.to} className="flex flex-col rounded-lg border bg-white p-3.5 transition hover:border-violet-400 hover:shadow-sm">
-              <span className="text-xs text-muted-foreground">{c.title}</span>
-              <span className="mt-0.5 text-3xl font-bold tabular-nums">{c.n}</span>
-              <span className="mt-1 min-h-[2.2em] text-xs leading-snug text-slate-600 line-clamp-2">{c.hint}</span>
-              <span className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">{c.go} <ArrowRight size={14} /></span>
-            </Link>
+    <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 lg:p-5" aria-label="오늘 할 일">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-xl font-bold">{d.tasks.length ? `오늘 할 일이 ${d.tasks.length}건 있습니다` : '오늘 결정할 일이 없습니다'}</h2>
+        {d.tasks.length > 0 && <button type="button" onClick={openAgent} className="inline-flex items-center gap-1 text-sm font-semibold text-violet-700 hover:underline"><Zap size={14} /> 에이전트에서 모두 보기 <ArrowRight size={14} /></button>}
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{d.tasks.length ? 'TrustLink 가 찾고 계산해 둔 것입니다. 사람은 고르기만 하면 됩니다.' : '새 자료나 알림이 생기면 여기에 표시됩니다. 아래에서 전체 현황을 볼 수 있습니다.'}</p>
+      {msg && <div className="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">{msg}</div>}
+      {top.length > 0 && (
+        <ul className="mt-3 grid gap-2.5 md:grid-cols-3">
+          {top.map((t) => (
+            <li key={t.id} className="flex flex-col rounded-lg border bg-white p-3.5">
+              <span className="text-[11px] font-semibold text-muted-foreground">{t.grade === 'run' ? '바로 실행' : t.grade === 'approve' ? '승인 필요' : '직접 처리'}{t.urgent && <span className="ml-1.5 rounded bg-red-100 px-1.5 py-0.5 font-bold text-red-700">급함</span>}</span>
+              <span className="mt-1 font-semibold leading-snug">{t.title}</span>
+              {t.why && <span className="mt-1 text-xs leading-snug text-slate-600 line-clamp-2">{t.why}</span>}
+              <span className="mt-auto flex flex-wrap gap-1.5 pt-2.5">
+                {t.grade === 'run' && <button type="button" disabled={busy} onClick={() => run(t.id)} className={cn(b, 'border-primary bg-primary font-semibold text-primary-foreground hover:border-primary')}>지금 실행</button>}
+                {t.grade === 'approve' && <button type="button" onClick={openAgent} className={b}>내용 보고 승인</button>}
+                {t.grade === 'go' && t.link && <Link to={t.link} className={b}>화면으로 이동</Link>}
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
       <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { askOpen(q.trim()); setQ(''); } }}>
-        <label htmlFor="home-ask" className="inline-flex items-center gap-1.5 text-sm font-semibold"><MessageCircleQuestion size={16} /> 묻고 찾기</label>
+        <label htmlFor="home-ask" className="inline-flex items-center gap-1.5 text-sm font-semibold"><MessageCircleQuestion size={16} /> 묻거나 시키기</label>
         <input id="home-ask" value={q} onChange={(e) => setQ(e.target.value)} maxLength={300} placeholder="예: CVE-2026-1234 가 어디에 걸리나?" className="h-10 min-w-0 flex-1 rounded-md border bg-white px-3 text-sm outline-none focus:border-violet-500" />
         <button type="submit" className="h-10 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground">묻기</button>
         <span className="flex w-full flex-wrap gap-1.5">
@@ -108,15 +120,8 @@ function Today({ sess }: { sess: Session }) {
 export default function Home() {
   const [sess, setSess] = useState<Session | null>(null);
   const [all, setAll] = useState(false);
-  const [seen, setSeen] = useState(() => { try { return localStorage.getItem(SEEN) || ''; } catch { return ''; } });
   useEffect(() => { getSession().then(setSess).catch(() => {}); }, []);
   const admin = !!sess?.groups?.includes('admins');
-  const latest = RELEASES[0];
-  const showNew = !!latest && (!seen || older(seen, latest.version));
-  const dismiss = () => {
-    setSeen(__APP_VERSION__);
-    try { localStorage.setItem(SEEN, __APP_VERSION__); } catch { /* 저장 못 해도 이번 화면에서만 닫힘 */ }
-  };
   const releases = all ? RELEASES : RELEASES.slice(0, 4);
 
   return (
@@ -129,37 +134,13 @@ export default function Home() {
         </p>
       </div>
 
-      {sess && <Today sess={sess} />}
+      {sess && <Today />}
 
-      {showNew && (
-        <div className="flex items-start gap-3 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3" role="status">
-          <Sparkles size={18} className="mt-0.5 shrink-0 text-violet-600" />
-          <div className="min-w-0 flex-1 text-sm">
-            <b>v{latest.version} 로 업데이트되었습니다 — {latest.title}</b>
-            <ul className="mt-1 list-disc pl-5 text-slate-700">{latest.items.map((it) => <li key={it.text}>{it.text}</li>)}</ul>
-          </div>
-          <button onClick={dismiss} className="rounded p-1 text-slate-500 hover:bg-violet-100" aria-label="새 버전 알림 닫기"><X size={16} /></button>
-        </div>
+      {admin && (
+        <section aria-label="전체 현황">
+          <Safe><Suspense fallback={<div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">현황을 불러오는 중…</div>}><Dashboard /></Suspense></Safe>
+        </section>
       )}
-
-      <section className="overflow-hidden rounded-lg border border-violet-200">
-        <div className="flex items-center gap-2 border-b border-violet-100 bg-violet-50/50 px-4 py-2">
-          <span className="text-sm font-semibold">제품 소개</span>
-          <span className="flex-1" />
-          <a href="/intro.html" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-violet-700 hover:underline">
-            <ExternalLink size={13} /> 크게 보기
-          </a>
-        </div>
-        <iframe src="/intro.html" title="TrustLink 제품 소개" className="block h-[440px] w-full border-0 bg-white" />
-      </section>
-
-      <section className="rounded-lg border bg-white p-4">
-        <div className="mb-2 flex flex-wrap items-baseline gap-2">
-          <h2 className="text-base font-semibold">TrustLink 한눈에 — 납품 소프트웨어의 신뢰 장부</h2>
-          <span className="text-xs text-muted-foreground">제품을 모으고, 분석하고, 고객에게 전달합니다. 그 뒤의 변화도 같은 다섯 단계 — 사람은 결정만 합니다.</span>
-        </div>
-        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록 다섯 단계. 맨 윗줄은 릴리스(제품 등록 · SBOM 분석 · VEX 판단 · 고객 내려받기 · 신뢰 장부), 아래는 취약점·규제·만료 세 갈래" className="mx-auto w-full max-w-[720px]" loading="lazy" />
-      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section>

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, Sparkles, ArrowRight } from 'lucide-react';
-import { agentRun, ask, askAction, askSummary, type AskAnswer } from '@/lib/api';
+import { Send, Sparkles, ArrowRight, Clapperboard } from 'lucide-react';
+import { agentRun, ask, askAction, askScene, askSummary, type AskAnswer } from '@/lib/api';
+import { SceneDialog } from '@/components/SceneDialog';
+import { answerStory, type StorySpec } from '@/lib/scenes';
 import { A2UISurface, applyA2UI, type A2Action, type A2Surface } from '@/components/A2UISurface';
 import { AIBadge } from '@/components/AIBadge';
 import { cn } from '@/lib/utils';
@@ -89,6 +91,14 @@ export function AskChat({ wide = false, onNavigate, autoFocus = false }: { wide?
   const { turns, busy } = useAskState();
   const [q, setQ] = useState('');
   const end = useRef<HTMLDivElement>(null);
+  // 답을 막대 인형 장면으로: 규칙으로 바로 만들고, 원하면 AI 가 풀어 쓴 장면으로 바꾼다
+  const [scene, setScene] = useState<{ id: string; stories: StorySpec[]; busy?: boolean; err?: string; ai?: string } | null>(null);
+  const aiScene = async () => {
+    if (!scene) return;
+    setScene({ ...scene, busy: true, err: '' });
+    try { const r = await askScene(scene.id); setScene((s) => (s ? { ...s, busy: false, ai: `${r.model} · ${(r.elapsedMs / 1000).toFixed(0)}초`, stories: [{ name: 'AI 가 풀어 쓴 설명', scenes: r.scenes }, ...s.stories.filter((x) => x.name !== 'AI 가 풀어 쓴 설명')] } : s)); }
+    catch (e) { setScene((s) => (s ? { ...s, busy: false, err: clean(e) } : s)); }
+  };
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [turns.length]);
   const lastUi = turns.reduce((n, t, k) => (t.ui ? k : n), -1);
   const suggest = turns.length ? turns[turns.length - 1].a?.suggest || DEFAULTS : DEFAULTS;
@@ -96,6 +106,11 @@ export function AskChat({ wide = false, onNavigate, autoFocus = false }: { wide?
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <SceneDialog open={!!scene} onOpenChange={(v) => { if (!v) setScene(null); }} title="질문의 답 — 장면으로 보기" stories={scene?.stories}
+        footer={<>
+          <span className="min-w-0 flex-1 text-xs text-muted-foreground">{scene?.err ? <span className="text-red-600">{scene.err}</span> : scene?.ai ? `AI 가 풀어 쓴 장면입니다(${scene.ai}). 그림은 정해진 틀이고 AI 는 글자만 채웁니다.` : '답의 내용으로 바로 만든 장면입니다. AI 가 2~3장면으로 풀어 설명하게 할 수도 있습니다(내부 모델은 1~2분).'}</span>
+          <button type="button" disabled={scene?.busy} onClick={aiScene} className="inline-flex h-9 items-center gap-1 rounded-md border border-violet-300 px-3 font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-60"><Sparkles size={13} /> {scene?.busy ? 'AI 가 장면을 쓰는 중…' : 'AI 가 풀어서 설명'}</button>
+        </>} />
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
           {turns.length === 0 && (
@@ -157,6 +172,7 @@ export function AskChat({ wide = false, onNavigate, autoFocus = false }: { wide?
                   {t.aiErr && <div className="text-xs text-red-600">{t.aiErr}</div>}
                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     {t.a.sources.length > 0 && <span>출처: {t.a.sources.join(' · ')}</span>}
+                    <button type="button" onClick={() => setScene({ id: t.a!.id, stories: [answerStory(t.q, t.a!, t.ai?.answer)] })} className="inline-flex items-center gap-1 rounded-full border border-violet-300 px-2 py-0.5 font-medium text-violet-800 hover:bg-violet-50"><Clapperboard size={11} /> 장면으로 보기</button>
                     {t.a.canAI && !t.ai && (
                       <button onClick={() => summarize(t.a!.id)} disabled={t.aiBusy} className="ml-auto inline-flex items-center gap-1 rounded-full border border-violet-300 px-2 py-0.5 font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-60">
                         <Sparkles size={11} /> {t.aiBusy ? (t.a.intent === 'free' ? 'AI 가 조회를 골라 답하는 중(1~2분)…' : 'AI 가 정리하는 중(20~30초)…') : 'AI 로 한 줄 정리'}

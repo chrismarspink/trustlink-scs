@@ -6,6 +6,7 @@ import { Sidebar, navTrail } from '@/components/Sidebar';
 import { NotificationBell } from '@/components/NotificationBell';
 import { AskPanel } from '@/components/AskPanel';
 import { AgentButton } from '@/components/Agent';
+import { IntroPopup } from '@/components/IntroPopup';
 
 // 통합 셸: 사이드바(브랜드·메뉴·사용자) + 경로 표시줄 + 본문. 제품/관리 모두 이 셸을 쓴다.
 export function Layout({ children }: { children: ReactNode }) {
@@ -44,7 +45,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <span className="truncate text-foreground">{trail[trail.length - 1]}</span>
             </span>
           )}
-          <div className="ml-auto flex shrink-0 items-center gap-1 pl-2"><AgentButton /><NotificationBell /></div>
+          <div className="ml-auto flex shrink-0 items-center gap-1 pl-2"><AgentButton /><IntroPopup /><NotificationBell /></div>
         </header>
         <main className="vt-view max-w-[1280px] px-4 py-5 lg:px-8 lg:py-6">{children}</main>
       </div>
