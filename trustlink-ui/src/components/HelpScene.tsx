@@ -3,7 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { CircleHelp, X } from 'lucide-react';
 
 // 도움말: 화면이 어떻게 동작하는지 막대 인형 장면(소개 자료와 같은 방식)으로 보여 준다. topic 은 intro.html 의 HELP 키.
-export function HelpScene({ topic, title }: { topic: 'vex' | 'ask'; title: string }) {
+export function HelpScene({ topic, title }: { topic: 'vex' | 'ask' | 'mcp'; title: string }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>

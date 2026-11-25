@@ -321,6 +321,12 @@ func main() {
 	mux.HandleFunc("POST /api/ask", s.guardSession(s.apiAsk))                                // 묻고 찾기(로그인한 누구나, 자기 권한 안에서)
 	mux.HandleFunc("POST /api/ask/action", s.guardSession(s.apiAskAction))                   // 양식의 단추(A2UI action) — 권한은 행동마다 다시 확인
 	mux.HandleFunc("POST /api/ask/{id}/summary", s.guardSession(s.apiAskSummary))            // 그 답의 AI 한 줄 정리
+	// MCP 서버(시범): AI 도구가 연결 토큰으로 조회 — mcp.go
+	mux.HandleFunc("POST /api/mcp", s.apiMcp) // 인증은 Bearer 연결 토큰(쿠키 아님)
+	mux.HandleFunc("GET /api/mcp", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Allow", "POST"); w.WriteHeader(http.StatusMethodNotAllowed) })
+	mux.HandleFunc("GET /api/mcp/tokens", s.guardSession(s.apiMcpTokens))
+	mux.HandleFunc("POST /api/mcp/tokens", s.guardSession(s.apiMcpTokenCreate))
+	mux.HandleFunc("DELETE /api/mcp/tokens/{id}", s.guardSession(s.apiMcpTokenDelete))
 	mux.HandleFunc("GET /api/inbox", s.guard(s.apiInbox))                                    // 승인 대기함: 사람이 결정할 일 모음
 	mux.HandleFunc("GET /api/auto-response", s.guard(s.apiAutoResponse))                     // 자동 대응 기록·설정
 	mux.HandleFunc("PUT /api/auto-response/settings", s.guard(s.apiAutoResponseSettings))    // 켜기/끄기

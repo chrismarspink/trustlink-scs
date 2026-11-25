@@ -136,11 +136,19 @@ func (s *Server) apiAsk(w http.ResponseWriter, r *http.Request) {
 }
 
 // askAnswer: 질문을 네 가지 중 하나로 가려 규칙으로 답을 만든다.
-func (s *Server) askAnswer(sess Session, q string) *askAnswer {
+func (s *Server) askAnswer(sess Session, q string) *askAnswer { return s.askAnswerOpt(sess, q, true) }
+
+// askQuery: 조회만 — 행동 양식(통지 초안·VEX 판정·보고서)은 만들지 않는다. MCP 처럼 화면 없이 묻는 경로가 쓴다.
+func (s *Server) askQuery(sess Session, q string) *askAnswer { return s.askAnswerOpt(sess, q, false) }
+
+func (s *Server) askAnswerOpt(sess Session, q string, actions bool) *askAnswer {
 	mine := s.myProducts(sess)
 	isCustomer := len(mine) > 0 && !contains(sess.Groups, "admins")
 	var a *askAnswer
-	if a = s.askAction(sess, q); a != nil { // 행동 요청(통지 초안·VEX 판정·규제 보고서)이면 양식을 붙여 답한다
+	if actions {
+		a = s.askAction(sess, q)
+	}
+	if a != nil { // 행동 요청(통지 초안·VEX 판정·규제 보고서)이면 양식을 붙여 답한다
 		if a.Rows == nil {
 			a.Rows = []askRow{}
 		}

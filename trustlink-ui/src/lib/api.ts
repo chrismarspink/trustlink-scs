@@ -909,3 +909,11 @@ export type Impact = {
   more?: number; canCustomers?: boolean; empty?: string;
 };
 export const impactMap = (vuln: string) => aj<Impact>(`/api/impact?vuln=${encodeURIComponent(vuln)}`);
+
+// ---------- AI 도구 연결(MCP) — 연결 토큰 ----------
+export type McpTokenRow = { id: string; name: string; user: string; created: string; expires: string; lastUsed?: string; uses: number; expired: boolean };
+export type McpInfo = { url: string; tokens: McpTokenRow[]; max: number; user: string };
+export type McpIssued = McpTokenRow & { token: string; url: string };
+export const mcpTokens = () => aj<McpInfo>('/api/mcp/tokens');
+export const mcpTokenCreate = (name: string, days: number) => aj<McpIssued>('/api/mcp/tokens', jsonInit('POST', { name, days }));
+export const mcpTokenDelete = (id: string) => aj<{ status: string }>(`/api/mcp/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' });

@@ -30,6 +30,17 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.34.0',
+    date: '2026-11-25',
+    title: 'AI 도구 연결(MCP) 시범',
+    items: [
+      { kind: '신규', text: 'AI 도구 연결(MCP) — Claude 같은 AI 도구에 TrustLink 를 등록해 그 도구 안에서 취약점 영향·구성요소·현황·급한 것을 바로 물음. 조회 전용' },
+      { kind: '신규', text: '"AI 도구 연결" 화면에서 연결 토큰을 만들면 등록 명령이 토큰이 채워진 채로 나옴. 토큰은 언제든 끊을 수 있고 계정이 꺼지면 함께 막힘' },
+      { kind: '신규', text: '답은 토큰을 만든 사람의 권한 범위 그대로이고, 누가 어떤 도구로 무엇을 물었는지 감사 원장에 기록' },
+      { kind: '개선', text: '묻고 찾기에 "MCP 설정 도와줘"라고 물으면 설정 순서를 안내. 소개 자료에 "AI 도구 연결" 장면 3컷' },
+    ],
+  },
+  {
     version: '2.33.0',
     date: '2026-11-25',
     title: '묻고 찾기 — 더 많은 질문',

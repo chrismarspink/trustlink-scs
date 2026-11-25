@@ -27,6 +27,25 @@ var (
 	askExpireRe = regexp.MustCompile(`만료|끝나|갱신|유지보수`)
 )
 
+var askMcpRe = regexp.MustCompile(`(?i)mcp|클로드|claude|ai ?도구|커넥터|연결 ?토큰`)
+
+// AI 도구 연결(MCP) — 설정 순서를 그대로 답한다. 화면: /mcp
+func askMcpHelp() *askAnswer {
+	a := &askAnswer{Intent: "howto", Title: "AI 도구에 TrustLink 연결하기(MCP)", Sources: []string{"TrustLink 도움말"},
+		Lead: "Claude 같은 AI 도구에 TrustLink 를 연결하면, 그 도구 안에서 취약점 영향과 현황을 바로 물을 수 있습니다. 'AI 도구 연결' 화면에서 토큰을 만들고 명령 한 줄을 붙여 넣으면 됩니다."}
+	for _, r := range []askRow{
+		{Title: "1. 'AI 도구 연결' 화면 열기", Detail: "사이드바 › 제품 › AI 도구 연결", Link: "/mcp"},
+		{Title: "2. 연결 토큰 만들기", Detail: "이름과 기한을 정하고 만듭니다. 값은 만든 직후 한 번만 보입니다."},
+		{Title: "3. 명령 복사해 붙여 넣기", Detail: "Claude Code 는 터미널에 한 줄, Claude Desktop 은 설정 파일에 한 덩어리. 화면에 토큰이 채워진 채로 나옵니다."},
+		{Title: "4. AI 도구에서 묻기", Detail: "예: 'TrustLink 에서 CVE-2026-1234 가 어디에 걸리는지 찾아 줘', '급한 취약점부터 정리해 줘'"},
+		{Title: "알아 둘 점", Detail: "조회만 됩니다(보내기·저장 없음). 답은 내 권한 범위 그대로이고, 물은 내용은 감사 원장에 남습니다. 토큰은 같은 화면에서 언제든 끊을 수 있습니다."},
+	} {
+		a.Rows = append(a.Rows, r)
+		a.facts = append(a.facts, aiFact{ID: fmt.Sprintf("K%d", len(a.facts)+1), Text: r.Title + " — " + r.Detail})
+	}
+	return a
+}
+
 type askTopic struct {
 	Keys []string // 질문에 이 낱말이 있으면 이 주제(소문자)
 	Name string
@@ -51,6 +70,7 @@ var askTopics = []askTopic{
 	{[]string{"규제", "보고서", "cra", "cmmc"}, "규제 보고서", "지역과 읽는 사람, 제품을 고르면 규제 카탈로그와 그 제품의 증빙으로 보고서를 만듭니다. '미국 수출 규제 보고서 만들어 줘'처럼 시킬 수 있습니다. 법률 자문은 아닙니다.", "/admin/reports"},
 	{[]string{"일괄", "ai 판정", "판정 초안"}, "AI 일괄 판정", "'VEX 판단'에서 제품별로 걸면 규칙으로 초안을 먼저 만들고 AI 가 요약을 덧붙입니다. 초안일 뿐이며 저장은 사람이 합니다.", "/vex"},
 	{[]string{"내 제품"}, "내 제품", "고객 계정이 자기 회사가 설치한 버전의 취약점과 권장 버전을 보는 화면입니다.", "/my"},
+	{[]string{"mcp", "ai 도구", "클로드", "claude"}, "AI 도구 연결(MCP)", "Claude 같은 AI 도구에 TrustLink 를 연결해 그 도구 안에서 바로 묻는 기능입니다. 'AI 도구 연결'에서 토큰을 만들어 등록하며, 조회만 됩니다.", "/mcp"},
 	{[]string{"휴대폰", "모바일", "핸드폰"}, "휴대폰", "같은 주소를 휴대폰 브라우저로 열면 됩니다. 메뉴는 왼쪽 위 단추로 열고, 큰 표는 옆으로 밀어서 봅니다.", ""},
 	{[]string{"뭘 물어", "무엇을 물어", "할 수 있", "도움말", "사용법", "기능"}, "묻고 찾기", "취약점 번호, 구성요소 이름, 제품 이름, 현황, 실제 악용 취약점, 할 일, 용어와 사용법을 물을 수 있습니다. 관리자는 고객과 계약 만료도 물을 수 있고, 통지 초안·VEX 판정·규제 보고서를 시킬 수 있습니다.", ""},
 }
@@ -73,6 +93,9 @@ func askTopicHits(q string) []askTopic {
 func (s *Server) askMore(sess Session, q string, mine []myCustomer, isCustomer bool) *askAnswer {
 	admin := contains(sess.Groups, "admins")
 	topics := askTopicHits(q)
+	if askMcpRe.MatchString(q) { // AI 도구 연결(MCP) 설정 안내
+		return askMcpHelp()
+	}
 	if len(topics) > 0 && askHowRe.MatchString(q) { // ⑤ 사용법·용어
 		return askHowto(topics)
 	}
