@@ -30,6 +30,14 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.38.1',
+    date: '2026-11-25',
+    title: '소개 자료 탭 정리',
+    items: [
+      { kind: '개선', text: '소개 자료의 지금 탭을 밑줄 없이 굵은 글씨로만 표시 — 바로 아래 진행 막대와 같은 색 줄이 겹쳐 보이던 것을 정리' },
+    ],
+  },
+  {
     version: '2.38.0',
     date: '2026-11-25',
     title: '규제 영향 지도',
