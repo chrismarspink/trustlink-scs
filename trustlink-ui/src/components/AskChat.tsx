@@ -96,7 +96,7 @@ export function AskChat({ wide = false, onNavigate, autoFocus = false }: { wide?
   const aiScene = async () => {
     if (!scene) return;
     setScene({ ...scene, busy: true, err: '' });
-    try { const r = await askScene(scene.id); setScene((s) => (s ? { ...s, busy: false, ai: `${r.model} · ${(r.elapsedMs / 1000).toFixed(0)}초`, stories: [{ name: 'AI 가 풀어 쓴 설명', scenes: r.scenes }, ...s.stories.filter((x) => x.name !== 'AI 가 풀어 쓴 설명')] } : s)); }
+    try { const r = await askScene(scene.id); setScene((s) => (s ? { ...s, busy: false, ai: r.cached ? `${r.model} · 캐시됨(즉시)` : `${r.model} · ${(r.elapsedMs / 1000).toFixed(0)}초`, stories: [{ name: 'AI 가 풀어 쓴 설명', scenes: r.scenes }, ...s.stories.filter((x) => x.name !== 'AI 가 풀어 쓴 설명')] } : s)); }
     catch (e) { setScene((s) => (s ? { ...s, busy: false, err: clean(e) } : s)); }
   };
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [turns.length]);

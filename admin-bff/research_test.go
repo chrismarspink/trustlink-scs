@@ -98,10 +98,11 @@ func TestAskPlanAndTasks(t *testing.T) {
 	}
 }
 
-// 장면 답변: AI 가 고른 틀과 채운 글자를 서버가 다듬어 돌려준다. 틀이 아니거나 빈칸이 모자란 장면은 버린다.
+// 장면 답변: 구조는 규칙(답의 줄·할 일)으로 만들고 AI 는 짧은 글(lead·notes)만 쓴다. 같은 질문은 캐시로 AI 없이 바로.
 func TestAskScene(t *testing.T) {
 	s := agentServer(t)
-	llm := fakeLLM(t, `{"scenes":[{"layout":"ask","title":"네 버전에 걸립니다","text":"설명","who":"관리자","say":"어디에 걸리나?","cards":[{"title":"prod 1.0","line":"판단 대기"}]},{"layout":"svg","title":"x","text":"y"},{"layout":"steps","title":"다음","text":"t","steps":["하나"]},{"layout":"steps","title":"다음 할 일","text":"t","steps":["초안 준비","검토","저장"]}]}`, nil)
+	var got map[string]any
+	llm := fakeLLM(t, `{"lead":"네 버전에 걸립니다","notes":["치명 등급이 섞여 있습니다","초안부터 준비하세요"]}`, &got)
 	defer llm.Close()
 	t.Setenv("AI_URL", llm.URL)
 	admin := Session{Username: "admin1", Groups: []string{"admins"}}
@@ -109,10 +110,27 @@ func TestAskScene(t *testing.T) {
 	var a struct{ ID string }
 	_ = json.Unmarshal([]byte(body), &a)
 	code, body := agentCall(t, s, admin, s.apiAskScene, "POST", a.ID, "")
-	var out struct{ Scenes []sceneSpec }
+	var out struct {
+		Scenes []sceneSpec
+		Cached bool
+	}
 	_ = json.Unmarshal([]byte(body), &out)
-	if code != 200 || len(out.Scenes) != 2 || out.Scenes[0].Layout != "ask" || out.Scenes[0].Cards[0].Lines[0] != "판단 대기" || out.Scenes[1].Layout != "steps" || len(out.Scenes[1].Steps) != 3 || out.Scenes[0].Tag != "AI 생성" {
+	if code != 200 || len(out.Scenes) == 0 || out.Scenes[0].Title != "네 버전에 걸립니다" || len(out.Scenes[0].Cards) == 0 || out.Scenes[0].Tag != "AI 생성" || out.Cached {
 		t.Fatalf("장면: %d %s", code, body)
+	}
+	// AI 출력을 짧게만 요청하는지(maxTokens 작게, lead/notes 스키마)
+	if _, ok := got["response_format"]; !ok {
+		t.Error("JSON 스키마 제약 없음")
+	}
+	// 두 번째 호출은 캐시 — 같은 결과, cached=true
+	_, body2 := agentCall(t, s, admin, s.apiAskScene, "POST", a.ID, "")
+	var out2 struct {
+		Scenes []sceneSpec
+		Cached bool
+	}
+	_ = json.Unmarshal([]byte(body2), &out2)
+	if !out2.Cached || out2.Scenes[0].Title != "네 버전에 걸립니다" {
+		t.Errorf("캐시 안 됨: %s", body2)
 	}
 	if code, _ := agentCall(t, s, Session{Username: "other", Groups: []string{"developers"}}, s.apiAskScene, "POST", a.ID, ""); code != 404 {
 		t.Errorf("남의 질문으로 장면: %d", code)
