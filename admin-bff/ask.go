@@ -35,17 +35,18 @@ type askRow struct {
 }
 
 type askAnswer struct {
-	ID      string   `json:"id"`
-	Intent  string   `json:"intent"` // vuln / component / my / todo / howto / status / urgent / product / customer / free
-	Title   string   `json:"title"`
-	Lead    string   `json:"lead"` // 규칙으로 만든 한 줄 답
-	Rows    []askRow `json:"rows"`
-	More    int      `json:"more,omitempty"` // 줄이느라 보여 주지 않은 건수
-	Sources []string `json:"sources"`        // 답의 출처(어느 기록에서 찾았나)
-	Suggest []string `json:"suggest,omitempty"`
-	CanAI   bool     `json:"canAI"`         // AI 한 줄 정리를 요청할 수 있는가
-	UI      []a2     `json:"ui,omitempty"`  // 행동 양식(A2UI v0.9.1 메시지) — ask_action.go
-	Map     string   `json:"map,omitempty"` // 영향 지도 링크(취약점을 찾았을 때)
+	ID      string      `json:"id"`
+	Intent  string      `json:"intent"` // vuln / component / my / todo / howto / status / urgent / product / customer / free
+	Title   string      `json:"title"`
+	Lead    string      `json:"lead"` // 규칙으로 만든 한 줄 답
+	Rows    []askRow    `json:"rows"`
+	More    int         `json:"more,omitempty"` // 줄이느라 보여 주지 않은 건수
+	Sources []string    `json:"sources"`        // 답의 출처(어느 기록에서 찾았나)
+	Suggest []string    `json:"suggest,omitempty"`
+	CanAI   bool        `json:"canAI"`           // AI 한 줄 정리를 요청할 수 있는가
+	UI      []a2        `json:"ui,omitempty"`    // 행동 양식(A2UI v0.9.1 메시지) — ask_action.go
+	Map     string      `json:"map,omitempty"`   // 영향 지도 링크(취약점을 찾았을 때)
+	Tasks   []agentTask `json:"tasks,omitempty"` // 할 일을 물었을 때: 에이전트의 할 일 제안(바로 실행할 수 있다)
 	facts   []aiFact
 	q, user string
 	pending *askPending
@@ -96,7 +97,7 @@ func artifactLink(repo, tag string) string {
 func askExamples(sess Session, isCustomer bool) []string {
 	switch {
 	case contains(sess.Groups, "admins"):
-		return []string{"오늘 승인할 것?", "CVE-2026-123634 가 어디에 걸리나?", "미국 수출 규제 보고서 만들어 줘"}
+		return []string{"오늘 승인할 것?", "CVE-2026-123634 가 어디에 걸리나?", "CVE-2026-123634 자료 조사해 줘", "미국 수출 규제 보고서 만들어 줘"}
 	case isCustomer:
 		return []string{"내가 조치할 게 있나?", "CVE-2026-123634 가 내 제품에 있나?"}
 	}
@@ -116,6 +117,13 @@ func (s *Server) apiAsk(w http.ResponseWriter, r *http.Request) {
 	a := s.askAnswer(sess, truncate(strings.TrimSpace(in.Q), 300))
 	a.q, a.user = in.Q, sess.Username
 	a.CanAI = len(a.facts) > 0 && aiEnabledFor("vex")
+	if inList(a.Intent, []string{"todo", "urgent", "my", "status"}) { // 할 일·현황을 물으면 실행할 수 있는 제안을 같이 준다
+		if ts := s.agentTasks(sess); len(ts) > 6 {
+			a.Tasks = ts[:6]
+		} else {
+			a.Tasks = ts
+		}
+	}
 	askKeep(a)
 	if a.pending != nil && a.UI == nil { // 양식은 답의 ID(= A2UI surfaceId)가 정해진 뒤에 만든다
 		switch a.pending.Kind {
@@ -157,6 +165,8 @@ func (s *Server) askAnswerOpt(sess Session, q string, actions bool) *askAnswer {
 		return a
 	}
 	switch {
+	case actions && researchRe.MatchString(q) && askVulnRe.MatchString(q): // 외부 공개 자료 조사(화면에서 물었을 때만 — MCP 조회로는 외부에 나가지 않는다)
+		a = s.askResearch(sess, strings.ToUpper(askVulnRe.FindString(q)))
 	case askVulnRe.MatchString(q):
 		a = s.askVuln(sess, strings.ToUpper(askVulnRe.FindString(q)), mine, isCustomer)
 	case askTodoRe.MatchString(q) && !isCustomer:
@@ -492,7 +502,7 @@ const askTask = `아래 사실만으로 질문에 두 문장 이내로 답한다
 
 var askSchema = map[string]any{
 	"type":       "object",
-	"properties": map[string]any{"answer": map[string]any{"type": "string", "maxLength": 320}},
+	"properties": map[string]any{"answer": map[string]any{"type": "string", "maxLength": 480}},
 	"required":   []string{"answer"},
 }
 
@@ -516,13 +526,21 @@ func (s *Server) apiAskSummary(w http.ResponseWriter, r *http.Request) {
 		Answer string `json:"answer"`
 	}
 	task, tok := askTask, 160
-	if a.Intent == "free" {
-		task, tok = askFreeTask, 220
+	steps := []askStep{}
+	switch a.Intent {
+	case "free": // AI 가 조회를 스스로 골라(읽기 전용, 최대 3개) 그 결과로 답한다
+		task, tok = askFreeTask, 260
+		if st, pf := s.askPlan(sess, a.q); len(st) > 0 {
+			steps = st
+			facts = append(append([]aiFact{facts[0]}, pf...), a.facts...)
+		}
+	case "research":
+		task, tok = askResearchTask, 300
 	}
 	meta, err := s.aiDraftOpt("vex", "ko", facts, task, askSchema, tok, &out, true)
 	if err != nil {
 		writeJSON(w, 502, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"answer": strings.TrimSpace(out.Answer), "model": meta.Model, "provider": meta.Provider, "elapsedMs": meta.ElapsedMs})
+	writeJSON(w, 200, map[string]any{"answer": strings.TrimSpace(out.Answer), "model": meta.Model, "provider": meta.Provider, "elapsedMs": meta.ElapsedMs, "steps": steps})
 }

@@ -61,6 +61,7 @@ type agentLog struct {
 	OK     bool       `json:"ok"`
 	Undo   *agentUndo `json:"undo,omitempty"`
 	Undone string     `json:"undone,omitempty"` // 되돌린 시각
+	Ask    string     `json:"ask,omitempty"`    // 결과를 다시 보려면 물을 말(자료 조사)
 }
 
 type agentSchedule struct {
@@ -87,6 +88,7 @@ var agentRecipes = []agentRecipe{
 	{"vex-draft", "판단 대기 취약점의 초안 준비", "초안만 만듭니다. 결과는 할 일 제안과 VEX 판단 화면에 올라오고, 저장·발행은 사람이 합니다.", "vex"},
 	{"expiry-check", "만료 예정 고객 점검과 안내 메일 준비", "메일은 승인 대기에 올라갑니다. 자동으로 나가지 않습니다.", "admin"},
 	{"reg-discover", "새 규제와 원문 변경 탐색(외부 인터넷)", "후보는 규제 화면에 올라옵니다. 채택은 사람이 합니다.", "admin"},
+	{"research", "급한 취약점의 공개 자료 조사(외부 인터넷)", "실제 악용·치명 취약점을 최대 3건 조사해 둡니다. 결과는 실행 기록의 \"결과 보기\"나 \"CVE-… 자료 조사\"로 봅니다.", "vex"},
 }
 
 var agentSt struct {
@@ -107,6 +109,7 @@ const (
 	agentMaxSchedules = 10 // 한 사람당
 	agentDraftLimit   = 20 // 한 제품·버전에서 한 번에 만드는 초안
 	agentDraftBatch   = 3  // 예약 한 번에 초안을 만드는 제품·버전 수(AI 부하)
+	agentResearchMax  = 3  // 예약 한 번에 조사하는 취약점 수(외부 요청을 아낀다)
 )
 
 func agentPath() string { return filepath.Join(filepath.Dir(aiConfigPath()), "agent.json") }
@@ -389,6 +392,17 @@ func agentLogAdd(actor, by, title, result string, ok bool, undo *agentUndo) agen
 	return e
 }
 
+func agentLogAsk(id, q string) {
+	agentSt.Lock()
+	defer agentSt.Unlock()
+	for i := range agentSt.Log {
+		if agentSt.Log[i].ID == id {
+			agentSt.Log[i].Ask = q
+		}
+	}
+	agentSave()
+}
+
 func (s *Server) agentRecord(actor, by, title, result string, ok bool, undo *agentUndo) agentLog {
 	e := agentLogAdd(actor, by, title, result, ok, undo)
 	_ = s.sor.append(SoREvent{Actor: actor, Action: "agent-run", Subject: title, Status: map[bool]string{true: "ok", false: "failed"}[ok], Detail: map[string]any{"by": by, "result": result}})
@@ -471,6 +485,28 @@ func (s *Server) agentRecipeRun(sess Session, key string) (string, error) {
 			return "새로 초안을 만들 제품이 없습니다.", nil
 		}
 		return "초안 준비를 시작했습니다: " + strings.Join(started, ", "), nil
+	case "research":
+		ids := []string{}
+		for _, r := range s.agentDraftRows(sess) {
+			if len(ids) >= agentResearchMax || r.PendKEV+r.PendCrit == 0 {
+				continue
+			}
+			fs, err := s.projectFindings(r.Project)
+			if err != nil {
+				continue
+			}
+			for _, f := range vexBatchPick(fs, agentResearchMax) {
+				if id := strings.ToUpper(askVulnRe.FindString(f.Vulnerability.VulnID)); id != "" && !inList(id, ids) && len(ids) < agentResearchMax {
+					if d := researchFetch(id); len(d.Sources) > 0 {
+						ids = append(ids, id)
+					}
+				}
+			}
+		}
+		if len(ids) == 0 {
+			return "새로 조사할 급한 취약점이 없거나 공개 자료를 받지 못했습니다.", nil
+		}
+		return "공개 자료를 조사해 두었습니다: " + strings.Join(ids, ", "), nil
 	case "expiry-check":
 		return fmt.Sprintf("만료 예정을 점검했습니다. 준비한 안내 메일 %d건(고객에게 갈 메일은 승인 대기에 있습니다).", s.custExpiryCheck()), nil
 	case "reg-discover":
@@ -536,7 +572,10 @@ func (s *Server) agentTick(now time.Time) {
 				msg = err.Error()
 			}
 		}
-		s.agentRecord(sc.Owner, "schedule", "예약: "+firstNonEmpty(rc.Title, sc.Recipe), msg, ok, nil)
+		e := s.agentRecord(sc.Owner, "schedule", "예약: "+firstNonEmpty(rc.Title, sc.Recipe), msg, ok, nil)
+		if id := askVulnRe.FindString(msg); ok && sc.Recipe == "research" && id != "" {
+			agentLogAsk(e.ID, id+" 자료 조사해 줘")
+		}
 		agentSt.Lock()
 		for i := range agentSt.Schedules {
 			x := &agentSt.Schedules[i]
@@ -580,10 +619,10 @@ func (s *Server) apiAgent(w http.ResponseWriter, r *http.Request) {
 			logs = append(logs, x)
 		}
 	}
-	auto := agentSt.Prefs[sess.Username]["autoOpen"]
+	prefs := map[string]bool{"autoOpen": agentSt.Prefs[sess.Username]["autoOpen"], "askOff": agentSt.Prefs[sess.Username]["askOff"]}
 	agentSt.Unlock()
 	writeJSON(w, 200, map[string]any{"user": sess.Username, "role": agentRole(sess, isCustomer), "tasks": s.agentTasks(sess),
-		"schedules": scheds, "log": logs, "recipes": recipes, "prefs": map[string]bool{"autoOpen": auto}, "ai": aiEnabled()})
+		"schedules": scheds, "log": logs, "recipes": recipes, "prefs": prefs, "ai": aiEnabled()})
 }
 
 func (s *Server) apiAgentRun(w http.ResponseWriter, r *http.Request) {
@@ -652,8 +691,9 @@ func (s *Server) apiAgentUndo(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiAgentPrefs(w http.ResponseWriter, r *http.Request) {
 	sess, _ := s.sessionOf(r)
-	var in struct {
-		AutoOpen bool `json:"autoOpen"`
+	var in struct { // 보낸 것만 바꾼다
+		AutoOpen *bool `json:"autoOpen"` // 접속하면 에이전트를 자동으로 연다
+		AskOff   *bool `json:"askOff"`   // 오른쪽 아래 묻고 찾기 버튼을 끈다
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&in); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "잘못된 요청"})
@@ -661,10 +701,20 @@ func (s *Server) apiAgentPrefs(w http.ResponseWriter, r *http.Request) {
 	}
 	agentSt.Lock()
 	agentLoad()
-	agentSt.Prefs[sess.Username] = map[string]bool{"autoOpen": in.AutoOpen}
+	p := agentSt.Prefs[sess.Username]
+	if p == nil {
+		p = map[string]bool{}
+	}
+	if in.AutoOpen != nil {
+		p["autoOpen"] = *in.AutoOpen
+	}
+	if in.AskOff != nil {
+		p["askOff"] = *in.AskOff
+	}
+	agentSt.Prefs[sess.Username] = p
 	agentSave()
 	agentSt.Unlock()
-	writeJSON(w, 200, map[string]bool{"autoOpen": in.AutoOpen})
+	writeJSON(w, 200, p)
 }
 
 func (s *Server) apiAgentScheduleAdd(w http.ResponseWriter, r *http.Request) {

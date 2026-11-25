@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Send, X, Zap } from 'lucide-react';
 import { adminMailHoldApprove, agentGet, agentPrefs, agentRun, agentScheduleAdd, agentScheduleDelete, agentScheduleSet, agentUndo, type AgentData, type AgentTask } from '@/lib/api';
-import { askOpen } from '@/lib/askOpen';
+import { setAskOff } from '@/lib/askOpen';
+import { AskChat, askSend } from '@/components/AskChat';
 import { cn } from '@/lib/utils';
 
 // 에이전트: 로그인한 사람의 권한에 맞는 할 일을 모아 제안하고, 고르면 대신 실행한다.
@@ -19,13 +20,17 @@ const skipped = (): string[] => { try { return JSON.parse(sessionStorage.getItem
 
 export function useAgent() {
   const [d, setD] = useState<AgentData | null>(null);
-  const load = useCallback(() => agentGet().then(setD).catch(() => setD(null)), []);
+  const load = useCallback(() => agentGet().then((x) => { setD(x); setAskOff(!!x.prefs.askOff); }).catch(() => { setD(null); setAskOff(false); }), []);
   useEffect(() => { load(); }, [load]);
   return { d, load };
 }
 
-export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => void; onNavigate?: () => void }) {
-  const [tab, setTab] = useState<'todo' | 'sched' | 'log'>('todo');
+type Tab = 'todo' | 'ask' | 'sched' | 'log';
+
+// go: 밖에서 탭을 바꿀 때(예: 다른 화면에서 물었을 때 '묻기'로). n 이 바뀔 때마다 그 탭으로 간다.
+export function AgentView({ d, load, onNavigate, go }: { d: AgentData; load: () => void; onNavigate?: () => void; go?: { tab: Tab; n: number } }) {
+  const [tab, setTab] = useState<Tab>(go?.tab || 'todo');
+  useEffect(() => { if (go) setTab(go.tab); }, [go?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [skip, setSkip] = useState<string[]>(skipped);
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [openHold, setOpenHold] = useState('');
@@ -34,7 +39,7 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ recipe: '', repeat: 'daily', time: '08:30', weekday: 1 });
   const [q, setQ] = useState('');
-  const askNow = (text: string) => { if (!text.trim()) return; setQ(''); onNavigate?.(); askOpen(text.trim()); }; // 질문은 묻고 찾기가 받아 답한다(패널은 닫는다)
+  const askNow = (text: string) => { if (!text.trim()) return; setQ(''); setTab('ask'); askSend(text); }; // 질문은 '묻기' 탭에서 이어서 답한다
 
   const tasks = d.tasks.filter((t) => !skip.includes(t.id));
   const picked = tasks.filter((t) => t.grade === 'run' && sel[t.id]);
@@ -60,11 +65,12 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
     <div className="flex min-h-0 flex-1 flex-col">
       <p className="px-4 pb-2 text-[13px] text-muted-foreground">{d.user} · {ROLE[d.role] || ROLE.user}</p>
       <div className="flex gap-5 border-b px-4" role="tablist">
-        {([['todo', `할 일 제안${tasks.length ? ' ' + tasks.length : ''}`], ...(canSched ? [['sched', '예약']] : []), ['log', '실행 기록']] as [typeof tab, string][]).map(([k, l]) => (
+        {([['todo', `할 일 제안${tasks.length ? ' ' + tasks.length : ''}`], ['ask', '묻기'], ...(canSched ? [['sched', '예약']] : []), ['log', '실행 기록']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => { setTab(k); setMsg(''); setErr(''); }} className={cn('py-2 text-sm', tab === k ? 'font-bold text-foreground' : 'text-muted-foreground')}>{l}</button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+      {tab === 'ask' && <AskChat onNavigate={onNavigate} />}
+      <div className={cn('min-h-0 flex-1 overflow-auto px-4 py-3', tab === 'ask' && 'hidden')}>
         {msg && <div className="mb-3 rounded-lg bg-primary/10 px-3 py-2 text-[13px]" role="status">{msg}</div>}
         {err && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700" role="alert">{err}</div>}
 
@@ -164,6 +170,7 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
                 <div className="mt-1 text-[13px]">{x.result}</div>
                 {x.undone ? <div className="mt-2 text-xs text-muted-foreground">{when(x.undone)}에 되돌렸습니다.</div>
                   : !!x.undo && x.ok && <button type="button" disabled={busy} onClick={() => act(async () => (await agentUndo(x.id)).result)} className={cn(btn, 'mt-2')}>되돌리기</button>}
+                {x.ask && <button type="button" onClick={() => askNow(x.ask!)} className={cn(btn, 'mt-2')}>결과 보기</button>}
               </div>
             ))}
             <p className="text-xs text-muted-foreground">메일 승인과 발송은 발송함에, 모든 실행은 로그에도 남습니다. 이미 발송된 메일과 발행한 VEX는 되돌릴 수 없습니다.</p>
@@ -171,11 +178,11 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
         )}
       </div>
       <div className="border-t bg-card px-4 py-2.5">
-        <form onSubmit={(e) => { e.preventDefault(); askNow(q); }} className="mb-2 flex items-center gap-2">
+        {tab !== 'ask' && <form onSubmit={(e) => { e.preventDefault(); askNow(q); }} className="mb-2 flex items-center gap-2">
           <label htmlFor="ag-ask" className="sr-only">묻거나 시키기</label>
           <input id="ag-ask" value={q} onChange={(e) => setQ(e.target.value)} maxLength={300} placeholder="묻거나 시키기 — 예: CVE-2026-1234 고객 통지 초안 만들어 줘" className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus:border-primary" />
           <button type="submit" disabled={!q.trim()} aria-label="보내기" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"><Send size={15} /></button>
-        </form>
+        </form>}
         {tab === 'todo' && tasks.some((t) => t.grade === 'run') && (
           <div className="mb-2 flex items-center gap-3">
             <span className="min-w-0 flex-1 text-[13px] text-muted-foreground">{picked.length ? `바로 실행 ${picked.length}건` : '실행할 것을 고르세요'}</span>
@@ -183,8 +190,12 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
           </div>
         )}
         <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
-          <input type="checkbox" checked={d.prefs.autoOpen} onChange={(e) => { agentPrefs(e.target.checked).then(load).catch(() => {}); }} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          <input type="checkbox" checked={d.prefs.autoOpen} onChange={(e) => { agentPrefs({ autoOpen: e.target.checked }).then(load).catch(() => {}); }} className="h-4 w-4 accent-[hsl(var(--primary))]" />
           접속하면 이 화면을 자동으로 엽니다
+        </label>
+        <label className="mt-1 flex items-center gap-2 text-[13px] text-muted-foreground">
+          <input type="checkbox" checked={!d.prefs.askOff} onChange={(e) => { agentPrefs({ askOff: !e.target.checked }).then(load).catch(() => {}); }} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          오른쪽 아래 묻고 찾기 버튼을 보입니다(꺼도 여기 "묻기"에서 똑같이 묻습니다)
         </label>
       </div>
     </div>
@@ -201,10 +212,13 @@ export function AgentButton() {
     setOpen(true);
   }, [d?.prefs.autoOpen]);
   useEffect(() => { if (open) load(); }, [open, load]);
-  useEffect(() => { // 묻고 찾기의 "에이전트에서 실행"으로 열기
-    const h = () => setOpen(true);
-    window.addEventListener('tl-agent', h);
-    return () => window.removeEventListener('tl-agent', h);
+  const [go, setGo] = useState<{ tab: Tab; n: number }>({ tab: 'todo', n: 0 });
+  useEffect(() => { // 다른 화면에서 열기: 'tl-agent'(할 일 제안), 'tl-ask'(바로 묻기 — askOpen)
+    const agent = () => { setGo((g) => ({ tab: 'todo', n: g.n + 1 })); setOpen(true); };
+    const asks = (e: Event) => { setGo((g) => ({ tab: 'ask', n: g.n + 1 })); setOpen(true); const q0 = (e as CustomEvent<{ q?: string }>).detail?.q; if (q0) askSend(q0); };
+    window.addEventListener('tl-agent', agent);
+    window.addEventListener('tl-ask', asks);
+    return () => { window.removeEventListener('tl-agent', agent); window.removeEventListener('tl-ask', asks); };
   }, []);
   if (!d) return null;
   const n = d.tasks.filter((t) => !skipped().includes(t.id)).length;
@@ -222,7 +236,7 @@ export function AgentButton() {
               <h2 className="flex-1 text-lg font-bold">에이전트</h2>
               <button type="button" onClick={() => setOpen(false)} aria-label="닫기" className="rounded-md p-2 hover:bg-secondary"><X size={18} /></button>
             </div>
-            <AgentView d={d} load={load} onNavigate={() => setOpen(false)} />
+            <AgentView d={d} load={load} onNavigate={() => setOpen(false)} go={go} />
           </aside>
         </>, document.body)}
     </>

@@ -890,14 +890,15 @@ export const adminInbox = () => aj<{ groups: InboxGroup[]; decisions: number; ge
 // ---------- 묻고 찾기(로그인한 누구나, 자기 권한 안에서) ----------
 export type AskRow = { title: string; detail?: string; link?: string; tone?: 'crit' | 'warn' | 'ok' | '' };
 export type AskAnswer = {
-  id: string; intent: 'vuln' | 'component' | 'my' | 'todo' | 'howto' | 'status' | 'urgent' | 'product' | 'customer' | 'free'; title: string; lead: string;
+  id: string; intent: 'vuln' | 'component' | 'my' | 'todo' | 'howto' | 'status' | 'urgent' | 'product' | 'customer' | 'free' | 'research'; title: string; lead: string;
   rows: AskRow[]; more?: number; sources: string[]; suggest?: string[]; canAI: boolean;
   ui?: Record<string, unknown>[]; // 행동 양식(A2UI v0.9.1 메시지)
   map?: string; // 영향 지도 링크
+  tasks?: AgentTask[]; // 할 일을 물었을 때: 에이전트가 대신 할 수 있는 일
 };
 export const ask = (q: string) => aj<AskAnswer>('/api/ask', jsonInit('POST', { q }));
 export const askSummary = (id: string) =>
-  aj<{ answer: string; model: string; provider?: string; elapsedMs: number }>(`/api/ask/${encodeURIComponent(id)}/summary`, jsonInit('POST', {}));
+  aj<{ answer: string; model: string; provider?: string; elapsedMs: number; steps?: { tool: string; arg?: string; lead: string }[] }>(`/api/ask/${encodeURIComponent(id)}/summary`, jsonInit('POST', {}));
 // 양식의 단추가 눌렸을 때: A2UI 클라이언트 → 서버 action 메시지. 답으로 같은 화면을 갱신할 메시지가 온다.
 export const askAction = (action: { name: string; surfaceId: string; sourceComponentId: string; timestamp: string; context: Record<string, unknown> }) =>
   aj<{ ui: Record<string, unknown>[]; lead?: string }>('/api/ask/action', jsonInit('POST', { version: 'v0.9.1', action }));
@@ -925,13 +926,13 @@ export const mcpTokenDelete = (id: string) => aj<{ status: string }>(`/api/mcp/t
 
 // ---------- 에이전트: 권한에 맞는 할 일 제안·실행·예약·되돌리기 ----------
 export type AgentTask = { id: string; kind: string; grade: 'run' | 'approve' | 'go'; title: string; why?: string; steps: string[]; link?: string; ref?: string; urgent?: boolean };
-export type AgentLog = { id: string; at: string; actor: string; by: 'user' | 'schedule' | 'ask'; title: string; result: string; ok: boolean; undo?: unknown; undone?: string };
+export type AgentLog = { id: string; at: string; actor: string; by: 'user' | 'schedule' | 'ask'; title: string; result: string; ok: boolean; undo?: unknown; undone?: string; ask?: string };
 export type AgentSchedule = { id: string; recipe: string; owner: string; repeat: string; time: string; weekday?: number; on: boolean; next?: string; last?: string; lastMsg?: string };
-export type AgentData = { user: string; role: string; tasks: AgentTask[]; schedules: AgentSchedule[]; log: AgentLog[]; recipes: { key: string; title: string; out: string }[]; prefs: { autoOpen: boolean }; ai: boolean };
+export type AgentData = { user: string; role: string; tasks: AgentTask[]; schedules: AgentSchedule[]; log: AgentLog[]; recipes: { key: string; title: string; out: string }[]; prefs: { autoOpen: boolean; askOff: boolean }; ai: boolean };
 export const agentGet = () => aj<AgentData>('/api/agent');
 export const agentRun = (ids: string[]) => aj<{ results: AgentLog[] }>('/api/agent/run', jsonInit('POST', { ids }));
 export const agentUndo = (id: string) => aj<{ result: string }>('/api/agent/undo', jsonInit('POST', { id }));
-export const agentPrefs = (autoOpen: boolean) => aj<{ autoOpen: boolean }>('/api/agent/prefs', jsonInit('POST', { autoOpen }));
+export const agentPrefs = (p: { autoOpen?: boolean; askOff?: boolean }) => aj<{ autoOpen?: boolean; askOff?: boolean }>('/api/agent/prefs', jsonInit('POST', p));
 export const agentScheduleAdd = (b: { recipe: string; repeat: string; time: string; weekday: number }) => aj<AgentSchedule>('/api/agent/schedules', jsonInit('POST', b));
 export const agentScheduleSet = (id: string, on: boolean) => aj<{ status: string }>(`/api/agent/schedules/${id}`, jsonInit('POST', { on }));
 export const agentScheduleDelete = (id: string) => aj<{ status: string }>(`/api/agent/schedules/${id}`, { method: 'DELETE' });

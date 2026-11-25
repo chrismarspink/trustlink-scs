@@ -49,7 +49,7 @@ func TestAgentByRole(t *testing.T) {
 	for _, x := range got.Tasks {
 		hold = hold || (x.ID == "hold:"+h.ID && x.Grade == "approve")
 	}
-	if got.Role != "admin" || !hold || len(got.Recipes) != 3 {
+	if got.Role != "admin" || !hold || len(got.Recipes) != 4 {
 		t.Fatalf("관리자: %s 승인 메일 %v 예약 종류 %d\n%s", got.Role, hold, len(got.Recipes), body)
 	}
 	// 승인이 필요한 것은 에이전트가 대신 실행하지 않는다
