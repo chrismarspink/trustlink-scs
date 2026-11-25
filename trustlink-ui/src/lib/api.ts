@@ -923,6 +923,19 @@ export const mcpTokens = () => aj<McpInfo>('/api/mcp/tokens');
 export const mcpTokenCreate = (name: string, days: number) => aj<McpIssued>('/api/mcp/tokens', jsonInit('POST', { name, days }));
 export const mcpTokenDelete = (id: string) => aj<{ status: string }>(`/api/mcp/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
+// ---------- 에이전트: 권한에 맞는 할 일 제안·실행·예약·되돌리기 ----------
+export type AgentTask = { id: string; kind: string; grade: 'run' | 'approve' | 'go'; title: string; why?: string; steps: string[]; link?: string; ref?: string; urgent?: boolean };
+export type AgentLog = { id: string; at: string; actor: string; by: 'user' | 'schedule'; title: string; result: string; ok: boolean; undo?: unknown; undone?: string };
+export type AgentSchedule = { id: string; recipe: string; owner: string; repeat: string; time: string; weekday?: number; on: boolean; next?: string; last?: string; lastMsg?: string };
+export type AgentData = { user: string; role: string; tasks: AgentTask[]; schedules: AgentSchedule[]; log: AgentLog[]; recipes: { key: string; title: string; out: string }[]; prefs: { autoOpen: boolean }; ai: boolean };
+export const agentGet = () => aj<AgentData>('/api/agent');
+export const agentRun = (ids: string[]) => aj<{ results: AgentLog[] }>('/api/agent/run', jsonInit('POST', { ids }));
+export const agentUndo = (id: string) => aj<{ result: string }>('/api/agent/undo', jsonInit('POST', { id }));
+export const agentPrefs = (autoOpen: boolean) => aj<{ autoOpen: boolean }>('/api/agent/prefs', jsonInit('POST', { autoOpen }));
+export const agentScheduleAdd = (b: { recipe: string; repeat: string; time: string; weekday: number }) => aj<AgentSchedule>('/api/agent/schedules', jsonInit('POST', b));
+export const agentScheduleSet = (id: string, on: boolean) => aj<{ status: string }>(`/api/agent/schedules/${id}`, jsonInit('POST', { on }));
+export const agentScheduleDelete = (id: string) => aj<{ status: string }>(`/api/agent/schedules/${id}`, { method: 'DELETE' });
+
 // ---------- 고객에게 갈 자동 메일의 승인 대기(VEX 발행 통보·만료 안내) ----------
 export type MailHold = { id: string; kind: 'vex' | 'expiry'; label: string; ref?: string; recipients: string[]; subject: string; createdAt: string;
   status: 'waiting' | 'approved' | 'rejected'; doneAt?: string; doneBy?: string; reason?: string; outboxId?: string };

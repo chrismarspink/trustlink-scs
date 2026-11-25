@@ -14,6 +14,7 @@ import VexQueue from '@/pages/VexQueue';
 import MyProducts from '@/pages/MyProducts';
 import ImpactMapPage from '@/pages/ImpactMap';
 import McpConnect from '@/pages/McpConnect';
+import { AgentPage } from '@/pages/AgentPage';
 
 // 관리 콘솔은 별도 청크로 분리(코드 스플릿) — /admin 진입 시에만 로드.
 const AdminApp = lazy(() => import('@/AdminApp'));
@@ -55,6 +56,7 @@ function ProductApp() {
         <Route path="/my" element={<MyProducts />} />
         <Route path="/impact" element={<ImpactMapPage />} />
         <Route path="/mcp" element={<McpConnect />} />
+        <Route path="/agent" element={<AgentPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

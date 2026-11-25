@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send, Plug, Share2, ListChecks, Settings } from 'lucide-react';
+  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send, Plug, Share2, ListChecks, Settings, Zap } from 'lucide-react';
 import { adminInbox, bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ const HOME: Item = { to: '/', label: '홈', icon: Home, end: true };
 const MENUS: Item[] = [
   {
     to: '#todo', label: '할 일', icon: ListChecks, open: true, children: [
+      { to: '/agent', label: '에이전트', icon: Zap, who: 'login' },
       { to: '/admin/inbox', label: '승인 대기함', icon: Inbox, who: 'admin' },
       { to: '/vex', label: 'VEX 판단', icon: ShieldQuestion, who: 'vex' },
       { to: '/admin', label: '대시보드', icon: LayoutDashboard, end: true, who: 'admin' },

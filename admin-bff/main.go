@@ -298,6 +298,7 @@ func main() {
 	go s.autoSweepLoop()                                                                         // 자동 대응 주기 검색(기본 6시간)
 	go s.aiSysLoop()                                                                             // 서버 CPU·메모리 표본(30초, AI 탭)
 	go s.custExpiryLoop()                                                                        // 만료·EOS 알림(하루 1회)
+	go s.agentLoop()                                                                             // 에이전트 예약 실행(1분마다 확인)
 	go func() { time.Sleep(20 * time.Second); s.dashboardCached(false); s.statsCached(false) }() // 대시보드·통계 미리 계산(첫 화면 대기 없앰)
 	mux.HandleFunc("GET /api/access/products", s.guard(s.apiAccessProducts))                     // 제품별 읽기/쓰기 대상
 	mux.HandleFunc("PUT /api/access/products", s.guard(s.apiAccessProductPut))
@@ -331,6 +332,13 @@ func main() {
 	mux.HandleFunc("GET /api/mcp/tokens", s.guardSession(s.apiMcpTokens))
 	mux.HandleFunc("POST /api/mcp/tokens", s.guardSession(s.apiMcpTokenCreate))
 	mux.HandleFunc("DELETE /api/mcp/tokens/{id}", s.guardSession(s.apiMcpTokenDelete))
+	mux.HandleFunc("GET /api/agent", s.guardSession(s.apiAgent)) // 에이전트: 권한에 맞는 할 일 제안·실행·예약·되돌리기
+	mux.HandleFunc("POST /api/agent/run", s.guardSession(s.apiAgentRun))
+	mux.HandleFunc("POST /api/agent/undo", s.guardSession(s.apiAgentUndo))
+	mux.HandleFunc("POST /api/agent/prefs", s.guardSession(s.apiAgentPrefs))
+	mux.HandleFunc("POST /api/agent/schedules", s.guardSession(s.apiAgentScheduleAdd))
+	mux.HandleFunc("POST /api/agent/schedules/{id}", s.guardSession(s.apiAgentSchedule))
+	mux.HandleFunc("DELETE /api/agent/schedules/{id}", s.guardSession(s.apiAgentSchedule))
 	mux.HandleFunc("GET /api/inbox", s.guard(s.apiInbox))                                    // 승인 대기함: 사람이 결정할 일 모음
 	mux.HandleFunc("GET /api/auto-response", s.guard(s.apiAutoResponse))                     // 자동 대응 기록·설정
 	mux.HandleFunc("PUT /api/auto-response/settings", s.guard(s.apiAutoResponseSettings))    // 켜기/끄기
