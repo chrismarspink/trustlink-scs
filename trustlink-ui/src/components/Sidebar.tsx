@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send, Plug } from 'lucide-react';
+  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, UserCog, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send, Plug, Share2 } from 'lucide-react';
 import { bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +32,8 @@ const ARTIFACTS_ITEM: Item = { to: '/artifacts', label: '아티팩트', icon: Pa
 const APIKEY_ITEM: Item = { to: '/apikeys', label: '내 API 키', icon: KeyRound };
 const MCP_ITEM: Item = { to: '/mcp', label: 'AI 도구 연결', icon: Plug };
 const VEX_ITEM: Item = { to: '/vex', label: 'VEX 판단', icon: ShieldQuestion };
+// 영향 지도: 개발·보안·관리자(고객 계정은 볼 수 없다 — 서버가 막는다)
+const IMPACT_ITEM: Item = { to: '/impact', label: '영향 지도', icon: Share2 };
 const MY_ITEM: Item = { to: '/my', label: '내 제품', icon: PackageCheck };
 // 관리 콘솔 — admins 일 때. 제품 개념 "납품 소프트웨어의 신뢰 장부"의 칸대로 묶는다:
 //   결정(사람이 할 일) · 릴리스(무엇을 줬나) · 고객(누가 쓰나) · 신호(무엇이 바뀌었나) · 전달·기록(누구에게 알렸나) · 설정.
@@ -95,7 +97,7 @@ export function navTrail(pathname: string): string[] | null {
     if (a) return [name, ...a];
   }
   if (pathname.startsWith('/artifact/')) return ['제품', '아티팩트'];
-  const p = hit([ARTIFACTS_ITEM, MY_ITEM, VEX_ITEM, APIKEY_ITEM, MCP_ITEM]);
+  const p = hit([ARTIFACTS_ITEM, MY_ITEM, VEX_ITEM, IMPACT_ITEM, APIKEY_ITEM, MCP_ITEM]);
   if (p) return ['제품', ...p];
   return hit(TOP);
 }
@@ -187,7 +189,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
   const showAdmin = !!sess?.groups?.includes('admins');
   // VEX 판단 대기열: 보안·개발·관리자(VEX 편집 권한)에게만
   // 내 제품: 고객사 사용자용(로그인 사용자 모두에게 보이되 서버가 본인 고객사로 제한)
-  const product = [ARTIFACTS_ITEM, ...(sess ? [MY_ITEM] : []), ...(sess?.canEditVex ? [VEX_ITEM] : []), APIKEY_ITEM, ...(sess ? [MCP_ITEM] : [])];
+  const product = [ARTIFACTS_ITEM, ...(sess ? [MY_ITEM] : []), ...(sess?.canEditVex ? [VEX_ITEM, IMPACT_ITEM] : []), APIKEY_ITEM, ...(sess ? [MCP_ITEM] : [])];
 
   return (
     <>
