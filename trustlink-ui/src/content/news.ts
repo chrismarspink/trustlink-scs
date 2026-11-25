@@ -30,11 +30,12 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
-    version: '2.34.1',
+    version: '2.34.2',
     date: '2026-11-25',
-    title: '영향 지도 메뉴',
+    title: '영향 지도 메뉴 · 메일 로고',
     items: [
       { kind: '개선', text: '사이드바 › 제품에 "영향 지도"를 추가(개발·보안·관리자). 지금까지는 주소나 묻고 찾기·VEX 판단의 링크로만 열 수 있었음' },
+      { kind: '신규', text: '시스템 상태 › 메일 로고와 모양 — 자동 메일 맨 위의 회사 로고를 올리거나 지우고, 메일 모양을 미리 봄' },
     ],
   },
   {
