@@ -1,7 +1,7 @@
 import { AskChip } from '@/components/AskChip';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Workflow, ShieldQuestion, Landmark, CalendarClock, Send, ArrowRight, Inbox as InboxIcon } from 'lucide-react';
+import { Workflow, ShieldQuestion, Landmark, CalendarClock, Send, ArrowRight, Inbox as InboxIcon, MailCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { adminInbox, type InboxGroup } from '@/lib/api';
 import { PageHeader, Alert, Loading } from './_ui';
@@ -15,6 +15,7 @@ const META: Record<InboxGroup['key'], { icon: LucideIcon; cls: string; hint: str
   vex: { icon: ShieldQuestion, cls: 'border-red-200 bg-red-50/40', hint: 'KEV·치명 취약점의 영향 판단 — VEX 로 기록' },
   reg: { icon: Landmark, cls: 'border-teal-200 bg-teal-50/40', hint: '규제 탐색이 찾은 새 후보 — 카탈로그에 채택할지' },
   expiry: { icon: CalendarClock, cls: 'border-orange-200 bg-orange-50/40', hint: '30일 안에 끝나는 유지보수·라이선스·EOS' },
+  hold: { icon: MailCheck, cls: 'border-amber-300 bg-amber-50/60', hint: '고객에게 갈 자동 메일(VEX 발행 통보·만료 안내) — 승인해야 나갑니다' },
   outbox: { icon: Send, cls: 'border-violet-200 bg-violet-50/40', hint: '보내기 전 대기 중 — 지금 취소할 수 있습니다' },
 };
 

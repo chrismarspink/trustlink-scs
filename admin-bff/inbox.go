@@ -134,6 +134,16 @@ func (s *Server) inboxGroups() ([]inboxGroup, int) {
 	groups = append(groups, g)
 
 	// ⑤ 발송함 대기(취소 가능)
+	// 고객에게 갈 자동 메일(VEX 발행 통보·만료 안내) — 승인해야 나간다
+	g = inboxGroup{Key: "hold", Label: "고객에게 보낼 메일 승인", Link: "/admin/outbox", Items: []inboxItem{}}
+	for _, h := range holdWaiting() {
+		g.Count++
+		if len(g.Items) < 6 {
+			g.Items = append(g.Items, inboxItem{Kind: "hold", Title: firstNonEmpty(h.Label, h.Subject), Detail: "→ " + joinMax(h.Recipients, 2), Link: "/admin/outbox", At: h.CreatedAt, Ref: h.ID})
+		}
+	}
+	groups = append(groups, g)
+
 	outbox.Lock()
 	outboxLoad()
 	items := append([]outboxItem(nil), outbox.items...)

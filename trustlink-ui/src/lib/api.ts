@@ -882,8 +882,8 @@ export const adminAutoApprove = (id: string, keys: string[], delay: number) => a
 export const adminAutoReject = (id: string, reason: string) => aj<AutoRun>(`/api/auto-response/${encodeURIComponent(id)}/reject`, jsonInit('POST', { reason }));
 
 // ---------- 승인 대기함(사람이 결정할 일 모음) ----------
-export type InboxItem = { kind: 'auto-customer' | 'auto-dev' | 'vex' | 'reg' | 'expiry' | 'outbox'; title: string; detail?: string; link: string; urgent?: boolean; at?: string; ref?: string };
-export type InboxGroup = { key: 'auto' | 'vex' | 'reg' | 'expiry' | 'outbox'; label: string; count: number; link: string; items: InboxItem[] };
+export type InboxItem = { kind: 'auto-customer' | 'auto-dev' | 'vex' | 'reg' | 'expiry' | 'hold' | 'outbox'; title: string; detail?: string; link: string; urgent?: boolean; at?: string; ref?: string };
+export type InboxGroup = { key: 'auto' | 'vex' | 'reg' | 'expiry' | 'hold' | 'outbox'; label: string; count: number; link: string; items: InboxItem[] };
 export const adminInbox = () => aj<{ groups: InboxGroup[]; decisions: number; generated: string }>('/api/inbox');
 
 // ---------- 묻고 찾기(로그인한 누구나, 자기 권한 안에서) ----------
@@ -917,3 +917,10 @@ export type McpIssued = McpTokenRow & { token: string; url: string };
 export const mcpTokens = () => aj<McpInfo>('/api/mcp/tokens');
 export const mcpTokenCreate = (name: string, days: number) => aj<McpIssued>('/api/mcp/tokens', jsonInit('POST', { name, days }));
 export const mcpTokenDelete = (id: string) => aj<{ status: string }>(`/api/mcp/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+// ---------- 고객에게 갈 자동 메일의 승인 대기(VEX 발행 통보·만료 안내) ----------
+export type MailHold = { id: string; kind: 'vex' | 'expiry'; label: string; ref?: string; recipients: string[]; subject: string; createdAt: string;
+  status: 'waiting' | 'approved' | 'rejected'; doneAt?: string; doneBy?: string; reason?: string; outboxId?: string };
+export const adminMailHold = () => aj<{ items: MailHold[] }>('/api/mail/hold');
+export const adminMailHoldApprove = (id: string, delay: number) => aj<{ hold: MailHold }>(`/api/mail/hold/${id}/approve`, jsonInit('POST', { delay }));
+export const adminMailHoldReject = (id: string, reason: string) => aj<MailHold>(`/api/mail/hold/${id}/reject`, jsonInit('POST', { reason }));

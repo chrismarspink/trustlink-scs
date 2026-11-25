@@ -312,18 +312,21 @@ func main() {
 	mux.HandleFunc("GET /api/metrics", s.guard(s.apiMetrics))
 	mux.HandleFunc("GET /api/logs", s.guard(s.apiLogs))
 	mux.HandleFunc("GET /api/health", s.guard(s.apiHealth))
-	mux.HandleFunc("GET /api/mail", s.guard(s.apiMailStatus))                                // 통보 메일 설정 상태
-	mux.HandleFunc("POST /api/mail/test", s.guard(s.apiMailTest))                            // 시험 메일 발송
-	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))                       // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
-	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))                      // 본문 미리보기
-	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))                      // 받는 사람·항목·첨부 추천(규칙 + AI)
-	mux.HandleFunc("GET /api/impact", s.guardSession(s.apiImpact))                           // 영향 지도(취약점 → 구성요소 → 버전 → 고객)
-	mux.HandleFunc("POST /api/ask", s.guardSession(s.apiAsk))                                // 묻고 찾기(로그인한 누구나, 자기 권한 안에서)
-	mux.HandleFunc("POST /api/ask/action", s.guardSession(s.apiAskAction))                   // 양식의 단추(A2UI action) — 권한은 행동마다 다시 확인
-	mux.HandleFunc("POST /api/ask/{id}/summary", s.guardSession(s.apiAskSummary))            // 그 답의 AI 한 줄 정리
+	mux.HandleFunc("GET /api/mail", s.guard(s.apiMailStatus))                     // 통보 메일 설정 상태
+	mux.HandleFunc("POST /api/mail/test", s.guard(s.apiMailTest))                 // 시험 메일 발송
+	mux.HandleFunc("GET /api/mail/options", s.guard(s.apiMailOptions))            // 메일에 넣을 항목·첨부 보고서·받을 사람 후보
+	mux.HandleFunc("POST /api/mail/preview", s.guard(s.apiMailPreview))           // 본문 미리보기
+	mux.HandleFunc("POST /api/mail/suggest", s.guard(s.apiMailSuggest))           // 받는 사람·항목·첨부 추천(규칙 + AI)
+	mux.HandleFunc("GET /api/impact", s.guardSession(s.apiImpact))                // 영향 지도(취약점 → 구성요소 → 버전 → 고객)
+	mux.HandleFunc("POST /api/ask", s.guardSession(s.apiAsk))                     // 묻고 찾기(로그인한 누구나, 자기 권한 안에서)
+	mux.HandleFunc("POST /api/ask/action", s.guardSession(s.apiAskAction))        // 양식의 단추(A2UI action) — 권한은 행동마다 다시 확인
+	mux.HandleFunc("POST /api/ask/{id}/summary", s.guardSession(s.apiAskSummary)) // 그 답의 AI 한 줄 정리
 	// MCP 서버(시범): AI 도구가 연결 토큰으로 조회 — mcp.go
 	mux.HandleFunc("POST /api/mcp", s.apiMcp) // 인증은 Bearer 연결 토큰(쿠키 아님)
-	mux.HandleFunc("GET /api/mcp", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Allow", "POST"); w.WriteHeader(http.StatusMethodNotAllowed) })
+	mux.HandleFunc("GET /api/mcp", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Allow", "POST")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
 	mux.HandleFunc("GET /api/mcp/tokens", s.guardSession(s.apiMcpTokens))
 	mux.HandleFunc("POST /api/mcp/tokens", s.guardSession(s.apiMcpTokenCreate))
 	mux.HandleFunc("DELETE /api/mcp/tokens/{id}", s.guardSession(s.apiMcpTokenDelete))
@@ -338,16 +341,20 @@ func main() {
 	mux.HandleFunc("PUT /api/mail/templates", s.guard(s.apiMailTemplatesPut))                // 관리자 작성 템플릿 저장
 	mux.HandleFunc("PUT /api/mail/logo", s.guard(s.apiMailLogoPut))                          // 메일 맨 위 회사 로고(서버 데이터에만)
 	mux.HandleFunc("DELETE /api/mail/logo", s.guard(s.apiMailLogoDelete))
-	mux.HandleFunc("GET /api/mail/layout-preview", s.guard(s.apiMailLayoutPreview))         // 메일 틀 미리보기
-	mux.HandleFunc("POST /api/mail/outbox/{id}/resend", s.guard(s.apiMailOutboxResend))      // 다시 보내기(최근 메일만)
-	mux.HandleFunc("GET /api/mail/outbox", s.guard(s.apiMailOutbox))                         // 발송함(기다리는 메일·최근 기록)
-	mux.HandleFunc("DELETE /api/mail/outbox/{id}", s.guard(s.apiMailOutboxCancel))           // 보내기 취소(기다리는 동안만)
-	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF))              // 규제 보고서 PDF(Gotenberg)
-	mux.HandleFunc("GET /api/notifications", s.guardSession(s.apiNotifications))             // 내 통보
-	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead))   // 읽음 표시
-	mux.HandleFunc("GET /api/notify/log", s.guard(s.apiNotifyLog))                           // 전체 통보 기록
-	mux.HandleFunc("POST /api/notify/sync", s.guard(s.apiNotifySync))                        // 지금 동기화
-	mux.HandleFunc("GET /api/vulnsources", s.guard(s.apiVulnSources))                        // 취약점 DB(OSV·GitHub) 설정
+	mux.HandleFunc("GET /api/mail/layout-preview", s.guard(s.apiMailLayoutPreview))     // 메일 틀 미리보기
+	mux.HandleFunc("POST /api/mail/outbox/{id}/resend", s.guard(s.apiMailOutboxResend)) // 다시 보내기(최근 메일만)
+	mux.HandleFunc("GET /api/mail/hold", s.guard(s.apiMailHold))                        // 고객에게 갈 자동 메일의 승인 대기 — mail_hold.go
+	mux.HandleFunc("GET /api/mail/hold/{id}/preview", s.guard(s.apiMailHoldPreview))
+	mux.HandleFunc("POST /api/mail/hold/{id}/approve", s.guard(s.apiMailHoldApprove))
+	mux.HandleFunc("POST /api/mail/hold/{id}/reject", s.guard(s.apiMailHoldReject))
+	mux.HandleFunc("GET /api/mail/outbox", s.guard(s.apiMailOutbox))                       // 발송함(기다리는 메일·최근 기록)
+	mux.HandleFunc("DELETE /api/mail/outbox/{id}", s.guard(s.apiMailOutboxCancel))         // 보내기 취소(기다리는 동안만)
+	mux.HandleFunc("GET /api/regs-report/{id}/pdf", s.guard(s.apiRegReportPDF))            // 규제 보고서 PDF(Gotenberg)
+	mux.HandleFunc("GET /api/notifications", s.guardSession(s.apiNotifications))           // 내 통보
+	mux.HandleFunc("POST /api/notifications/read", s.guardSession(s.apiNotificationsRead)) // 읽음 표시
+	mux.HandleFunc("GET /api/notify/log", s.guard(s.apiNotifyLog))                         // 전체 통보 기록
+	mux.HandleFunc("POST /api/notify/sync", s.guard(s.apiNotifySync))                      // 지금 동기화
+	mux.HandleFunc("GET /api/vulnsources", s.guard(s.apiVulnSources))                      // 취약점 DB(OSV·GitHub) 설정
 	mux.HandleFunc("PUT /api/vulnsources", s.guard(s.apiVulnSourcesPut))
 	mux.HandleFunc("POST /api/vulnsources/reanalyze", s.guard(s.apiVulnReanalyze))
 	mux.HandleFunc("GET /api/mirror", s.guard(s.apiMirror)) // 취약점 DB 미러 상태·정책
@@ -378,11 +385,11 @@ func main() {
 	mux.HandleFunc("POST /api/sbom/generate", vexEdit(s.apiSBOMGenerate)) // syft SBOM 생성·부착(제품 쓰기 권한, self 는 admins)
 	mux.HandleFunc("GET /api/vex/queue", vexEdit(s.apiVexQueue))          // VEX 판단 대기열(전 제품)
 	mux.HandleFunc("GET /api/vex/kev", vexEdit(s.apiVexKEV))              // KEV 등재 여부(미러 사본) — 우선순위 정렬용
-	mux.HandleFunc("POST /api/ai-perf/vex-bench", s.guard(s.apiVexBench))  // VEX 판정 방식별 속도 측정(관리자)
+	mux.HandleFunc("POST /api/ai-perf/vex-bench", s.guard(s.apiVexBench)) // VEX 판정 방식별 속도 측정(관리자)
 	mux.HandleFunc("GET /api/ai-perf/vex-bench", s.guard(s.apiVexBench))
-	mux.HandleFunc("POST /api/ai/vex-draft", vexEdit(s.apiAIVexDraft))    // AI VEX 판정·대응 초안(저장은 사람이)
-	mux.HandleFunc("POST /api/ai/vex-batch", vexEdit(s.apiAIVexBatch))    // 미분석 항목 일괄 초안(비동기)·취소
-	mux.HandleFunc("GET /api/ai/vex-batch", vexEdit(s.apiAIVexBatchGet))  // 일괄 초안 진행·결과
+	mux.HandleFunc("POST /api/ai/vex-draft", vexEdit(s.apiAIVexDraft))   // AI VEX 판정·대응 초안(저장은 사람이)
+	mux.HandleFunc("POST /api/ai/vex-batch", vexEdit(s.apiAIVexBatch))   // 미분석 항목 일괄 초안(비동기)·취소
+	mux.HandleFunc("GET /api/ai/vex-batch", vexEdit(s.apiAIVexBatchGet)) // 일괄 초안 진행·결과
 	mux.HandleFunc("GET /api/ai/status", s.guardSession(s.apiAIStatus))
 	mux.HandleFunc("GET /api/ai/config", s.guard(s.apiAIConfigGet)) // AI 연결 설정(로컬·외부 LLM) — 키는 끝 4자리만
 	mux.HandleFunc("PUT /api/ai/config", s.guard(s.apiAIConfigPut))

@@ -44,6 +44,7 @@ type Notice struct {
 	NoEmail  []string        `json:"noEmail,omitempty"` // 이메일이 없어 메일을 받지 못한 사용자
 	Dropped  []string        `json:"dropped,omitempty"` // 메일 허용 목록 밖이라 보내지 않은 주소
 	MailErr  string          `json:"mailError,omitempty"`
+	Held     string          `json:"held,omitempty"` // 고객 메일을 승인 대기로 둔 경우 그 ID
 	Read     map[string]bool `json:"read,omitempty"`
 	card     *mailCard       // 메일 틀(없으면 Body 를 기본 틀에 담는다). 화면 알림에는 쓰지 않음
 }
@@ -571,7 +572,10 @@ func (s *Server) deliver(nt Notice, to []kcUser, extra []string) {
 			emails = append(emails, a)
 		}
 	}
-	if s.mail.Configured() && len(emails) > 0 {
+	if nt.Audience == "customer" && len(emails) > 0 { // 고객에게 가는 메일은 승인을 기다린다 — mail_hold.go
+		h := s.holdMail("vex", "VEX 발행 통보 · "+path.Base(nt.Repo)+" "+nt.Tag, nt.Repo+":"+nt.Tag, emails, nt.Title, s.renderMail(noticeCard(nt)))
+		nt.Held = h.ID
+	} else if s.mail.Configured() && len(emails) > 0 {
 		mc := s.renderMail(noticeCard(nt))
 		sent, dropped, err := s.mail.SendRich(emails, nt.Title, mc)
 		outboxRecord("notify", nt.Kind+" · "+path.Base(nt.Repo)+" "+nt.Tag, nt.Repo+":"+nt.Tag, emails, nt.Title, mc, sent, dropped, err)

@@ -105,8 +105,11 @@ func TestCustExpiryDedupe(t *testing.T) {
 	c.d.Settings.ExpiryToCustomer = true
 	s.custExpiryCheck()
 	d = c.snapshot()
-	if len(d.ExpirySent) != 2 || logLen() != 4 || d.ExpiryLog[3].Audience != "customer" || d.ExpiryLog[3].Dropped[0] != "buy@alpha.example.com" {
-		t.Fatalf("7일 임계값 1회 + 고객 구매 담당(설정 시): %+v", d.ExpiryLog)
+	if len(d.ExpirySent) != 2 || logLen() != 4 || d.ExpiryLog[3].Audience != "customer" || len(d.ExpiryLog[3].Held) != 1 || d.ExpiryLog[3].Held[0] != "buy@alpha.example.com" || len(d.ExpiryLog[3].Sent)+len(d.ExpiryLog[3].Dropped) != 0 {
+		t.Fatalf("7일 임계값 1회 + 고객 구매 담당에게 갈 안내는 승인 대기(설정 시): %+v", d.ExpiryLog)
+	}
+	if hw := holdWaiting(); len(hw) != 1 || hw[0].Kind != "expiry" || hw[0].Recipients[0] != "buy@alpha.example.com" {
+		t.Fatalf("고객 만료 안내가 승인 대기에 없음: %+v", hw)
 	}
 	s.custExpiryCheck()
 	if logLen() != 4 {

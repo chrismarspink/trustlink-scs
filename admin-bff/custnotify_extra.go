@@ -29,6 +29,7 @@ type expiryRec struct {
 	Sent       []string `json:"sent,omitempty"`
 	Dropped    []string `json:"dropped,omitempty"` // 허용 목록 밖이라 건너뜀
 	Error      string   `json:"error,omitempty"`
+	Held       []string `json:"held,omitempty"` // 고객에게 갈 안내를 승인 대기로 둔 주소
 }
 
 type expiryDue struct {
@@ -159,6 +160,11 @@ func (s *Server) expiryMail(cu Customer, aud string, to []string, subject, body 
 		reason := map[string]string{"customer": "고객사 담당자", "internal": "이 고객의 영업·지원 담당"}[aud]
 		mc := s.renderMail(mailCard{Module: "계약·지원 만료 관리", Purpose: "만료 안내", Tone: "info",
 			Title: strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(subject, "[TrustLink]"), "[안내]")), Body: body, Reason: reason, Ref: cu.ID})
+		if aud == "customer" { // 고객에게 가는 안내는 승인을 기다린다 — mail_hold.go
+			s.holdMail("expiry", cu.Name+" · 만료 안내", cu.ID, to, subject, mc)
+			r.Held = to
+			return r
+		}
 		sent, dropped, err := s.mail.SendRich(to, subject, mc)
 		outboxRecord("expiry", cu.Name+" · 만료 안내", cu.ID, to, subject, mc, sent, dropped, err)
 		r.Sent, r.Dropped, r.Error = sent, dropped, errString(err)
