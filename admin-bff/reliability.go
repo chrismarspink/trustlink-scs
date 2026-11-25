@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -107,6 +108,18 @@ func (s *Server) relTasks() []agentTask {
 			Steps: []string{"시스템 상태에서 디스크와 구성요소를 확인합니다", "실패한 동안의 변경·기록은 남지 않았을 수 있습니다"}})
 	}
 	return out
+}
+
+// reqHTTPS: 이 요청이 암호화 연결로 들어왔는가(앞단 프록시가 TLS 를 끊어도 X-Forwarded-Proto 로 알린다).
+func reqHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	p := r.Header.Get("X-Forwarded-Proto")
+	if i := strings.IndexByte(p, ','); i >= 0 { // 프록시가 여럿이면 맨 앞이 원래 값
+		p = p[:i]
+	}
+	return strings.EqualFold(strings.TrimSpace(p), "https")
 }
 
 // uiCacheHeader: 이름에 해시가 붙은 빌드 파일은 오래 보관하고, 첫 문서는 매번 확인한다.

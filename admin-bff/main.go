@@ -521,7 +521,9 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 	// (관리 콘솔 API 는 admins 전용 guard, VEX 편집은 guardGroups 로 별도 게이트)
 	sid := s.store.put(Session{Username: username, Groups: groups, Expiry: time.Now().Add(8 * time.Hour)})
 	// 주소가 https 인 설치에서는 암호화 연결로만 쿠키를 보낸다(http 로 쓰는 개발 환경은 그대로)
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: sid, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: strings.HasPrefix(s.cfg.RedirectURI, "https://")})
+	// Secure 는 이 요청이 실제로 https 로 들어왔을 때만 붙인다(앞단 프록시는 X-Forwarded-Proto 로 알린다).
+	// 콜백 주소로 판단하면, 내부 IP·http 로 접속하는 사용자는 쿠키를 돌려받지 못해 로그인 직후 튕긴다.
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: sid, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: reqHTTPS(r)})
 	http.Redirect(w, r, st.ret, http.StatusFound)
 }
 

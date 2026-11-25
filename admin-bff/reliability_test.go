@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
@@ -53,5 +54,32 @@ func TestUICacheHeader(t *testing.T) {
 	uiCacheHeader(w, false)
 	if w.Header().Get("Cache-Control") != "no-cache" {
 		t.Errorf("첫 문서: %q", w.Header().Get("Cache-Control"))
+	}
+}
+
+func TestReqHTTPS(t *testing.T) {
+	cases := []struct {
+		tls  bool
+		xfp  string
+		want bool
+	}{
+		{false, "", false},
+		{false, "http", false},
+		{false, "https", true},
+		{false, "https, http", true},
+		{false, "HTTPS", true},
+		{true, "", true},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("GET", "/", nil)
+		if c.xfp != "" {
+			r.Header.Set("X-Forwarded-Proto", c.xfp)
+		}
+		if c.tls {
+			r.TLS = &tls.ConnectionState{}
+		}
+		if got := reqHTTPS(r); got != c.want {
+			t.Errorf("tls=%v xfp=%q → %v, want %v", c.tls, c.xfp, got, c.want)
+		}
 	}
 }

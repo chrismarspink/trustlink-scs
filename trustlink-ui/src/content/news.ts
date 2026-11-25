@@ -30,6 +30,14 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.43.1',
+    date: '2026-11-26',
+    title: '로그인 쿠키 보안 속성을 접속 방식으로 판단',
+    items: [
+      { kind: '수정', text: '접속 쿠키의 Secure 속성을 콜백 주소가 아니라 그 요청이 실제로 https 로 들어왔는지로 판단 — 내부 IP·http 로 접속해도 로그인이 유지됩니다' },
+    ],
+  },
+  {
     version: '2.43.0',
     date: '2026-11-26',
     title: '안내 장면 팝업, 새 첫 화면, 장면으로 답하기',
