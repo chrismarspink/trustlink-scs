@@ -35,7 +35,7 @@ type askRow struct {
 
 type askAnswer struct {
 	ID      string   `json:"id"`
-	Intent  string   `json:"intent"` // vuln / component / my / todo / help
+	Intent  string   `json:"intent"` // vuln / component / my / todo / howto / status / urgent / product / customer / free
 	Title   string   `json:"title"`
 	Lead    string   `json:"lead"` // 규칙으로 만든 한 줄 답
 	Rows    []askRow `json:"rows"`
@@ -154,14 +154,18 @@ func (s *Server) askAnswer(sess Session, q string) *askAnswer {
 		a = s.askTodo(sess)
 	case isCustomer && (askMyRe.MatchString(q) || askTodoRe.MatchString(q)):
 		a = askMine(mine)
-	case askCompKw.MatchString(q) && askCompRe.MatchString(q), !strings.Contains(q, " ") && askCompRe.MatchString(q):
-		a = s.askComponent(sess, askCompRe.FindString(q))
-	case askMyRe.MatchString(q) && len(mine) > 0:
-		a = askMine(mine)
 	default:
-		a = &askAnswer{Intent: "help", Title: "이렇게 물어보세요",
-			Lead:    "취약점 번호(CVE-…), 구성요소 이름, 할 일, 내 제품에 대해 답합니다. 그 밖의 질문은 아직 받지 않습니다.",
-			Sources: []string{}}
+		if a = s.askMore(sess, q, mine, isCustomer); a != nil { // 사용법·현황·실제 악용·제품·고객
+			break
+		}
+		switch {
+		case !isCustomer && (askCompKw.MatchString(q) && askCompRe.MatchString(q) || !strings.Contains(q, " ") && askCompRe.MatchString(q)):
+			a = s.askComponent(sess, askCompRe.FindString(q))
+		case askMyRe.MatchString(q) && len(mine) > 0:
+			a = askMine(mine)
+		default:
+			a = s.askFree(sess, mine, isCustomer)
+		}
 	}
 	if a.Rows == nil {
 		a.Rows = []askRow{}
@@ -479,7 +483,7 @@ const askTask = `아래 사실만으로 질문에 두 문장 이내로 답한다
 
 var askSchema = map[string]any{
 	"type":       "object",
-	"properties": map[string]any{"answer": map[string]any{"type": "string", "maxLength": 220}},
+	"properties": map[string]any{"answer": map[string]any{"type": "string", "maxLength": 320}},
 	"required":   []string{"answer"},
 }
 
@@ -502,7 +506,11 @@ func (s *Server) apiAskSummary(w http.ResponseWriter, r *http.Request) {
 	var out struct {
 		Answer string `json:"answer"`
 	}
-	meta, err := s.aiDraftOpt("vex", "ko", facts, askTask, askSchema, 160, &out, true)
+	task, tok := askTask, 160
+	if a.Intent == "free" {
+		task, tok = askFreeTask, 220
+	}
+	meta, err := s.aiDraftOpt("vex", "ko", facts, task, askSchema, tok, &out, true)
 	if err != nil {
 		writeJSON(w, 502, map[string]string{"error": err.Error()})
 		return

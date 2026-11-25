@@ -76,7 +76,7 @@ func TestAskComponentTodoHelp(t *testing.T) {
 	if b.Intent != "todo" || len(b.Rows) == 0 || !strings.Contains(b.Lead, "판단 대기") {
 		t.Errorf("할 일(개발자): %s %q", b.Intent, b.Lead)
 	}
-	if c := s.askAnswer(dev, "제로트러스트가 뭐야"); c.Intent != "help" || len(c.Suggest) == 0 {
+	if c := s.askAnswer(dev, "제로트러스트가 뭐야"); c.Intent != "free" || len(c.Suggest) == 0 {
 		t.Errorf("그 밖의 질문: %s", c.Intent)
 	}
 }

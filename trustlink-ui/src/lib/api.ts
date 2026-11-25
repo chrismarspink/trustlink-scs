@@ -889,7 +889,7 @@ export const adminInbox = () => aj<{ groups: InboxGroup[]; decisions: number; ge
 // ---------- 묻고 찾기(로그인한 누구나, 자기 권한 안에서) ----------
 export type AskRow = { title: string; detail?: string; link?: string; tone?: 'crit' | 'warn' | 'ok' | '' };
 export type AskAnswer = {
-  id: string; intent: 'vuln' | 'component' | 'my' | 'todo' | 'help'; title: string; lead: string;
+  id: string; intent: 'vuln' | 'component' | 'my' | 'todo' | 'howto' | 'status' | 'urgent' | 'product' | 'customer' | 'free'; title: string; lead: string;
   rows: AskRow[]; more?: number; sources: string[]; suggest?: string[]; canAI: boolean;
   ui?: Record<string, unknown>[]; // 행동 양식(A2UI v0.9.1 메시지)
   map?: string; // 영향 지도 링크

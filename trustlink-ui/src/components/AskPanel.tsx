@@ -37,6 +37,15 @@ export function AskPanel() {
     try {
       const a = await ask(t);
       setTurns((xs) => last(xs, (x) => ({ ...x, a, ui: a.ui ? applyA2UI(undefined, a.ui) : undefined })));
+      if (a.intent === 'free' && a.canAI) { // 바로 찾지 못한 질문은 AI 답을 이어서 받는다
+        setTurns((xs) => last(xs, (x) => ({ ...x, aiBusy: true })));
+        try {
+          const r = await askSummary(a.id);
+          setTurns((xs) => xs.map((x) => (x.a?.id === a.id ? { ...x, aiBusy: false, ai: { answer: r.answer, model: r.model, ms: r.elapsedMs } } : x)));
+        } catch (e) {
+          setTurns((xs) => xs.map((x) => (x.a?.id === a.id ? { ...x, aiBusy: false, aiErr: clean(e) } : x)));
+        }
+      }
     } catch (e) {
       setTurns((xs) => last(xs, (x) => ({ ...x, err: clean(e) })));
     }
@@ -143,7 +152,7 @@ export function AskPanel() {
                       {t.a.sources.length > 0 && <span>출처: {t.a.sources.join(' · ')}</span>}
                       {t.a.canAI && !t.ai && (
                         <button onClick={() => summarize(k)} disabled={t.aiBusy} className="ml-auto inline-flex items-center gap-1 rounded-full border border-violet-300 px-2 py-0.5 font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-60">
-                          <Sparkles size={11} /> {t.aiBusy ? 'AI 가 정리하는 중(20~30초)…' : 'AI 로 한 줄 정리'}
+                          <Sparkles size={11} /> {t.aiBusy ? (t.a.intent === 'free' ? 'AI 가 답하는 중(30초~1분)…' : 'AI 가 정리하는 중(20~30초)…') : 'AI 로 한 줄 정리'}
                         </button>
                       )}
                     </div>
