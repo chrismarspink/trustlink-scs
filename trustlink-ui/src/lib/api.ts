@@ -903,13 +903,17 @@ export const askAction = (action: { name: string; surfaceId: string; sourceCompo
   aj<{ ui: Record<string, unknown>[]; lead?: string }>('/api/ask/action', jsonInit('POST', { version: 'v0.9.1', action }));
 
 // ---------- 영향 지도 ----------
-export type ImpactNode = { id: string; type: 'vuln' | 'component' | 'version' | 'safe' | 'customer'; label: string; sub?: string; state?: string; link?: string };
+export type ImpactNode = { id: string; type: 'vuln' | 'component' | 'version' | 'safe' | 'customer' | 'reg' | 'product'; label: string; sub?: string; state?: string; link?: string };
 export type Impact = {
   vulnId: string; kev: boolean; nodes: ImpactNode[]; edges: { from: string; to: string }[];
   steps: { key: 'shipped' | 'found' | 'judged' | 'notified'; label: string; at?: string; text: string }[];
   more?: number; canCustomers?: boolean; empty?: string;
+  kind?: 'reg'; title?: string; cols?: { title: string; types: ImpactNode['type'][] }[]; reqs?: { clause: string; title: string }[]; // 규제 영향 지도
 };
 export const impactMap = (vuln: string) => aj<Impact>(`/api/impact?vuln=${encodeURIComponent(vuln)}`);
+export type ImpactRegItem = { id: string; name: string; region: string; reqs: number };
+export const impactRegs = () => aj<{ regs: ImpactRegItem[] }>('/api/impact/reg');
+export const impactReg = (id: string) => aj<Impact>(`/api/impact/reg?id=${encodeURIComponent(id)}`);
 
 // ---------- AI 도구 연결(MCP) — 연결 토큰 ----------
 export type McpTokenRow = { id: string; name: string; user: string; created: string; expires: string; lastUsed?: string; uses: number; expired: boolean };
