@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { X, Zap } from 'lucide-react';
+import { Send, X, Zap } from 'lucide-react';
 import { adminMailHoldApprove, agentGet, agentPrefs, agentRun, agentScheduleAdd, agentScheduleDelete, agentScheduleSet, agentUndo, type AgentData, type AgentTask } from '@/lib/api';
+import { askOpen } from '@/lib/askOpen';
 import { cn } from '@/lib/utils';
 
 // 에이전트: 로그인한 사람의 권한에 맞는 할 일을 모아 제안하고, 고르면 대신 실행한다.
@@ -32,6 +33,8 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ recipe: '', repeat: 'daily', time: '08:30', weekday: 1 });
+  const [q, setQ] = useState('');
+  const askNow = (text: string) => { if (!text.trim()) return; setQ(''); onNavigate?.(); askOpen(text.trim()); }; // 질문은 묻고 찾기가 받아 답한다(패널은 닫는다)
 
   const tasks = d.tasks.filter((t) => !skip.includes(t.id));
   const picked = tasks.filter((t) => t.grade === 'run' && sel[t.id]);
@@ -157,7 +160,7 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
             {d.log.map((x) => (
               <div key={x.id} className="mb-2.5 rounded-lg border bg-card p-3">
                 <div className="font-semibold">{!x.ok && <span className="mr-1.5 rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-red-700">실패</span>}{x.title}</div>
-                <div className="mt-0.5 text-[13px] text-muted-foreground">{when(x.at)} · {x.by === 'schedule' ? `예약(${x.actor})` : x.actor}</div>
+                <div className="mt-0.5 text-[13px] text-muted-foreground">{when(x.at)} · {x.by === 'schedule' ? `예약(${x.actor})` : x.by === 'ask' ? `${x.actor} · 묻고 찾기` : x.actor}</div>
                 <div className="mt-1 text-[13px]">{x.result}</div>
                 {x.undone ? <div className="mt-2 text-xs text-muted-foreground">{when(x.undone)}에 되돌렸습니다.</div>
                   : !!x.undo && x.ok && <button type="button" disabled={busy} onClick={() => act(async () => (await agentUndo(x.id)).result)} className={cn(btn, 'mt-2')}>되돌리기</button>}
@@ -168,6 +171,11 @@ export function AgentView({ d, load, onNavigate }: { d: AgentData; load: () => v
         )}
       </div>
       <div className="border-t bg-card px-4 py-2.5">
+        <form onSubmit={(e) => { e.preventDefault(); askNow(q); }} className="mb-2 flex items-center gap-2">
+          <label htmlFor="ag-ask" className="sr-only">묻거나 시키기</label>
+          <input id="ag-ask" value={q} onChange={(e) => setQ(e.target.value)} maxLength={300} placeholder="묻거나 시키기 — 예: CVE-2026-1234 고객 통지 초안 만들어 줘" className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus:border-primary" />
+          <button type="submit" disabled={!q.trim()} aria-label="보내기" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"><Send size={15} /></button>
+        </form>
         {tab === 'todo' && tasks.some((t) => t.grade === 'run') && (
           <div className="mb-2 flex items-center gap-3">
             <span className="min-w-0 flex-1 text-[13px] text-muted-foreground">{picked.length ? `바로 실행 ${picked.length}건` : '실행할 것을 고르세요'}</span>
@@ -193,6 +201,11 @@ export function AgentButton() {
     setOpen(true);
   }, [d?.prefs.autoOpen]);
   useEffect(() => { if (open) load(); }, [open, load]);
+  useEffect(() => { // 묻고 찾기의 "에이전트에서 실행"으로 열기
+    const h = () => setOpen(true);
+    window.addEventListener('tl-agent', h);
+    return () => window.removeEventListener('tl-agent', h);
+  }, []);
   if (!d) return null;
   const n = d.tasks.filter((t) => !skipped().includes(t.id)).length;
   return (

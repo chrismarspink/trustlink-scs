@@ -431,6 +431,9 @@ func (s *Server) apiAskAction(w http.ResponseWriter, r *http.Request) {
 			detail["ask"] = a.ID
 			_ = s.sor.append(SoREvent{Actor: sess.Username, Action: "ask-action", Status: status, Subject: name, Repo: p.Hit.Repo, Tag: p.Hit.Tag, Detail: detail})
 		}
+		if res := askDoneText[status]; res != "" { // 묻고 찾기로 실행한 것도 에이전트 실행 기록에 남긴다(되돌리기는 없다)
+			agentLogAdd(sess.Username, "ask", strings.TrimSpace("묻고 찾기: "+askKindKo[p.Kind]+" "+p.VulnID), res, true, nil)
+		}
 	}
 	switch {
 	case name == "cancel":

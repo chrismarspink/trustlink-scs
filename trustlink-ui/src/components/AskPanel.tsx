@@ -138,6 +138,7 @@ export function AskPanel() {
                       </ul>
                     )}
                     {!!t.a.more && <div className="text-xs text-muted-foreground">외 {t.a.more}건 — 해당 화면에서 전체를 볼 수 있습니다.</div>}
+                    {t.a.intent === 'todo' && <button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new Event('tl-agent')); }} className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/5">에이전트에서 골라 실행 <ArrowRight size={12} /></button>}
                     {t.a.map && <Link to={t.a.map} className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/5">영향 지도 보기 <ArrowRight size={12} /></Link>}
                     {t.ui && wide && k === lastUi && <div className="rounded-md bg-primary/5 px-2.5 py-1.5 text-xs text-primary">오른쪽 양식에서 확인해 주세요.</div>}
                     {t.ui && !(wide && k === lastUi) && (

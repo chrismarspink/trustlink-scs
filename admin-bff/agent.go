@@ -55,7 +55,7 @@ type agentLog struct {
 	ID     string     `json:"id"`
 	At     string     `json:"at"`
 	Actor  string     `json:"actor"`
-	By     string     `json:"by"` // user / schedule
+	By     string     `json:"by"` // user / schedule / ask(묻고 찾기로 실행)
 	Title  string     `json:"title"`
 	Result string     `json:"result"`
 	OK     bool       `json:"ok"`
@@ -372,13 +372,25 @@ func (s *Server) agentMarkRead(user string, ids []string, read bool) {
 	n.saveLocked()
 }
 
-func (s *Server) agentRecord(actor, by, title, result string, ok bool, undo *agentUndo) agentLog {
+// 묻고 찾기로 실행한 일의 이름과 결과 문장(실행 기록에 같이 남긴다).
+var (
+	askKindKo   = map[string]string{"notice": "고객 통지", "vex": "VEX 판정", "report": "규제 보고서"}
+	askDoneText = map[string]string{"queued": "발송함에 넣었습니다. 대기 중에는 발송함에서 취소할 수 있습니다.", "made": "보고서를 만들었습니다. 보고서함에서 볼 수 있습니다.", "recorded": "판정을 저장했습니다. 고치려면 제품 화면에서 다시 판정합니다."}
+)
+
+// agentLogAdd: 실행 기록에 한 줄(감사 원장은 부르는 쪽이 따로 남긴다).
+func agentLogAdd(actor, by, title, result string, ok bool, undo *agentUndo) agentLog {
 	e := agentLog{ID: agentID("al-"), At: time.Now().UTC().Format(time.RFC3339), Actor: actor, By: by, Title: title, Result: result, OK: ok, Undo: undo}
 	agentSt.Lock()
 	agentLoad()
 	agentSt.Log = append(agentSt.Log, e)
 	agentSave()
 	agentSt.Unlock()
+	return e
+}
+
+func (s *Server) agentRecord(actor, by, title, result string, ok bool, undo *agentUndo) agentLog {
+	e := agentLogAdd(actor, by, title, result, ok, undo)
 	_ = s.sor.append(SoREvent{Actor: actor, Action: "agent-run", Subject: title, Status: map[bool]string{true: "ok", false: "failed"}[ok], Detail: map[string]any{"by": by, "result": result}})
 	return e
 }

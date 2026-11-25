@@ -925,7 +925,7 @@ export const mcpTokenDelete = (id: string) => aj<{ status: string }>(`/api/mcp/t
 
 // ---------- 에이전트: 권한에 맞는 할 일 제안·실행·예약·되돌리기 ----------
 export type AgentTask = { id: string; kind: string; grade: 'run' | 'approve' | 'go'; title: string; why?: string; steps: string[]; link?: string; ref?: string; urgent?: boolean };
-export type AgentLog = { id: string; at: string; actor: string; by: 'user' | 'schedule'; title: string; result: string; ok: boolean; undo?: unknown; undone?: string };
+export type AgentLog = { id: string; at: string; actor: string; by: 'user' | 'schedule' | 'ask'; title: string; result: string; ok: boolean; undo?: unknown; undone?: string };
 export type AgentSchedule = { id: string; recipe: string; owner: string; repeat: string; time: string; weekday?: number; on: boolean; next?: string; last?: string; lastMsg?: string };
 export type AgentData = { user: string; role: string; tasks: AgentTask[]; schedules: AgentSchedule[]; log: AgentLog[]; recipes: { key: string; title: string; out: string }[]; prefs: { autoOpen: boolean }; ai: boolean };
 export const agentGet = () => aj<AgentData>('/api/agent');
