@@ -572,6 +572,7 @@ export type VexQueueRow = {
   pendCritical: number; pendHigh: number; pendKev: number; affected: number;
   batchState?: string; batchDone?: number; batchTotal?: number; batchDrafts?: number; batchAt?: string;
   batchPhase?: 'enrich'; enrichDone?: number; enrichTotal?: number;
+  imported?: number; demo?: boolean; // 버전 등록 시각(ms) · 시연용 제품
 };
 export type VexQueue = { dt: boolean; rows: VexQueueRow[]; summary?: Record<string, number>; ai?: boolean; generated?: string };
 export const vexQueue = (refresh = false) => aj<VexQueue>(`/api/vex/queue${refresh ? '?refresh=1' : ''}`);

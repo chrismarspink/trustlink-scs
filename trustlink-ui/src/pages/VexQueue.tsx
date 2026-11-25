@@ -17,6 +17,9 @@ export default function VexQueue() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
+  const [scope, setScope] = useState<'real' | 'demo' | 'all'>('real');
+  const [fold, setFold] = useState(true);
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const load = (refresh = false) => vexQueue(refresh).then(setQ).catch((e) => setErr(String(e)));
   useEffect(() => {
     load();
@@ -50,6 +53,18 @@ export default function VexQueue() {
     setBusy('');
   };
 
+  // 제품마다 최신 버전(SBOM 을 가장 늦게 받은 버전) 한 줄. 이전 버전은 그 줄에서 펼친다 — 숨기지 않고 접어 둘 뿐이다.
+  const all: VexQueueRowAuto[] = q?.rows || [];
+  const hasDemo = all.some((r) => r.demo) && all.some((r) => !r.demo);
+  const inScope = all.filter((r) => !hasDemo || scope === 'all' || (scope === 'demo') === !!r.demo);
+  const canFold = all.some((r) => r.imported);
+  const latestOf = new Map<string, VexQueueRowAuto>();
+  for (const r of inScope) { const c = latestOf.get(r.repo); if (!c || (r.imported || 0) > (c.imported || 0)) latestOf.set(r.repo, r); }
+  const older = (repo: string) => inScope.filter((r) => r.repo === repo && r !== latestOf.get(repo));
+  const shown: { r: VexQueueRowAuto; old: boolean }[] = !canFold || !fold
+    ? inScope.map((r) => ({ r, old: false }))
+    : inScope.filter((r) => latestOf.get(r.repo) === r).flatMap((r) => [{ r, old: false }, ...(open.has(r.repo) ? older(r.repo).map((o) => ({ r: o, old: true })) : [])]);
+  const toggle = (repo: string) => setOpen((o) => { const n = new Set(o); if (n.has(repo)) n.delete(repo); else n.add(repo); return n; });
   const aiOn = !!(ai?.enabled && ai.reachable);
   const s = q?.summary || {};
   return (
@@ -103,6 +118,23 @@ export default function VexQueue() {
       {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
       {q && !q.dt && <div className="text-sm text-muted-foreground">Dependency-Track 미설정 — 분석 기능이 꺼져 있습니다.</div>}
 
+      {q && (hasDemo || canFold) && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          {hasDemo && (
+            <div className="inline-flex rounded-lg border p-0.5" role="group" aria-label="제품 범위">
+              {([['real', '실제 제품'], ['demo', '시연용'], ['all', '전체']] as const).map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={scope === k} onClick={() => setScope(k)} className={`h-8 rounded-md px-3 ${scope === k ? 'bg-primary font-semibold text-primary-foreground' : ''}`}>{l}</button>
+              ))}
+            </div>
+          )}
+          {canFold && (
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+              <input type="checkbox" checked={fold} onChange={(e) => setFold(e.target.checked)} /> 제품마다 최신 버전만(이전 버전은 접어 두기)
+            </label>
+          )}
+          <span className="text-xs text-muted-foreground">제품 {latestOf.size}개 · 버전 {inScope.length}개</span>
+        </div>
+      )}
       <Card className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-secondary/50 text-left text-xs text-muted-foreground">
@@ -114,12 +146,19 @@ export default function VexQueue() {
           </thead>
           <tbody>
             {!q && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">집계 중… (제품 수에 따라 수십 초)</td></tr>}
-            {q?.rows.map((r: VexQueueRowAuto) => {
+            {shown.map(({ r, old }) => {
+              const prev = canFold && fold && !old ? older(r.repo) : [];
+              const prevPend = prev.reduce((n, x) => n + x.pending, 0), prevKev = prev.reduce((n, x) => n + x.pendKev, 0);
               const pct = r.total ? Math.round((r.analyzed / r.total) * 100) : 100;
               return (
-                <tr key={r.project} className="border-t align-middle hover:bg-secondary/30">
-                  <td className="px-3 py-2 font-medium">
-                    {r.repo}:<span className="text-muted-foreground">{r.tag}</span>
+                <tr key={r.project} className={`border-t align-middle hover:bg-secondary/30 ${old ? 'bg-secondary/20' : ''}`}>
+                  <td className={`px-3 py-2 font-medium ${old ? 'pl-8 font-normal' : ''}`}>
+                    {old && <span className="mr-1 text-xs text-muted-foreground">이전</span>}{r.repo}:<span className="text-muted-foreground">{r.tag}</span>
+                    {prev.length > 0 && (
+                      <button type="button" onClick={() => toggle(r.repo)} aria-expanded={open.has(r.repo)} className="mt-0.5 block text-left text-xs font-normal text-primary hover:underline">
+                        {open.has(r.repo) ? '이전 버전 접기' : `이전 버전 ${prev.length}개 · 판단 대기 ${prevPend}건${prevKev ? ` (실제 악용 ${prevKev}건)` : ''}`}
+                      </button>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
@@ -152,7 +191,7 @@ export default function VexQueue() {
                 </tr>
               );
             })}
-            {q && q.rows.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">감시 중인 제품이 없습니다 — SBOM 이 붙은 버전이 생기면 10분 안에 나타납니다.</td></tr>}
+            {q && shown.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">{q.rows.length ? '이 범위에 해당하는 제품이 없습니다.' : '감시 중인 제품이 없습니다 — SBOM 이 붙은 버전이 생기면 10분 안에 나타납니다.'}</td></tr>}
           </tbody>
         </table>
       </Card>

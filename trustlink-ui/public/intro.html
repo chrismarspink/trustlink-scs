@@ -395,21 +395,22 @@ const LEDGER = [
 },
 {
   tab: '하나의 흐름', kicker: '모든 변화는', title: '같은 다섯 단계를 지나고, 사람은 결정만 합니다',
-  text: '새 취약점이든, 규제 개정이든, 계약·EOS 만료든 처리 방법은 하나입니다. 신호를 받으면 영향받는 릴리스와 고객을 계산하고, 사람이 결정하면, 전달하고, 기록으로 남깁니다. 새 종류의 변화가 생겨도 화면이 아니라 이 표에 한 줄이 늘 뿐입니다.',
-  list: ['<b>신호</b>: DT 새 취약점·주기 검색, 규제 탐색, 만료 도래', '<b>영향</b>: 어느 릴리스, 어느 고객 — 패치 버전까지', '<b>결정</b>: 사람만 하는 단계 — 승인 대기함 한 곳에서', '<b>전달·기록</b>: 발송함 한 길로 나가고, 감사 기록에 남음'],
+  text: 'TrustLink 의 본래 일은 맨 윗줄입니다. 제품의 새 버전이 등록되면 분석하고, 판단을 거쳐 고객에게 전달하고, 무엇을 누구에게 줬는지 장부에 남깁니다. 출고한 뒤에 생기는 변화(새 취약점, 규제 개정, 계약·EOS 만료)도 같은 다섯 단계로 처리합니다.',
+  list: ['<b>릴리스</b>: 등록 → SBOM 분석 → VEX 판단 → 고객 전달 → 장부', '<b>신호·영향</b>: 출고 뒤의 변화가 어느 릴리스, 어느 고객에 닿는지', '<b>결정</b>: 사람만 하는 단계 — 승인 대기함 한 곳에서', '<b>전달·기록</b>: 발송함 한 길로 나가고, 감사 기록에 남음'],
   svg: () => {
     const st = ['신호', '영향', '결정 (사람)', '전달', '기록'];
-    const lanes = [['취약점', [['DT 새 취약점', '주기 검색'], ['영향 릴리스', '패치·고객'], ['고객 통지', '개발 요청·VEX'], ['보안 권고', '수정 요청'], ['감사 원장', '통지 이력']]],
+    const lanes = [['릴리스', [['새 버전 등록', 'CI·업로드'], ['SBOM 분석', '취약점 대조'], ['VEX 판단', '발행·출고'], ['고객 내려받기', '제품·SBOM·VEX'], ['신뢰 장부', '무엇을 누구에게']]],
+      ['취약점', [['DT 새 취약점', '주기 검색'], ['영향 릴리스', '패치·고객'], ['고객 통지', '개발 요청·VEX'], ['보안 권고', '수정 요청'], ['감사 원장', '통지 이력']]],
       ['규제', [['규제 탐색', '법령·관보'], ['우리 제품', '요구사항'], ['채택·무시', '대응 계획'], ['보고서', '현황 메일'], ['보고서함', '판 관리']]],
       ['만료', [['계약·유지보수', 'EOS 도래'], ['해당 고객', '설치 버전'], ['안내 여부', '연장 협의'], ['만료 안내', '메일'], ['발송 기록', '감사 원장']]]];
-    const X = i => 66 + i * 114, W = 100, ys = [100, 170, 240];
+    const X = i => 66 + i * 114, W = 100, ys = [92, 150, 208, 266], H = 50; // 맨 윗줄(릴리스)이 본래 흐름, 아래 세 줄은 출고 뒤의 변화
     const d = (i, k = 0) => (0.3 + i * 0.55 + k * 0.08).toFixed(2);
     return st.map((t, i) => `<g class="pop" style="animation-delay:${d(i)}s"><rect x="${X(i)}" y="46" width="${W}" height="36" rx="8" fill="${i === 2 ? 'var(--soft)' : '#fff'}" stroke="${i === 2 ? 'var(--tl)' : '#cbd5e1'}" stroke-width="${i === 2 ? 2.5 : 1.5}"/><text x="${X(i) + W / 2}" y="69" font-size="12.5" font-weight="700" text-anchor="middle" fill="${i === 2 ? 'var(--tl)' : 'var(--ink)'}">${t}</text></g>` +
         (i < 4 ? `<path class="fade" style="animation-delay:${d(i)}s" d="M${X(i) + W + 2} 64 h10" stroke="#94a3b8" stroke-width="2"/>` : '')).join('') +
-      lanes.map(([name, cells], k) => `<text x="8" y="${ys[k] + 33}" font-size="12.5" font-weight="700" fill="var(--ink)">${name}</text>` +
-        cells.map(([a, b], i) => `<g class="pop" style="animation-delay:${d(i, k + 1)}s"><rect x="${X(i)}" y="${ys[k]}" width="${W}" height="56" rx="8" fill="${i === 2 ? '#f5f3ff' : '#f1f5f9'}" stroke="${i === 2 ? 'var(--tl)' : 'none'}"/><text x="${X(i) + W / 2}" y="${ys[k] + 24}" font-size="10.5" text-anchor="middle" fill="#334155">${a}</text><text x="${X(i) + W / 2}" y="${ys[k] + 40}" font-size="10.5" text-anchor="middle" fill="#334155">${b}</text></g>`).join('')).join('') +
-      `<rect class="blink" style="animation-delay:3.4s" x="${X(2) - 6}" y="40" width="${W + 12}" height="262" rx="12" fill="none" stroke="var(--tl)" stroke-width="2" stroke-dasharray="6 5"/>` +
-      `<text class="sm fade" x="320" y="330" style="animation-delay:3.4s">신호·영향·전달·기록은 TrustLink 가 — 결정은 승인 대기함 한 곳에서 사람이</text>`;
+      lanes.map(([name, cells], k) => `<text x="8" y="${ys[k] + 30}" font-size="12.5" font-weight="700" fill="${k === 0 ? 'var(--dev)' : 'var(--ink)'}">${name}</text>` +
+        cells.map(([a, b], i) => `<g class="pop" style="animation-delay:${d(i, k + 1)}s"><rect x="${X(i)}" y="${ys[k]}" width="${W}" height="${H}" rx="8" fill="${i === 2 ? '#f5f3ff' : k === 0 ? '#eff6ff' : '#f1f5f9'}" stroke="${i === 2 ? 'var(--tl)' : k === 0 ? 'var(--dev)' : 'none'}" stroke-width="${k === 0 ? 1.5 : 1}"/><text x="${X(i) + W / 2}" y="${ys[k] + 21}" font-size="10.5" font-weight="${k === 0 ? 700 : 400}" text-anchor="middle" fill="#334155">${a}</text><text x="${X(i) + W / 2}" y="${ys[k] + 37}" font-size="10.5" text-anchor="middle" fill="#334155">${b}</text></g>`).join('')).join('') +
+      `<rect class="blink" style="animation-delay:3.4s" x="${X(2) - 6}" y="40" width="${W + 12}" height="282" rx="12" fill="none" stroke="var(--tl)" stroke-width="2" stroke-dasharray="6 5"/>` +
+      `<text class="sm fade" x="320" y="342" style="animation-delay:3.4s">맨 윗줄이 본래 일(제품을 모으고 분석해 전달) — 아래 세 줄은 출고 뒤의 변화. 결정만 사람이</text>`;
   }
 },
 {

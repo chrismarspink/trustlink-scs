@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircleQuestion, X, Send, Sparkles, ArrowRight } from 'lucide-react';
+import { MessageCircleQuestion, X, Send, Sparkles, ArrowRight, Maximize2, Minimize2 } from 'lucide-react';
 import { ask, askAction, askSummary, getSession, type AskAnswer } from '@/lib/api';
 import { A2UISurface, applyA2UI, type A2Action, type A2Surface } from '@/components/A2UISurface';
 import { HelpScene } from '@/components/HelpScene';
@@ -22,6 +22,7 @@ const clean = (e: unknown) => String(e).replace(/^(Api)?Error:\s*(\d{3}\s*)?/, '
 export function AskPanel() {
   const [on, setOn] = useState(false);
   const [open, setOpen] = useState(false);
+  const [wide, setWide] = useState(false); // 넓게 보기: 대화 왼쪽, 확인할 양식 오른쪽
   const [turns, setTurns] = useState<Turn[]>([]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -37,6 +38,7 @@ export function AskPanel() {
     try {
       const a = await ask(t);
       setTurns((xs) => last(xs, (x) => ({ ...x, a, ui: a.ui ? applyA2UI(undefined, a.ui) : undefined })));
+      if (a.ui && window.matchMedia('(min-width: 1024px)').matches) setWide(true); // 양식이 오면 넓혀서 대화와 나란히
       if (a.intent === 'free' && a.canAI) { // 바로 찾지 못한 질문은 AI 답을 이어서 받는다
         setTurns((xs) => last(xs, (x) => ({ ...x, aiBusy: true })));
         try {
@@ -58,6 +60,7 @@ export function AskPanel() {
     window.addEventListener('tl-ask', h);
     return () => window.removeEventListener('tl-ask', h);
   }, []);
+  const lastUi = turns.reduce((n, t, k) => (t.ui ? k : n), -1);
   if (!on) return null;
   const setData = (k: number, path: string, value: unknown) =>
     setTurns((xs) => xs.map((x, i) => (i === k && x.ui ? { ...x, ui: applyA2UI(x.ui, [{ updateDataModel: { surfaceId: x.ui.id, path, value } }]) } : x)));
@@ -92,7 +95,7 @@ export function AskPanel() {
         </button>
       )}
       {open && (
-        <div className="fixed bottom-5 right-5 z-40 flex h-[min(620px,80vh)] w-[min(420px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl" role="dialog" aria-label="묻고 찾기">
+        <div className={cn('fixed bottom-5 right-5 z-40 flex flex-col overflow-hidden rounded-xl border bg-background shadow-2xl', wide ? 'h-[min(760px,88vh)] w-[min(1080px,calc(100vw-2.5rem))]' : 'h-[min(620px,80vh)] w-[min(420px,calc(100vw-2.5rem))]')} role="dialog" aria-label="묻고 찾기">
           <div className="flex items-center gap-2 border-b px-4 py-2.5">
             <MessageCircleQuestion size={17} className="text-primary" />
             <div className="flex-1 leading-tight">
@@ -100,10 +103,12 @@ export function AskPanel() {
               <div className="text-[11px] text-muted-foreground">내 권한 안의 기록에서 찾고, 시킨 일은 양식으로 확인받습니다</div>
             </div>
             <HelpScene topic="ask" title="묻고 찾기는 이렇게 동작합니다" />
+            <button type="button" onClick={() => setWide(!wide)} aria-pressed={wide} aria-label={wide ? '작게 보기' : '넓게 보기'} title={wide ? '작게 보기' : '넓게 보기 — 대화와 양식을 나란히'} className="hidden rounded p-1 text-muted-foreground hover:bg-secondary lg:block">{wide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
             <button onClick={() => setOpen(false)} aria-label="닫기" className="rounded p-1 text-muted-foreground hover:bg-secondary"><X size={16} /></button>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
+          <div className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
             {turns.length === 0 && (
               <p className="text-xs leading-relaxed text-muted-foreground">
                 취약점 번호(CVE-…), 구성요소 이름, 할 일, 내 제품에 대해 물어보세요. "CVE-… 고객 통지 초안 만들어 줘", "CVE-… VEX 판정 초안", "미국 수출 규제 보고서 만들어 줘"처럼 일을 시킬 수도 있습니다. 보내거나 저장하는 일은 양식에서 확인하고 단추를 눌러야 실행됩니다.
@@ -134,7 +139,8 @@ export function AskPanel() {
                     )}
                     {!!t.a.more && <div className="text-xs text-muted-foreground">외 {t.a.more}건 — 해당 화면에서 전체를 볼 수 있습니다.</div>}
                     {t.a.map && <Link to={t.a.map} className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/40 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/5">영향 지도 보기 <ArrowRight size={12} /></Link>}
-                    {t.ui && (
+                    {t.ui && wide && k === lastUi && <div className="rounded-md bg-primary/5 px-2.5 py-1.5 text-xs text-primary">오른쪽 양식에서 확인해 주세요.</div>}
+                    {t.ui && !(wide && k === lastUi) && (
                       <div className="rounded-lg border border-primary/30 bg-primary/[0.03] p-3">
                         <A2UISurface surface={t.ui} busy={t.acting} onData={(path, value) => setData(k, path, value)} onAction={(a) => act(k, a)} />
                         {t.acting && <div className="mt-2 text-xs text-muted-foreground">처리하는 중…</div>}
@@ -161,6 +167,19 @@ export function AskPanel() {
               </div>
             ))}
             <div ref={end} />
+          </div>
+          {wide && (
+            <aside className="hidden w-[46%] shrink-0 overflow-y-auto border-l bg-secondary/30 p-4 text-sm lg:block" aria-label="확인이 필요한 일">
+              <div className="mb-2 text-xs font-semibold text-muted-foreground">확인이 필요한 일{lastUi >= 0 ? ' · 1건' : ''}</div>
+              {lastUi < 0 ? <p className="text-xs leading-relaxed text-muted-foreground">일을 시키면(고객 통지 초안, VEX 판정, 규제 보고서) 확인할 양식이 여기에 뜹니다. 단추를 누르기 전에는 아무것도 나가거나 저장되지 않습니다.</p> : (
+                <div className="rounded-lg border border-primary/30 bg-background p-3">
+                  <A2UISurface surface={turns[lastUi].ui!} busy={turns[lastUi].acting} onData={(path, value) => setData(lastUi, path, value)} onAction={(a) => act(lastUi, a)} />
+                  {turns[lastUi].acting && <div className="mt-2 text-xs text-muted-foreground">처리하는 중…</div>}
+                  {turns[lastUi].actErr && <div className="mt-2 text-xs text-red-600">{turns[lastUi].actErr}</div>}
+                </div>
+              )}
+            </aside>
+          )}
           </div>
 
           <div className="border-t px-3 py-2.5">

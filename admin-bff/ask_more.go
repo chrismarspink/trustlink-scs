@@ -34,7 +34,7 @@ func askMcpHelp() *askAnswer {
 	a := &askAnswer{Intent: "howto", Title: "AI 도구에 TrustLink 연결하기(MCP)", Sources: []string{"TrustLink 도움말"},
 		Lead: "Claude 같은 AI 도구에 TrustLink 를 연결하면, 그 도구 안에서 취약점 영향과 현황을 바로 물을 수 있습니다. 'AI 도구 연결' 화면에서 토큰을 만들고 명령 한 줄을 붙여 넣으면 됩니다."}
 	for _, r := range []askRow{
-		{Title: "1. 'AI 도구 연결' 화면 열기", Detail: "사이드바 › 제품 › AI 도구 연결", Link: "/mcp"},
+		{Title: "1. 'AI 도구 연결' 화면 열기", Detail: "사이드바 › 제품·릴리스 › AI 도구 연결", Link: "/mcp"},
 		{Title: "2. 연결 토큰 만들기", Detail: "이름과 기한을 정하고 만듭니다. 값은 만든 직후 한 번만 보입니다."},
 		{Title: "3. 명령 복사해 붙여 넣기", Detail: "Claude Code 는 터미널에 한 줄, Claude Desktop 은 설정 파일에 한 덩어리. 화면에 토큰이 채워진 채로 나옵니다."},
 		{Title: "4. AI 도구에서 묻기", Detail: "예: 'TrustLink 에서 CVE-2026-1234 가 어디에 걸리는지 찾아 줘', '급한 취약점부터 정리해 줘'"},

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sync"
 )
 
 func (s *Server) dtEnabled() bool { return s.cfg.DTBaseURL != "" && s.dtAPIKey() != "" }
@@ -51,11 +52,16 @@ func (s *Server) dtLookupProject(name, version string) (string, error) {
 		return "", fmt.Errorf("lookup status %d", resp.StatusCode)
 	}
 	var p struct {
-		UUID string `json:"uuid"`
+		UUID          string `json:"uuid"`
+		LastBomImport int64  `json:"lastBomImport"` // 마지막으로 SBOM 을 받은 때(ms) — 어느 버전이 최신인지 가리는 데 쓴다
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&p)
+	dtImported.Store(p.UUID, p.LastBomImport)
 	return p.UUID, nil
 }
+
+// dtImported: 프로젝트 UUID → 마지막 SBOM 수신 시각(ms). dtLookupProject 가 채운다.
+var dtImported sync.Map
 
 // SBOM 업로드(없으면 autoCreate) → 처리 토큰.
 // dtMultipartLimit: DT 는 JSON 본문의 문자열을 20MB 까지만 받는다 — 그보다 큰 SBOM 은 multipart 로 보낸다.

@@ -192,8 +192,9 @@ func (s *Server) attachSBOM(repo, tag string, sbom []byte, generator string) (st
 }
 
 // POST /api/sbom/generate {repo, tag, source}
-//   source="self": TrustLink 자기 자신(BFF 바이너리) 스캔. 그 외: 대상 아티팩트 스캔.
-//   생성한 CycloneDX SBOM 을 subject 에 referrer 로 부착.
+//
+//	source="self": TrustLink 자기 자신(BFF 바이너리) 스캔. 그 외: 대상 아티팩트 스캔.
+//	생성한 CycloneDX SBOM 을 subject 에 referrer 로 부착.
 func (s *Server) apiSBOMGenerate(w http.ResponseWriter, r *http.Request) {
 	var in struct{ Repo, Tag, Source string }
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Repo == "" || in.Tag == "" {

@@ -23,7 +23,9 @@ type vexQueueRow struct {
 	PendCrit    int    `json:"pendCritical"`
 	PendHigh    int    `json:"pendHigh"`
 	PendKEV     int    `json:"pendKev"`
-	Affected    int    `json:"affected"` // 영향 있음(조치 필요)
+	Affected    int    `json:"affected"`           // 영향 있음(조치 필요)
+	Imported    int64  `json:"imported,omitempty"` // 이 버전의 SBOM 을 받은 때(ms) — 화면이 제품별 최신 버전을 가린다
+	Demo        bool   `json:"demo,omitempty"`     // 시연용 제품(REAL_REPO_PREFIX 를 정했을 때 그 밖의 제품)
 	BatchState  string `json:"batchState,omitempty"`
 	BatchDone   int    `json:"batchDone,omitempty"`
 	BatchTotal  int    `json:"batchTotal,omitempty"`
@@ -78,6 +80,10 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 			continue
 		}
 		row := vexQueueRow{Repo: repo, Tag: tag, Project: uuid}
+		if v, ok := dtImported.Load(uuid); ok {
+			row.Imported, _ = v.(int64)
+		}
+		row.Demo = isDemoRepo(repo)
 		var fs []dtFinding
 		if b, err := s.dtFindings(uuid); err == nil {
 			_ = json.Unmarshal(b, &fs)
@@ -191,4 +197,18 @@ func (s *Server) apiVexQueue(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, map[string]any{"dt": true, "rows": rows, "summary": sum, "ai": aiEnabled(), "generated": time.Now().UTC().Format(time.RFC3339)})
+}
+
+// isDemoRepo: REAL_REPO_PREFIX(쉼표로 여러 개)를 정해 두면 그 접두어로 시작하지 않는 제품을 시연용으로 본다. 비어 있으면 나누지 않는다.
+func isDemoRepo(repo string) bool {
+	real := strings.TrimSpace(env("REAL_REPO_PREFIX", ""))
+	if real == "" {
+		return false
+	}
+	for _, p := range strings.Split(real, ",") {
+		if p = strings.TrimSpace(p); p != "" && strings.HasPrefix(repo, p) {
+			return false
+		}
+	}
+	return true
 }

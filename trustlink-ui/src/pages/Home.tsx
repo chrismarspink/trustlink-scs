@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   Package, PackageCheck, ShieldQuestion, Rocket, Download, Bug, KeyRound, ExternalLink,
-  LayoutDashboard, Bell, Archive, ClipboardCheck, Megaphone, Sparkles, X,
+  LayoutDashboard, Bell, Archive, ClipboardCheck, Megaphone, Sparkles, X, ArrowRight, MessageCircleQuestion,
 } from 'lucide-react';
-import { getSession, type Session } from '@/lib/api';
+import { adminInbox, getSession, vexQueue, type InboxGroup, type Session } from '@/lib/api';
+import { askOpen } from '@/lib/askOpen';
 import { EXT_LINKS, NOTICES, RELEASES } from '@/content/news';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,51 @@ function LinkTile({ l }: { l: L }) {
     : <Link to={l.to} className={cls}>{inner}</Link>;
 }
 
+// 오늘 결정할 일: 로그인하면 가장 먼저 보이는 것. 관리자는 승인 대기함의 묶음, 개발·보안은 판단 대기 취약점.
+const ASKS = ['오늘 승인할 것?', '급한 것부터', '취약점 몇 건이야?'];
+function Today({ sess }: { sess: Session }) {
+  const admin = !!sess.groups?.includes('admins');
+  const [groups, setGroups] = useState<InboxGroup[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [vex, setVex] = useState<{ pending: number; kev: number } | null>(null);
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    if (admin) adminInbox().then((r) => { setGroups(r.groups); setTotal(r.decisions); }).catch(() => setGroups([]));
+    else if (sess.canEditVex) vexQueue().then((r) => setVex({ pending: r.summary?.pending || 0, kev: r.summary?.pendKev || 0 })).catch(() => {});
+  }, [admin, sess.canEditVex]);
+  if (!admin && !sess.canEditVex) return null;
+  const cards = admin
+    ? (groups || []).filter((g) => g.count > 0).slice(0, 3).map((g) => ({ key: g.key, n: g.count, title: g.label, hint: g.items[0]?.title || '', to: g.key === 'vex' ? '/vex' : '/admin/inbox', go: g.key === 'vex' ? '급한 순으로 판정' : '한 건씩 보기' }))
+    : vex && vex.pending > 0 ? [{ key: 'vex', n: vex.pending, title: '취약점 영향 판정하기', hint: vex.kev ? `실제 악용 ${vex.kev}건 포함` : '규칙 초안을 확인하고 저장합니다', to: '/vex', go: '급한 순으로 판정' }] : [];
+  const loaded = admin ? groups !== null : vex !== null;
+  return (
+    <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 lg:p-5" aria-label="오늘 결정할 일">
+      <h2 className="text-xl font-bold">{!loaded ? '할 일을 세는 중…' : cards.length ? (admin ? `오늘 결정할 일이 ${total}건 있습니다` : `판단을 기다리는 취약점이 ${vex?.pending}건 있습니다`) : '지금 결정할 일이 없습니다'}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">TrustLink 가 찾고 계산해 둔 것입니다. 사람은 고르기만 하면 됩니다.</p>
+      {cards.length > 0 && (
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          {cards.map((c) => (
+            <Link key={c.key} to={c.to} className="flex flex-col rounded-lg border bg-white p-3.5 transition hover:border-violet-400 hover:shadow-sm">
+              <span className="text-xs text-muted-foreground">{c.title}</span>
+              <span className="mt-0.5 text-3xl font-bold tabular-nums">{c.n}</span>
+              <span className="mt-1 min-h-[2.2em] text-xs leading-snug text-slate-600 line-clamp-2">{c.hint}</span>
+              <span className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-violet-700">{c.go} <ArrowRight size={14} /></span>
+            </Link>
+          ))}
+        </div>
+      )}
+      <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { askOpen(q.trim()); setQ(''); } }}>
+        <label htmlFor="home-ask" className="inline-flex items-center gap-1.5 text-sm font-semibold"><MessageCircleQuestion size={16} /> 묻고 찾기</label>
+        <input id="home-ask" value={q} onChange={(e) => setQ(e.target.value)} maxLength={300} placeholder="예: CVE-2026-1234 가 어디에 걸리나?" className="h-10 min-w-0 flex-1 rounded-md border bg-white px-3 text-sm outline-none focus:border-violet-500" />
+        <button type="submit" className="h-10 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground">묻기</button>
+        <span className="flex w-full flex-wrap gap-1.5">
+          {ASKS.map((a) => <button key={a} type="button" onClick={() => askOpen(a)} className="rounded-full border bg-white px-2.5 py-1 text-xs hover:border-violet-400">{a}</button>)}
+        </span>
+      </form>
+    </section>
+  );
+}
+
 export default function Home() {
   const [sess, setSess] = useState<Session | null>(null);
   const [all, setAll] = useState(false);
@@ -82,6 +128,8 @@ export default function Home() {
           {sess?.username && <> · <b className="text-foreground">{sess.username}</b> 님 환영합니다</>}
         </p>
       </div>
+
+      {sess && <Today sess={sess} />}
 
       {showNew && (
         <div className="flex items-start gap-3 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3" role="status">
@@ -108,9 +156,9 @@ export default function Home() {
       <section className="rounded-lg border bg-white p-4">
         <div className="mb-2 flex flex-wrap items-baseline gap-2">
           <h2 className="text-base font-semibold">TrustLink 한눈에 — 납품 소프트웨어의 신뢰 장부</h2>
-          <span className="text-xs text-muted-foreground">변화가 생기면 신호 → 영향 → 결정 → 전달 → 기록. 사람은 결정만 합니다.</span>
+          <span className="text-xs text-muted-foreground">제품을 모으고, 분석하고, 고객에게 전달합니다. 그 뒤의 변화도 같은 다섯 단계 — 사람은 결정만 합니다.</span>
         </div>
-        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록, 취약점·규제·만료 세 갈래" className="mx-auto w-full max-w-[720px]" loading="lazy" />
+        <img src="/concept-flow.svg" alt="신호 → 영향 → 결정 → 전달 → 기록 다섯 단계. 맨 윗줄은 릴리스(제품 등록 · SBOM 분석 · VEX 판단 · 고객 내려받기 · 신뢰 장부), 아래는 취약점·규제·만료 세 갈래" className="mx-auto w-full max-w-[720px]" loading="lazy" />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
