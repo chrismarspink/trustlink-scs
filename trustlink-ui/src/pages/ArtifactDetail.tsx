@@ -348,7 +348,7 @@ export default function ArtifactDetail() {
         <ArrowLeft size={15} /> 아티팩트 목록
       </Link>
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{repo}</h1>
+        <h1 className="vt-hero w-fit text-2xl font-semibold tracking-tight">{repo}</h1>
         {img && (img.isSigned
           ? <span className="inline-flex items-center gap-1 text-sm text-emerald-700"><ShieldCheck size={15} /> 서명됨</span>
           : <span className="inline-flex items-center gap-1 text-sm text-muted-foreground" title="cosign 등으로 서명되지 않은 산출물"><ShieldAlert size={15} /> 서명 없음</span>)}

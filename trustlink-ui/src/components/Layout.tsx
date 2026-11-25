@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Menu } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { canVT, withVT } from '@/lib/vt';
 import { Sidebar, navTrail } from '@/components/Sidebar';
 import { NotificationBell } from '@/components/NotificationBell';
 import { AskPanel } from '@/components/AskPanel';
@@ -12,6 +13,24 @@ export function Layout({ children }: { children: ReactNode }) {
   // 좁은 화면(휴대폰)에서는 사이드바를 접어 두고 메뉴 단추로 연다. 화면을 옮기면 닫는다.
   const [nav, setNav] = useState(false);
   useEffect(() => { setNav(false); }, [pathname]);
+  // 화면 전환: 앱 안의 링크를 누르면 본문이 살짝 밀리며 바뀐다. 목록의 한 줄을 눌러 상세로 갈 때는 그 줄의 이름이 상세 제목으로 옮겨 간다.
+  const navigate = useNavigate();
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || !canVT()) return;
+      const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!a || a.target || a.hasAttribute('download') || a.origin !== window.location.origin) return;
+      const to = a.pathname + a.search + a.hash;
+      if (/^\/(api|v2|auth|zot)\//.test(a.pathname) || /\.[a-z0-9]{2,5}$/i.test(a.pathname) || to === window.location.pathname + window.location.search + window.location.hash) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const hero = a.closest('[data-vt-row], tr')?.querySelector<HTMLElement>('[data-vt-hero]') || null;
+      if (hero) hero.style.viewTransitionName = 'hero';
+      withVT(() => navigate(to), () => { if (hero) hero.style.viewTransitionName = ''; });
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [navigate]);
   return (
     <div className="flex min-h-screen">
       <Sidebar open={nav} onClose={() => setNav(false)} />
@@ -26,7 +45,7 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
           <NotificationBell />
         </header>
-        <main className="max-w-[1280px] px-4 py-5 lg:px-8 lg:py-6">{children}</main>
+        <main className="vt-view max-w-[1280px] px-4 py-5 lg:px-8 lg:py-6">{children}</main>
       </div>
       <AskPanel />
     </div>

@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import { adminInbox, adminMailHoldApprove, adminMailHoldReject, type InboxGroup } from '@/lib/api';
 import { PageHeader, Alert, Loading } from './_ui';
 import { cn } from '@/lib/utils';
+import { withVT } from '@/lib/vt';
 
 // 관리 › 승인 대기함: 신호 → 영향 → **결정** → 전달 → 기록 중 사람이 하는 "결정"을 한 곳에.
 // 흩어진 대기열(자동 대응 승인·VEX 판단·규제 후보·만료·발송 대기)을 모아 보여 주고 원래 화면으로 보낸다.
@@ -34,7 +35,7 @@ function Triage({ groups, onDone }: { groups: InboxGroup[]; onDone: () => void }
   const [err, setErr] = useState('');
   const [show, setShow] = useState(false);
   const cur = items[i];
-  const next = (what: string) => { setLog((l) => [{ title: cur.it.title, what }, ...l].slice(0, 6)); setI(i + 1); setShow(false); setErr(''); };
+  const next = (what: string) => withVT(() => { setLog((l) => [{ title: cur.it.title, what }, ...l].slice(0, 6)); setI(i + 1); setShow(false); setErr(''); });
   const act = async (what: string, fn: () => Promise<unknown>) => { setBusy(true); setErr(''); try { await fn(); next(what); onDone(); } catch (e) { setErr(String(e).replace(/^(Api)?Error:\s*(\d{3}\s*)?/, '')); } setBusy(false); };
   const pct = items.length ? Math.round((Math.min(i, items.length) / items.length) * 100) : 100;
   const head = (
@@ -61,7 +62,7 @@ function Triage({ groups, onDone }: { groups: InboxGroup[]; onDone: () => void }
     <>
       {head}
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-        <div className="flex flex-col gap-4 rounded-xl border bg-card p-5 lg:p-7">
+        <div className="vt-card flex flex-col gap-4 rounded-xl border bg-card p-5 lg:p-7">
           <div className="flex flex-wrap gap-2 text-xs">
             {cur.it.urgent && <span className="rounded bg-red-600 px-2 py-1 font-bold text-white">긴급</span>}
             <span className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-1"><m.icon size={13} /> {cur.g.label}</span>

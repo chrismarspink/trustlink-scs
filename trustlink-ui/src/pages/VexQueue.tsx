@@ -153,7 +153,7 @@ export default function VexQueue() {
               return (
                 <tr key={r.project} className={`border-t align-middle hover:bg-secondary/30 ${old ? 'bg-secondary/20' : ''}`}>
                   <td className={`px-3 py-2 font-medium ${old ? 'pl-8 font-normal' : ''}`}>
-                    {old && <span className="mr-1 text-xs text-muted-foreground">이전</span>}{r.repo}:<span className="text-muted-foreground">{r.tag}</span>
+                    {old && <span className="mr-1 text-xs text-muted-foreground">이전</span>}<span data-vt-hero className="inline-block">{r.repo}</span>:<span className="text-muted-foreground">{r.tag}</span>
                     {prev.length > 0 && (
                       <button type="button" onClick={() => toggle(r.repo)} aria-expanded={open.has(r.repo)} className="mt-0.5 block text-left text-xs font-normal text-primary hover:underline">
                         {open.has(r.repo) ? '이전 버전 접기' : `이전 버전 ${prev.length}개 · 판단 대기 ${prevPend}건${prevKev ? ` (실제 악용 ${prevKev}건)` : ''}`}

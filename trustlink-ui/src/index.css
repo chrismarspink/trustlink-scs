@@ -40,3 +40,20 @@ body {
   main th { white-space: nowrap; }
   main td { word-break: keep-all; overflow-wrap: break-word; }
 }
+
+/* 화면 전환 — 본문만 살짝 밀리며 바뀌고(사이드바·머리줄은 그대로), 목록의 이름은 상세 제목으로 옮겨 가고, 한 건씩 보기의 카드는 옆으로 빠진다.
+   움직임을 줄이도록 설정한 사용자와 지원하지 않는 브라우저에서는 lib/vt.ts 가 전환 없이 바로 바꾼다. */
+.vt-on .vt-view { view-transition-name: view; }
+.vt-hero { view-transition-name: hero; }
+.vt-card { view-transition-name: card; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition-old(view) { animation: vt-out 160ms ease both; }
+::view-transition-new(view) { animation: vt-in 220ms ease both; }
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(6px); } }
+::view-transition-group(hero) { animation-duration: 300ms; }
+::view-transition-old(card) { animation: vt-card-out 260ms ease both; }
+::view-transition-new(card) { animation: vt-card-in 300ms ease both; }
+@keyframes vt-card-out { to { opacity: 0; transform: translateX(-48px) rotate(-1.5deg); } }
+@keyframes vt-card-in { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
