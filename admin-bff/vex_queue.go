@@ -39,9 +39,10 @@ type vexQueueRow struct {
 
 var vexQueueCache struct {
 	sync.Mutex
-	at   time.Time
-	rows []vexQueueRow
-	idx  map[string][]vulnHit // 취약점 ID(대문자) → 그 취약점이 있는 제품·버전("묻고 찾기"용)
+	at      time.Time
+	rows    []vexQueueRow
+	idx     map[string][]vulnHit // 취약점 ID(대문자) → 그 취약점이 있는 제품·버전("묻고 찾기"용)
+	skipped int                  // 취약점 분석기가 답하지 않아 집계에서 빠진 제품·버전 수(화면이 "일부만 표시"를 알린다)
 }
 
 // vulnHit: 어느 제품·버전의 어느 구성요소에 그 취약점이 있는가.
@@ -70,12 +71,16 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 	kev, _, _ := kevIndex()
 	rows := []vexQueueRow{}
 	idx := map[string][]vulnHit{}
+	skipped := 0
 	for key, repo := range projects {
 		name, tag, ok := strings.Cut(key, "@")
 		if !ok {
 			continue
 		}
 		uuid, err := s.dtLookupProject(name, tag)
+		if err != nil {
+			skipped++
+		}
 		if err != nil || uuid == "" {
 			continue
 		}
@@ -87,6 +92,9 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 		var fs []dtFinding
 		if b, err := s.dtFindings(uuid); err == nil {
 			_ = json.Unmarshal(b, &fs)
+		} else {
+			skipped++
+			continue // 취약점을 못 받은 제품을 "0건"으로 보여 주지 않는다
 		}
 		for _, f := range fs {
 			if f.Analysis.IsSuppressed {
@@ -147,7 +155,7 @@ func (s *Server) vexQueueRows(refresh bool) []vexQueueRow {
 		}
 		return a.Repo+a.Tag < b.Repo+b.Tag
 	})
-	vexQueueCache.rows, vexQueueCache.at, vexQueueCache.idx = rows, time.Now(), idx
+	vexQueueCache.rows, vexQueueCache.at, vexQueueCache.idx, vexQueueCache.skipped = rows, time.Now(), idx, skipped
 	return rows
 }
 
@@ -183,6 +191,9 @@ func (s *Server) apiVexQueue(w http.ResponseWriter, r *http.Request) {
 			rows = append(rows, row)
 		}
 	}
+	vexQueueCache.Lock()
+	skipped := vexQueueCache.skipped
+	vexQueueCache.Unlock()
 	sum := map[string]int{}
 	for _, row := range rows {
 		sum["pending"] += row.Pending
@@ -196,7 +207,7 @@ func (s *Server) apiVexQueue(w http.ResponseWriter, r *http.Request) {
 			sum["running"]++
 		}
 	}
-	writeJSON(w, 200, map[string]any{"dt": true, "rows": rows, "summary": sum, "ai": aiEnabled(), "generated": time.Now().UTC().Format(time.RFC3339)})
+	writeJSON(w, 200, map[string]any{"dt": true, "rows": rows, "summary": sum, "ai": aiEnabled(), "generated": time.Now().UTC().Format(time.RFC3339), "skipped": skipped})
 }
 
 // isDemoRepo: REAL_REPO_PREFIX(쉼표로 여러 개)를 정해 두면 그 접두어로 시작하지 않는 제품을 시연용으로 본다. 비어 있으면 나누지 않는다.

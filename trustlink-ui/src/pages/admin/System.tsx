@@ -101,7 +101,21 @@ export default function System() {
         <tbody>
           <tr><Td>zot (레지스트리)</Td><Td><StatusDot ok={h.zot} /></Td></tr>
           <tr><Td>Keycloak (인증)</Td><Td><StatusDot ok={h.keycloak} /></Td></tr>
-          {h.dtrack !== undefined && <tr><Td>Dependency-Track (취약점 분석)</Td><Td><StatusDot ok={h.dtrack} /></Td></tr>}
+          {h.dtrack !== undefined && <tr><Td>Dependency-Track (취약점 분석)</Td><Td><StatusDot ok={h.dtrack} />{!!h.dtSkipped && <span className="ml-2 text-xs text-amber-700">최근 집계에서 {h.dtSkipped}개 버전의 응답을 받지 못했습니다</span>}</Td></tr>}
+          {h.mirror !== undefined && <tr><Td>취약점 DB 미러</Td><Td><StatusDot ok={h.mirror} /></Td></tr>}
+          {h.pdf !== undefined && <tr><Td>PDF 변환</Td><Td><StatusDot ok={h.pdf} /></Td></tr>}
+          {h.ai !== undefined && <tr><Td>AI 연결</Td><Td><StatusDot ok={h.ai} /><span className="ml-2 text-xs text-muted-foreground">{h.ai ? '설정됨 — 응답 속도는 AI 연결 화면' : '설정 안 됨'}</span></Td></tr>}
+          {h.mail !== undefined && <tr><Td>메일 서버</Td><Td><StatusDot ok={h.mail} /><span className="ml-2 text-xs text-muted-foreground">{h.mail ? '설정됨' : '설정 안 됨'}</span></Td></tr>}
+          {(h.disks || []).map((d) => (
+            <tr key={d.path}><Td>디스크 <span className="text-xs text-muted-foreground">{d.path}</span></Td>
+              <Td><StatusDot ok={d.usedPct < 80} /><span className={d.usedPct >= 90 ? 'ml-2 font-semibold text-red-700' : d.usedPct >= 80 ? 'ml-2 font-semibold text-amber-700' : 'ml-2'}>{d.usedPct}% 사용 · 여유 {d.freeGB}GB / {d.totalGB}GB</span>{d.usedPct >= 80 && <span className="ml-2 text-xs text-muted-foreground">가득 차면 저장과 감사 기록이 실패합니다</span>}</Td></tr>
+          ))}
+          {h.storeFails !== undefined && (
+            <tr><Td>저장·감사 기록</Td>
+              <Td><StatusDot ok={!h.storeFails && !h.sorFails} />{h.storeFails || h.sorFails
+                ? <span className="ml-2 font-semibold text-red-700">서버를 켠 뒤 저장 실패 {h.storeFails}건 · 감사 기록 실패 {h.sorFails}건 <span className="font-normal text-muted-foreground">— 마지막: {h.lastFail} ({h.lastFailAt?.slice(0, 16).replace('T', ' ')} UTC)</span></span>
+                : <span className="ml-2 text-xs text-muted-foreground">서버를 켠 뒤 실패 없음</span>}</Td></tr>
+          )}
         </tbody>
       </Table>
       <MailCard />

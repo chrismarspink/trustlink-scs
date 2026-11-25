@@ -519,7 +519,8 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 	// 인증된 사용자는 모두 세션 발급(그룹 보존). 실제 권한은 엔드포인트별 가드가 그룹으로 판정한다.
 	// (관리 콘솔 API 는 admins 전용 guard, VEX 편집은 guardGroups 로 별도 게이트)
 	sid := s.store.put(Session{Username: username, Groups: groups, Expiry: time.Now().Add(8 * time.Hour)})
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: sid, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	// 주소가 https 인 설치에서는 암호화 연결로만 쿠키를 보낸다(http 로 쓰는 개발 환경은 그대로)
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: sid, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: strings.HasPrefix(s.cfg.RedirectURI, "https://")})
 	http.Redirect(w, r, st.ret, http.StatusFound)
 }
 

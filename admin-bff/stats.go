@@ -400,18 +400,18 @@ func (s *Server) buildStats() []productStat {
 				vs.Vulnerabilities = vuln
 				vs.Affected = byStatus["affected"]
 				vs.Fixed = byStatus["fixed"]
-			} else {
+			} else if demoData {
 				// 실 취약점 데이터 없음 → 더미 추이
 				vs.Vulnerabilities, vs.Affected, vs.Fixed = synthSecurity(repo, tag, idx, comp)
 				vs.Synthetic = true
 			}
-			if vs.Components == 0 { // SBOM 없는 버전 → 컴포넌트도 더미
+			if vs.Components == 0 && demoData { // SBOM 없는 버전 → 컴포넌트도 더미
 				vs.Components = synthComponents(repo, idx)
 				vs.Synthetic = true
 			}
 			if len(byStatus) > 0 { // 실 VEX 문서 존재 → 상태별 실데이터
 				vs.Vex = byStatus
-			} else { // VEX 문서 없음 → 더미 추이
+			} else if demoData { // VEX 문서 없음 → 더미 추이
 				vs.Vex = synthVex(repo, tag, idx)
 				vs.Synthetic = true
 			}
@@ -423,3 +423,6 @@ func (s *Server) buildStats() []productStat {
 	}
 	return products
 }
+
+// demoData: 실제 분석 자료가 없는 곳을 더미로 채울지. 운영 설치에서는 DASH_DEMO_DATA=off 로 끈다(기본은 지금까지와 같이 켬).
+var demoData = env("DASH_DEMO_DATA", "on") != "off"

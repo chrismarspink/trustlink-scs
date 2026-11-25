@@ -35,7 +35,12 @@ type SoR struct {
 func newSoR(path string) *SoR { return &SoR{path: path} }
 
 // append: 이벤트 1건을 JSONL 로 추가(생성·append·fsync). Time 미설정 시 현재시각.
-func (s *SoR) append(ev SoREvent) error {
+func (s *SoR) append(ev SoREvent) (err error) {
+	defer func() { // 호출한 쪽이 오류를 버려도 기록 누락은 세어 둔다
+		if err != nil {
+			storeFailed("sor", s.path, err)
+		}
+	}()
 	if ev.Time == "" {
 		ev.Time = time.Now().UTC().Format(time.RFC3339)
 	}

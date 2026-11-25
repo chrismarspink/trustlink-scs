@@ -241,6 +241,7 @@ func (s *Server) agentTasks(sess Session) []agentTask {
 	}
 
 	if admin {
+		out = append(s.relTasks(), out...) // 운영 문제(디스크, 저장 실패)는 맨 앞에
 		// 고객에게 보낼 메일(승인 필요)
 		for i, h := range holdWaiting() {
 			if i >= 8 {

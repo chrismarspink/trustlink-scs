@@ -21,6 +21,7 @@ func (s *Server) apiHealth(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.DTBaseURL != "" {
 		out["dtrack"] = s.ping(s.cfg.DTBaseURL+"/api/version", false) && s.dtAPIKey() != ""
 	}
+	s.relHealth(out)
 	writeJSON(w, 200, out)
 }
 

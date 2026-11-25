@@ -89,6 +89,7 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
 	clean := filepath.Clean(r.URL.Path)
 	fp := filepath.Join(dir, clean)
 	if fi, err := os.Stat(fp); err == nil && !fi.IsDir() {
+		uiCacheHeader(w, strings.HasPrefix(clean, "/assets/"))
 		http.ServeFile(w, r, fp)
 		return
 	}
@@ -97,5 +98,6 @@ func (s *Server) serveUI(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	uiCacheHeader(w, false)
 	http.ServeFile(w, r, filepath.Join(dir, "index.html"))
 }

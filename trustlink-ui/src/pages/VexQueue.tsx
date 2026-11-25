@@ -195,6 +195,7 @@ export default function VexQueue() {
           </tbody>
         </table>
       </Card>
+      {!!q?.skipped && <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">취약점 분석기가 {q.skipped}개 버전에 답하지 않아 <b>일부만 표시 중</b>입니다. 판단할 것이 줄어든 것이 아닙니다. 잠시 뒤 새로 고침해 보세요.</div>}
       {q?.generated && <p className="mt-2 text-xs text-muted-foreground">집계 {fmt(q.generated)} · 1분 캐시 · 관리자가 아니면 읽기 권한이 있는 제품만 보입니다.</p>}
     </div>
   );

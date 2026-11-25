@@ -276,7 +276,8 @@ export type Metrics = {
 };
 export const adminMetrics = () => aj<Metrics>('/api/metrics');
 
-export type Health = { zot: boolean; keycloak: boolean; dtrack?: boolean };
+export type Health = { zot: boolean; keycloak: boolean; dtrack?: boolean; ai?: boolean; mail?: boolean; mirror?: boolean; pdf?: boolean;
+  disks?: { path: string; usedPct: number; freeGB: number; totalGB: number }[]; storeFails?: number; sorFails?: number; lastFail?: string; lastFailAt?: string; dtSkipped?: number };
 export const adminHealth = () => aj<Health>('/api/health');
 export type NoticeItem = { id: string; time: string; kind: string; repo: string; tag: string; title: string; body: string; read: boolean };
 // 내 통보(로그인 필요). BFF 세션이 없으면 null.
@@ -574,7 +575,7 @@ export type VexQueueRow = {
   batchPhase?: 'enrich'; enrichDone?: number; enrichTotal?: number;
   imported?: number; demo?: boolean; // 버전 등록 시각(ms) · 시연용 제품
 };
-export type VexQueue = { dt: boolean; rows: VexQueueRow[]; summary?: Record<string, number>; ai?: boolean; generated?: string };
+export type VexQueue = { dt: boolean; rows: VexQueueRow[]; summary?: Record<string, number>; ai?: boolean; generated?: string; skipped?: number };
 export const vexQueue = (refresh = false) => aj<VexQueue>(`/api/vex/queue${refresh ? '?refresh=1' : ''}`);
 export const vexKev = (ids: string[]) => aj<KevInfo>(`/api/vex/kev?ids=${encodeURIComponent(ids.join(','))}`);
 

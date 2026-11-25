@@ -321,7 +321,12 @@ func readJSONFile(p string, v any) error {
 	return json.Unmarshal(b, v)
 }
 
-func writeJSONFile(p string, v any) error {
+func writeJSONFile(p string, v any) (err error) {
+	defer func() { // 호출한 쪽이 오류를 버려도 실패는 세어 둔다(시스템 상태·에이전트가 알린다)
+		if err != nil {
+			storeFailed("store", p, err)
+		}
+	}()
 	b, err := json.MarshalIndent(v, "", " ")
 	if err != nil {
 		return err
