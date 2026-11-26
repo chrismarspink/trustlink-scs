@@ -127,7 +127,7 @@ export default function Home() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="mb-1 text-2xl font-bold">TrustLink</h1>
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight">TrustLink</h1>
         <p className="text-sm text-muted-foreground">
           납품하는 소프트웨어의 신뢰를 잇습니다 — 저장 · 검증 · 판단 · 통보 · 규제 대응
           {sess?.username && <> · <b className="text-foreground">{sess.username}</b> 님 환영합니다</>}

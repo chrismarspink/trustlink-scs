@@ -118,7 +118,7 @@ export default function MyProducts() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">내 제품</h1>
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight">내 제품</h1>
       <p className="mb-5 text-sm text-muted-foreground">귀사에 등록된 제품·설치 버전과 그 버전의 취약점 판정, 권장 패치 버전, 최근 보안 통지입니다.</p>
       {err && <div className="rounded-md bg-red-100 p-3 text-sm text-red-700">{err}</div>}
       {!d ? !err && <p className="text-muted-foreground">불러오는 중…</p> : d.customers.length === 0 ? (

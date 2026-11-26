@@ -71,7 +71,7 @@ export default function VexQueue() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-5 flex flex-wrap items-start gap-3">
         <div className="basis-full sm:flex-1 sm:basis-0">
-          <h1 className="flex items-center gap-2 text-2xl font-bold"><ShieldQuestion size={22} /> VEX 판단</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><ShieldQuestion size={22} /> VEX 판단</h1>
           <p className="mt-1 text-sm text-muted-foreground">감시 중인 모든 제품·버전의 판단 안 된 취약점을 급한 순(실제 악용 KEV → 치명 → 높음)으로 모았습니다. 판단과 VEX 발행은 각 제품 화면에서 합니다.</p>
         </div>
         <HelpScene topic="vex" title="VEX 판단은 이렇게 동작합니다" />
@@ -82,7 +82,7 @@ export default function VexQueue() {
         {[['판단 대기', s.pending, ''], ['실제 악용(KEV)', s.pendKev, 'text-red-700'], ['치명', s.pendCritical, 'text-red-600'], ['높음', s.pendHigh, 'text-orange-600'], ['영향 있음(조치)', s.affected, 'text-amber-700']].map(([l, v, c]) => (
           <Card key={l as string} className="p-3">
             <div className="text-xs text-muted-foreground">{l}</div>
-            <div className={`mt-1 text-2xl font-bold tabular-nums ${c}`}>{q ? (v ?? 0) : '…'}</div>
+            <div className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${c}`}>{q ? (v ?? 0) : '…'}</div>
           </Card>
         ))}
       </div>

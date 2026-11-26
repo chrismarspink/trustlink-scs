@@ -22,7 +22,7 @@ export default function Artifacts() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">아티팩트</h1>
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight">아티팩트</h1>
       <p className="mb-5 text-sm text-muted-foreground">공급망 산출물(바이너리 + SBOM/VEX/서명) 레지스트리</p>
 
       <div className="mb-5 flex items-center gap-2">

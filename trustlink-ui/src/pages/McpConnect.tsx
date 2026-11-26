@@ -60,7 +60,7 @@ export default function McpConnect() {
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-2 flex flex-wrap items-center gap-3">
-        <h1 className="flex items-center gap-2 text-2xl font-bold"><Plug size={22} /> AI 도구 연결 <Badge variant="outline">시범</Badge></h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Plug size={22} /> AI 도구 연결 <Badge variant="outline">시범</Badge></h1>
         <HelpScene topic="mcp" title="AI 도구 연결(MCP)은 이렇게 동작합니다" />
       </div>
       <p className="mb-5 text-sm text-muted-foreground">

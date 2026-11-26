@@ -99,7 +99,7 @@ export default function UpstreamPrint() {
       <div className="sheet mx-auto my-6 w-[210mm] bg-white p-[13mm] shadow">
         <div className="border-b-2 border-slate-800 pb-3">
           <div className="text-[11px] font-semibold tracking-wide text-teal-700">제3자 구성요소 실사(Due Diligence) 기록</div>
-          <h1 className="mt-1 text-2xl font-bold">공개 저장소(상류) 건강도 점검</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">공개 저장소(상류) 건강도 점검</h1>
           <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] text-slate-600">
             <div>대상: <b className="text-slate-800">{title}</b></div>
             <div>보고서 ID: {rep.id}</div>

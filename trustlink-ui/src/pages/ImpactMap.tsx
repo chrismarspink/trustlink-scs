@@ -104,7 +104,7 @@ export default function ImpactMapPage() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="flex-1">
-          <h1 className="flex items-center gap-2 text-2xl font-bold"><Share2 size={22} /> 영향 지도</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Share2 size={22} /> 영향 지도</h1>
           <p className="mt-1 text-sm text-muted-foreground">{mode === 'reg' ? '규제 하나가 어느 고객에게 해당될 수 있고, 그 고객이 우리 제품 무엇을 쓰는지 봅니다. 국가·업종으로 맞춘 추정입니다.' : '취약점 하나가 구성요소, 출고한 버전, 고객으로 번지는 모습을 시간 순서로 봅니다.'}</p>
           {admin && (
             <div className="mt-2 inline-flex rounded-lg border p-0.5 text-sm" role="group" aria-label="지도 종류">

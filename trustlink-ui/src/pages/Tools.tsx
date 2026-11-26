@@ -38,7 +38,7 @@ const AGENTS: Agent[] = [
 export default function Tools() {
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">진단 도구</h1>
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight">진단 도구</h1>
       <p className="mb-5 text-sm text-muted-foreground">
         현장에서 실행해 진단 자료를 수집하는 도구입니다. 받은 뒤 실행하면 번들이 생성되어 공통 이슈 번호로 TrustLink에 전달됩니다.
       </p>
