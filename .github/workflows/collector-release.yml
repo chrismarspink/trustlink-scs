@@ -1,0 +1,95 @@
+# 이노스마트 진단 수집기 릴리즈 — Windows 빌드·(선택)서명·GitHub Release 게시
+#
+# 트리거: collector-vX.Y.Z 태그를 push 하면 실행(또는 수동 실행).
+#   git tag collector-v0.1.0 && git push origin collector-v0.1.0
+#
+# 산출물: ismart-collector-vX.Y.Z-x64.exe + .sha256 를 해당 태그의 Release 에 첨부.
+# 서명: 저장소 시크릿 SIGN_PFX_BASE64 / SIGN_PFX_PASSWORD 가 있으면 Authenticode 서명,
+#       없으면 미서명으로 게시하고 로그에 경고(스켈레톤/프리릴리즈 단계 허용).
+
+name: collector-release
+
+on:
+  push:
+    tags:
+      - 'collector-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '버전(예: 0.1.0) — 수동 실행 시'
+        required: true
+
+permissions:
+  contents: write   # Release 생성용
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 버전 결정
+        id: ver
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/collector-v*') {
+            $v = $env:GITHUB_REF -replace 'refs/tags/collector-v',''
+          } else {
+            $v = '${{ github.event.inputs.version }}'
+          }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "release version: $v"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: 빌드
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc --manifest-path collector/Cargo.toml
+
+      - name: 산출물 이름·체크섬
+        id: pkg
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $out = "ismart-collector-v$v-x64.exe"
+          Copy-Item "collector/target/x86_64-pc-windows-msvc/release/ismart-collector.exe" $out
+          $hash = (Get-FileHash $out -Algorithm SHA256).Hash.ToLower()
+          "$hash  $out" | Out-File -Encoding ascii "$out.sha256"
+          "artifact=$out" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Authenticode 서명(시크릿 있을 때만)
+        if: ${{ env.SIGN_PFX_BASE64 != '' }}
+        env:
+          SIGN_PFX_BASE64: ${{ secrets.SIGN_PFX_BASE64 }}
+          SIGN_PFX_PASSWORD: ${{ secrets.SIGN_PFX_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:SIGN_PFX_BASE64))
+          & signtool sign /fd SHA256 /f cert.pfx /p $env:SIGN_PFX_PASSWORD `
+            /tr http://timestamp.digicert.com /td SHA256 '${{ steps.pkg.outputs.artifact }}'
+          Remove-Item cert.pfx
+          # 서명 후 체크섬 재계산
+          $out = '${{ steps.pkg.outputs.artifact }}'
+          $hash = (Get-FileHash $out -Algorithm SHA256).Hash.ToLower()
+          "$hash  $out" | Out-File -Encoding ascii "$out.sha256"
+
+      - name: 서명 경고(시크릿 없을 때)
+        if: ${{ env.SIGN_PFX_BASE64 == '' }}
+        run: Write-Warning "코드서명 시크릿이 없어 미서명으로 게시합니다. 정식 배포 전 서명 설정 필요."
+
+      - name: GitHub Release 게시
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: 진단 수집기 v${{ steps.ver.outputs.version }}
+          body: |
+            이노스마트 진단 수집기 v${{ steps.ver.outputs.version }} (Windows x64)
+
+            - 지원 OS: Windows 10(1809+)·11·Server 2016/2019/2022/2025, x64
+            - 무결성: 함께 올라온 `.sha256` 로 검증
+            - 사용법: 다운로드 후 실행(포터블). 자세한 안내는 TrustLink 문서 참조.
+          files: |
+            ${{ steps.pkg.outputs.artifact }}
+            ${{ steps.pkg.outputs.artifact }}.sha256
+          prerelease: true

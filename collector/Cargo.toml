@@ -1,0 +1,27 @@
+[package]
+name = "ismart-collector"
+version = "0.1.0"
+edition = "2021"
+description = "이노스마트 진단 수집기 — Windows 호환성/후킹 충돌 진단용 포터블 수집기 (1차)"
+license = "Proprietary"
+publish = false
+
+# 1차 스캐폴드는 표준 라이브러리만 사용해 오프라인에서도 컴파일됩니다.
+# 실제 기능 구현 시 추가 예정(결정 후):
+#   - serde / serde_json / toml : 선언형 룰·매니페스트
+#   - zip                       : 번들 압축
+#   - sha2 / ed25519-dalek      : 서명·체크섬 검증
+#   - ureq 또는 reqwest         : 업로드
+#   - self-replace / self_update: 자가 업데이트(2차)
+[dependencies]
+
+# Windows 네이티브 수집은 windows 크레이트로 구현(2차 결정에 따라).
+# mac/리눅스에서는 스텁으로 컴파일되어 구조 검증이 가능합니다.
+[target.'cfg(windows)'.dependencies]
+# windows = { version = "0.59", features = ["Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_System_Diagnostics_ToolHelp"] }
+
+[profile.release]
+opt-level = "z"   # 크기 최적화(작은 단일 바이너리)
+lto = true
+strip = true
+panic = "abort"
