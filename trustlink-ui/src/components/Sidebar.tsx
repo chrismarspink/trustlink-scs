@@ -7,6 +7,7 @@ import {
   ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send, Plug, Share2, ListChecks, Settings, Zap, Wrench } from 'lucide-react';
 import { adminInbox, bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { wsOn, setWs, wsName, WsNav } from '@/components/Workspace';
 
 declare const __APP_VERSION__: string;
 
@@ -181,6 +182,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
   }, []);
 
   const admin = !!sess?.groups?.includes('admins');
+  const ws = wsOn(); // 역할별 작업공간(시험 운영) — 꺼져 있으면 아래 기존 메뉴 그대로
   const can = (w: Who = 'all') => w === 'all' || (w === 'login' && !!sess) || (w === 'vex' && !!sess?.canEditVex) || (w === 'admin' && admin);
   const menus = MENUS.map((m) => ({ ...m, children: (m.children || []).filter((c) => can(c.who)) })).filter((m) => m.children.length > 0);
   // 할 일 옆 숫자: 관리자가 결정할 일(승인 대기함의 합계)
@@ -204,13 +206,22 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         </span>
         <span className="leading-tight">
           <span className="block text-sm font-semibold">TrustLink</span>
-          <span className="block text-[11px] text-muted-foreground">Software Supply Chain · v{__APP_VERSION__}</span>
+          <span className="block text-[11px] text-muted-foreground">{ws ? wsName(sess) : 'Software Supply Chain'} · v{__APP_VERSION__}</span>
         </span>
       </Link>
       <nav className="flex-1 space-y-0.5 overflow-y-auto pb-3" aria-label="주 메뉴">
-        <div className="pt-2"><NavItem item={HOME} /></div>
-        {menus.map((m) => <NavGroup key={m.to} item={m} badge={m.to === '#todo' ? todo : 0} />)}
+        {ws ? <WsNav sess={sess} todo={todo} /> : (
+          <>
+            <div className="pt-2"><NavItem item={HOME} /></div>
+            {menus.map((m) => <NavGroup key={m.to} item={m} badge={m.to === '#todo' ? todo : 0} />)}
+          </>
+        )}
       </nav>
+      {(ws || admin) && (
+        <button type="button" onClick={() => setWs(!ws)} className="mx-4 mb-2 text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+          {ws ? '기존 화면으로 돌아가기' : '새 화면 써 보기 (시험)'}
+        </button>
+      )}
       {sess?.username && (
         <div className="flex items-center gap-2.5 border-t p-3">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold uppercase">

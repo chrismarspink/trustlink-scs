@@ -7,11 +7,14 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { AskPanel } from '@/components/AskPanel';
 import { AgentButton } from '@/components/Agent';
 import { IntroPopup } from '@/components/IntroPopup';
+import { wsOn, wsTrail, WsTabs, useWsSession } from '@/components/Workspace';
 
 // 통합 셸: 사이드바(브랜드·메뉴·사용자) + 경로 표시줄 + 본문. 제품/관리 모두 이 셸을 쓴다.
 export function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  const trail = navTrail(pathname);
+  const ws = wsOn();
+  const wsSess = useWsSession();
+  const trail = ws ? wsTrail(pathname, wsSess) : navTrail(pathname);
   // 좁은 화면(휴대폰)에서는 사이드바를 접어 두고 메뉴 단추로 연다. 화면을 옮기면 닫는다.
   const [nav, setNav] = useState(false);
   useEffect(() => { setNav(false); }, [pathname]);
@@ -47,7 +50,7 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
           <div className="ml-auto flex shrink-0 items-center gap-1 pl-2"><AgentButton /><IntroPopup /><NotificationBell /></div>
         </header>
-        <main className="vt-view max-w-[1280px] px-4 py-5 lg:px-8 lg:py-6">{children}</main>
+        <main className="vt-view max-w-[1280px] px-4 py-5 lg:px-8 lg:py-6">{ws && <WsTabs sess={wsSess} />}{children}</main>
       </div>
       <AskPanel />
     </div>
