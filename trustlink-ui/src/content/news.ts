@@ -30,6 +30,14 @@ export const NOTICES: Notice[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: '2.44.2',
+    date: '2026-11-26',
+    title: '용어·사용법 장면은 AI 없이 즉시',
+    items: [
+      { kind: '개선', text: 'VEX·SBOM 같은 용어·사용법 질문의 장면과 설명은 내장 도움말에서 바로 나옵니다 — 로컬 모델을 거치지 않아 즉시 열리고, 답도 매번 같습니다' },
+    ],
+  },
+  {
     version: '2.44.1',
     date: '2026-11-26',
     title: 'AI 답변 장면과 도움말을 같은 틀로',

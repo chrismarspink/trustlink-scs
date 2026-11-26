@@ -516,6 +516,10 @@ func (s *Server) apiAskSummary(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 404, map[string]string{"error": "질문을 찾지 못했습니다 — 다시 물어보세요"})
 		return
 	}
+	if a.Intent == "howto" { // 용어·사용법: 답이 이미 손으로 쓴 완성본이라 AI 로 다시 요약하지 않는다(즉시)
+		writeJSON(w, 200, map[string]any{"answer": a.Lead, "model": "내장 도움말", "elapsedMs": 0})
+		return
+	}
 	if len(a.facts) == 0 || !aiEnabledFor("vex") {
 		writeJSON(w, 409, map[string]string{"error": "AI 로 정리할 내용이 없거나 AI 연결이 꺼져 있습니다"})
 		return

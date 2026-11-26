@@ -146,6 +146,19 @@ func sceneFacts(a *askAnswer) []aiFact {
 	return facts
 }
 
+// sceneStatic: 손으로 쓴 정적 지식(용어·사용법)은 AI 없이 장면 글자를 규칙으로 채운다.
+// 라이브 데이터가 없는 질문이라 로컬 추론을 돌릴 이유가 없다 — 즉시, 그리고 매번 같은 정답.
+func sceneStatic(a *askAnswer) (sceneText, bool) {
+	if a.Intent != "howto" {
+		return sceneText{}, false
+	}
+	note := strings.TrimSpace(a.Lead)
+	if i := strings.Index(note, "다. "); i >= 0 { // 첫 문장만(문장 중간에서 잘리지 않게)
+		note = note[:i+len("다.")]
+	}
+	return sceneText{Lead: truncate(a.Title, 40), Notes: []string{truncate(note, 90)}, Model: "내장 도움말"}, true
+}
+
 // POST /api/ask/{id}/scene — 그 답을 AI 가 장면으로 풀어 설명(질문한 본인만)
 func (s *Server) apiAskScene(w http.ResponseWriter, r *http.Request) {
 	sess, _ := s.sessionOf(r)
@@ -154,6 +167,10 @@ func (s *Server) apiAskScene(w http.ResponseWriter, r *http.Request) {
 	askStore.Unlock()
 	if a == nil || a.user != sess.Username {
 		writeJSON(w, 404, map[string]string{"error": "질문을 찾지 못했습니다 — 다시 물어보세요"})
+		return
+	}
+	if t, ok := sceneStatic(a); ok { // 용어·사용법: AI 없이 바로(AI 연결이 꺼져 있어도 열린다)
+		writeJSON(w, 200, map[string]any{"scenes": sceneBuild(a, t), "model": t.Model, "elapsedMs": 0, "cached": true})
 		return
 	}
 	if !aiEnabledFor("vex") {
