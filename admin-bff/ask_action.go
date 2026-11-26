@@ -468,6 +468,11 @@ func (s *Server) apiAskAction(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 404, map[string]string{"error": "통지 초안이 없습니다 — 다시 만들어 주세요"})
 			return
 		}
+		if msg := pilotGate(n, keys); msg != "" { // 내부 검증 고객 먼저
+			custNoticeMu.Unlock()
+			writeJSON(w, 409, map[string]string{"error": msg})
+			return
+		}
 		s.sendNotice(n, keys, sess.Username, outboxDelay(sec))
 		err := c.putNotice(n)
 		custNoticeMu.Unlock()

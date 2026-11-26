@@ -122,7 +122,7 @@ export default function Customers() {
                             <div className="font-medium">{c.name}</div>
                             <div className="mt-0.5 flex flex-wrap gap-1 text-xs text-muted-foreground">
                               {c.disabled && <Badge variant="outline">중지 · {CUST_DISABLE_REASONS[c.disabledReason || 'other']}</Badge>}
-                              <Ind v={c.industry} />{c.lang === 'en' && <Badge variant="outline">EN</Badge>}{c.orgGroup && <span>{c.orgGroup}</span>}
+                              <Ind v={c.industry} />{c.pilot && <Badge variant="outline" title="내부 검증(사전 배포) 고객 — 통지를 먼저 받습니다">내부검증</Badge>}{c.lang === 'en' && <Badge variant="outline">EN</Badge>}{c.orgGroup && <span>{c.orgGroup}</span>}
                             </div>
                           </div>
                         </div>
@@ -282,7 +282,7 @@ function CustomerCard({ c, products, onEdit, onDelete, onChanged }: { c: Custome
             <CompanyLogo logo={c.logo} disabled={c.disabled} size={44} />
             <div>
               <div className="text-lg font-semibold">{c.name}</div>
-              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground"><Ind v={c.industry} />{c.country && <span>{c.country}</span>}<span>· {c.lang === 'en' ? '영어' : '한국어'} 통지</span><span>· ID {c.id}</span></div>
+              <div className="flex flex-wrap gap-1 text-xs text-muted-foreground"><Ind v={c.industry} />{c.pilot && <Badge variant="outline" title="내부 검증(사전 배포) 고객 — 통지를 먼저 받습니다">내부검증</Badge>}{c.country && <span>{c.country}</span>}<span>· {c.lang === 'en' ? '영어' : '한국어'} 통지</span><span>· ID {c.id}</span></div>
             </div>
           </div>
           <div className="flex gap-1">
@@ -408,6 +408,13 @@ function CustomerForm({ init, isNew, onClose, onSaved }: { init: Customer; isNew
               <F label="국가"><Input value={c.country || ''} onChange={(e) => set({ country: e.target.value })} /></F>
               <F label="통지 언어"><select className={cn(selectCls, 'w-full')} value={c.lang} onChange={(e) => set({ lang: e.target.value as Customer['lang'] })}><option value="ko">한국어</option><option value="en">영어</option></select></F>
               <F label="고객사 그룹(선택)" className="sm:col-span-3"><Input list="cust-orgs" placeholder="org-…" value={c.orgGroup || ''} onChange={(e) => set({ orgGroup: e.target.value })} /></F>
+              <F label="내부 검증 고객" className="sm:col-span-3">
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={!!c.pilot} onChange={(e) => set({ pilot: e.target.checked })} />
+                  내부 테스트팀·QA 등 사전 배포(먼저 쓰는) 고객
+                </label>
+                <p className="mt-1 text-xs text-muted-foreground">켜면 취약점 통지가 이 고객에게 먼저 나가고, 확인한 뒤에야 외부 고객에게 보낼 수 있습니다.</p>
+              </F>
             </div>
           </Sec>
 

@@ -28,6 +28,15 @@ function Sev({ s }: { s: string }) {
   return <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-semibold', cls)}>{s || '미상'}</span>;
 }
 
+// 내부 검증(pilot) 링 — 외부 대상은 내부 링을 먼저 보낸 뒤에야 보낼 수 있다(서버도 같은 게이트).
+const isOpenTarget = (t: CustTarget) => !t.result?.sent?.length && !t.result?.pending;
+const pilotPendingTargets = (n: CustNotice) => n.targets.filter((t) => t.ring === 'pilot' && isOpenTarget(t));
+// 지금 보낼 수 있는(미발송) 대상 키 — 내부 링이 남아 있으면 그 링만 먼저.
+function sendableKeys(n: CustNotice): string[] {
+  const p = pilotPendingTargets(n);
+  return (p.length ? p : n.targets.filter(isOpenTarget)).map((t) => t.key);
+}
+
 function SendState({ t }: { t: CustTarget }) {
   const r = t.result;
   if (!r) return <span className="text-xs text-muted-foreground">미발송</span>;
@@ -65,7 +74,7 @@ export default function CustomerNotify() {
 
   const open = (x: CustNotice) => {
     setN(x); setErr(''); setTab('flow'); setKind(x.kind);
-    setSel(x.targets.filter((t) => !t.result?.sent?.length && !t.result?.pending).map((t) => t.key));
+    setSel(sendableKeys(x)); // 내부 검증 고객이 있으면 그 링을 먼저 선택
     setStage(x.status === 'draft' ? 2 : 5);
   };
   const pick = async (c: CustVulnCand) => {
@@ -95,7 +104,8 @@ export default function CustomerNotify() {
   const send = async () => {
     if (!n || !sel.length || !confirm(`${sel.length}곳에 메일을 보낼까요?${delay ? `\n\n${delay}초 동안 발송함에서 기다리며, 그 사이 '보내기 취소'를 누르면 나가지 않습니다(취소한 곳은 다시 보낼 수 있음).` : ''}`)) return;
     setBusy('send'); setErr('');
-    try { const r = await adminCustNotifySend(n.id, sel, delay); setN(r); setSel([]); } catch (e) { setErr(String(e)); }
+    try { const r = await adminCustNotifySend(n.id, sel, delay); setN(r); setSel(sendableKeys(r)); } catch (e) { setErr(String(e)); } // 내부를 보냈으면 다음은 외부 링
+
     setBusy('');
   };
   const reset = () => { setN(null); setStage(1); setErr(''); };
@@ -276,8 +286,16 @@ function NoticeHead({ n }: { n: CustNotice }) {
 }
 
 function TargetTable({ n, sel, setSel, showResult }: { n: CustNotice; sel: string[]; setSel: (v: string[]) => void; showResult?: boolean }) {
-  const open = n.targets.filter((t) => !t.result?.sent?.length && !t.result?.pending).map((t) => t.key);
+  const pend = pilotPendingTargets(n); // 아직 안 나간 내부 검증 고객
+  const open = sendableKeys(n);        // 지금 고를 수 있는 대상(내부가 남아 있으면 내부만)
+  const locked = (t: CustTarget) => pend.length > 0 && t.ring !== 'pilot'; // 외부는 내부 발송 전까지 잠금
   return (
+    <>
+      {pend.length > 0 && (
+        <div className="mb-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+          <b>내부 검증 고객 먼저</b> — {pend.map((t) => t.customer).join(', ')}에게 먼저 보내 확인한 뒤에야 외부 고객에게 보낼 수 있습니다. (아래 외부 고객은 그때까지 잠깁니다)
+        </div>
+      )}
     <Table>
       <thead><tr>
         <Th><input type="checkbox" checked={open.length > 0 && open.every((k) => sel.includes(k))} onChange={(e) => setSel(e.target.checked ? open : [])} /></Th>
@@ -285,9 +303,9 @@ function TargetTable({ n, sel, setSel, showResult }: { n: CustNotice; sel: strin
       </tr></thead>
       <tbody>
         {n.targets.length === 0 ? <tr><Td colSpan={7} className="text-center text-muted-foreground">보낼 고객이 없습니다(제외 사유 참고).</Td></tr> : n.targets.map((t) => (
-          <tr key={t.key}>
-            <Td><input type="checkbox" disabled={!!t.result?.sent?.length || !!t.result?.pending} checked={sel.includes(t.key)} onChange={(e) => setSel(e.target.checked ? [...sel, t.key] : sel.filter((x) => x !== t.key))} /></Td>
-            <Td><div className="flex items-center gap-1.5"><Building2 size={13} className="text-muted-foreground" /><b>{t.customer}</b>{t.lang === 'en' && <Badge variant="outline">EN</Badge>}</div></Td>
+          <tr key={t.key} className={locked(t) ? 'opacity-50' : undefined}>
+            <Td><input type="checkbox" disabled={!!t.result?.sent?.length || !!t.result?.pending || locked(t)} checked={sel.includes(t.key)} onChange={(e) => setSel(e.target.checked ? [...sel, t.key] : sel.filter((x) => x !== t.key))} /></Td>
+            <Td><div className="flex items-center gap-1.5"><Building2 size={13} className="text-muted-foreground" /><b>{t.customer}</b>{t.ring === 'pilot' && <Badge variant="outline" title="내부 검증(사전 배포) 고객">내부검증</Badge>}{t.lang === 'en' && <Badge variant="outline">EN</Badge>}</div></Td>
             <Td className="text-xs">{t.tags.join(', ')}</Td>
             {n.kind === 'patch' && <Td>{t.recommend ? <Badge variant="success">{t.recommend}</Badge> : <span className="text-xs text-amber-700">없음 — 완화 조치</span>}</Td>}
             <Td className="text-xs">
@@ -305,6 +323,7 @@ function TargetTable({ n, sel, setSel, showResult }: { n: CustNotice; sel: strin
         ))}
       </tbody>
     </Table>
+    </>
   );
 }
 

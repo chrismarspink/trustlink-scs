@@ -757,6 +757,7 @@ export type CustUsage = {
 export type Customer = {
   id: string; name: string; industry: CustIndustry; country?: string; lang: 'ko' | 'en'; orgGroup?: string;
   salesOwner?: string; supportOwner?: string; memo?: string; contacts: CustContact[]; usages: CustUsage[]; updated?: string; updatedBy?: string;
+  pilot?: boolean; // 내부 검증(사전 배포) 고객 — 테스트팀/QA. 새 버전·통지를 외부보다 먼저 받는다
   // 사용/중지(폐업·관계 종료·계약 해지)와 로고 — 전용 API 로만 바뀐다
   disabled?: boolean; disabledReason?: CustDisableReason; disabledNote?: string; disabledAt?: string; disabledBy?: string; logo?: string;
   deleted?: boolean; deletedAt?: string; deletedBy?: string; // 휴지통
@@ -806,7 +807,7 @@ export type CustFix = {
 export type CustSendResult = { at: string; sent?: string[]; dropped?: string[]; error?: string; outbox?: string; pending?: boolean; sendAt?: string; cancelled?: boolean };
 export type CustTarget = {
   key: string; customerId: string; customer: string; usageId: string; lang: 'ko' | 'en'; tags: string[]; recommend?: string; recComp?: string;
-  notes?: string[]; internal?: string[]; contacts: string[]; to: string[]; cc?: string[]; subject: string; text: string; html: string; result?: CustSendResult;
+  notes?: string[]; internal?: string[]; ring?: string; contacts: string[]; to: string[]; cc?: string[]; subject: string; text: string; html: string; result?: CustSendResult;
 };
 export type CustAIText = { summary: string; impact: string; action: string; citations: string[]; source: 'ai' | 'rule'; model?: string; warnings?: string[] };
 export type CustNotice = {

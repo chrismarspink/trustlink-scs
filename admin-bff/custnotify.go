@@ -268,6 +268,7 @@ type CustTarget struct {
 	RecComp    string          `json:"recComp,omitempty"`
 	Notes      []string        `json:"notes,omitempty"`    // 고객 메일에 넣는 계약·EOS 안내
 	Internal   []string        `json:"internal,omitempty"` // 내부 메모(메일 미포함)
+	Ring       string          `json:"ring,omitempty"`     // pilot = 내부 검증(사전 배포) 고객 — 외부보다 먼저 보낸다
 	Contacts   []string        `json:"contacts"`           // 이름(역할)
 	To         []string        `json:"to"`
 	Cc         []string        `json:"cc,omitempty"` // 영업 담당(유지보수 만료 시)
@@ -462,6 +463,9 @@ func (s *Server) buildNotice(kind, repo, vulnID, actor string) (*CustNotice, err
 		sort.Strings(langs)
 		for _, l := range langs {
 			t := CustTarget{Key: h.c.ID + "|" + h.u.ID + "|" + l, CustomerID: h.c.ID, Customer: h.c.Name, UsageID: h.u.ID, Lang: l, Tags: h.tags, Contacts: []string{}, To: []string{}}
+			if h.c.Pilot {
+				t.Ring = "pilot" // 내부 검증 고객 — 발송은 이 링을 먼저
+			}
 			for _, ct := range byLang[l] {
 				t.Contacts = append(t.Contacts, ct.Name+"("+ct.Role+")")
 				t.To = append(t.To, ct.Email)
@@ -825,6 +829,39 @@ func (c *custStore) notice(id string) (*CustNotice, bool) {
 
 // ---------- ⑤ 발송 ----------
 
+// pilotPending: 아직 보내지 않은(시도조차 안 한) 내부 검증(pilot) 대상 고객 이름. 비어 있으면 외부로 보내도 된다.
+// "시도함"(Result != nil)을 기준으로 봐 — 내부 주소가 모두 허용 목록 밖이어도 외부가 영영 막히지 않게.
+func pilotPending(n *CustNotice) []string {
+	out := []string{}
+	for i := range n.Targets {
+		if t := &n.Targets[i]; t.Ring == "pilot" && t.Result == nil && !inList(t.Customer, out) {
+			out = append(out, t.Customer)
+		}
+	}
+	return out
+}
+
+// hasExternalKey: 고른 키 중 외부(비 pilot) 대상이 있는가.
+func hasExternalKey(n *CustNotice, keys []string) bool {
+	for i := range n.Targets {
+		if t := &n.Targets[i]; t.Ring != "pilot" && inList(t.Key, keys) {
+			return true
+		}
+	}
+	return false
+}
+
+// pilotGate: 외부 대상을 보내려는데 내부 검증(pilot) 링이 아직 안 나갔으면 막을 사유(없으면 ""). 발송하는 모든 경로가 부른다.
+func pilotGate(n *CustNotice, keys []string) string {
+	if !hasExternalKey(n, keys) {
+		return ""
+	}
+	if p := pilotPending(n); len(p) > 0 {
+		return "내부 검증 고객(" + strings.Join(p, ", ") + ")에게 먼저 보내고 확인한 뒤 외부 고객에게 보낼 수 있습니다."
+	}
+	return ""
+}
+
 // sendNotice: 선택한 대상(키)을 발송함에 넣는다(delay 뒤 발송, 그 전에는 취소 가능).
 // 이미 보냈거나 기다리는 대상은 다시 넣지 않는다. custNoticeMu 를 잡은 채로 부른다.
 func (s *Server) sendNotice(n *CustNotice, keys []string, actor string, delay time.Duration) {
@@ -1073,6 +1110,10 @@ func (s *Server) apiCustNotifySend(w http.ResponseWriter, r *http.Request) {
 	}
 	if n.AIState == "running" {
 		writeJSON(w, 409, map[string]string{"error": "AI 설명을 작성하는 중입니다 — 끝난 뒤 보내세요"})
+		return
+	}
+	if msg := pilotGate(n, in.Keys); msg != "" { // 내부 검증(pilot) 고객을 먼저 보낸 뒤에야 외부로
+		writeJSON(w, 409, map[string]string{"error": msg})
 		return
 	}
 	s.sendNotice(n, in.Keys, w.Header().Get("X-User"), delay)

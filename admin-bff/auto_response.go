@@ -695,6 +695,11 @@ func (s *Server) apiAutoResponseDecide(w http.ResponseWriter, r *http.Request) {
 			keys = append(keys, t.Key)
 		}
 	}
+	if msg := pilotGate(n, keys); msg != "" { // 내부 검증 고객 먼저
+		custNoticeMu.Unlock()
+		writeJSON(w, 409, map[string]string{"error": msg})
+		return
+	}
 	s.sendNotice(n, keys, actor, delay)
 	err := s.cust().putNotice(n)
 	custNoticeMu.Unlock()

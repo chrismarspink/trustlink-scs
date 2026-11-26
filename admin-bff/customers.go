@@ -84,6 +84,10 @@ type Customer struct {
 	Usages       []CustUsage   `json:"usages"`
 	Updated      string        `json:"updated,omitempty"`
 	UpdatedBy    string        `json:"updatedBy,omitempty"`
+	// 내부 검증(사전 배포) 고객 — 우리 테스트팀/QA 처럼 새 버전과 통지를 외부 고객보다 "먼저" 받는 링.
+	// 통지는 이 고객에게 먼저 보내 확인한 뒤에야 외부 고객에게 나간다(custnotify.go 의 발송 게이트).
+	// 코드/JSON 은 pilot — "internal" 은 이미 '우리 담당자'를 뜻해(notify.go) 섞이지 않도록 다른 이름을 쓴다.
+	Pilot bool `json:"pilot,omitempty"`
 	// 사용/중지: 폐업·관계 종료·계약 해지 등으로 더는 거래하지 않는 회사. 지우지 않고 중지해 기록을 남긴다.
 	// 중지된 회사는 고객 통지·만료 알림·내 제품에서 빠지고, 목록에서 기본으로 숨는다. (PUT /api/customers/{id}/status 로만 바꾼다)
 	Disabled       bool   `json:"disabled,omitempty"`
