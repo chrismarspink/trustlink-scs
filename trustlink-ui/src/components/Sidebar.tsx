@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Package, BookOpen, LayoutDashboard, Users, HardDrive,
   ScrollText, Boxes, Activity, KeyRound, Database,
-  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send, Plug, Share2, ListChecks, Settings, Zap } from 'lucide-react';
+  ChevronRight, Home, Rocket, Download, Bug, Building2, ShieldCheck, Bot, LogOut, Bell, DatabaseZap, ClipboardCheck, Sparkles, Landmark, Archive, GitBranch, ShieldQuestion, Contact, Megaphone, PackageCheck, Workflow, Inbox, Send, Plug, Share2, ListChecks, Settings, Zap, Wrench } from 'lucide-react';
 import { adminInbox, bffLogin, getSession, logout, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +36,11 @@ const MENUS: Item[] = [
       { to: '/admin/upstream', label: '공개 저장소 분석', icon: GitBranch, who: 'admin' },
       { to: '/apikeys', label: '내 API 키', icon: KeyRound },
       { to: '/mcp', label: 'AI 도구 연결', icon: Plug, who: 'login' },
+    ]
+  },
+  {
+    to: '#tools', label: '도구', icon: Wrench, children: [
+      { to: '/tools', label: '진단 도구', icon: Download, who: 'login' },
     ]
   },
   {
@@ -80,6 +85,7 @@ const MENUS: Item[] = [
       { to: '/docs/share', label: '업로드·다운로드', icon: Download },
       { to: '/docs/vuln', label: '취약점·VEX', icon: Bug },
       { to: '/docs/rbac', label: '권한·참고', icon: KeyRound },
+      { to: '/docs/collector', label: '진단 수집기', icon: Wrench },
     ]
   },
 ];
