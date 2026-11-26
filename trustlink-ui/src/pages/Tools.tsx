@@ -28,7 +28,7 @@ const AGENTS: Agent[] = [
     os: 'Windows 10(1809+)·11·Server 2016/2019/2022/2025, x64',
     osShort: 'Windows x64',
     repo: REPO,
-    latestTag: 'collector-v0.1.0',
+    latestTag: 'collector-v0.1.1',
     signed: false,
     status: '프리릴리스',
     guide: '/docs/collector',

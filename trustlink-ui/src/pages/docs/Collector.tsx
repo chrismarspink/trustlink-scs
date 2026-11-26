@@ -35,11 +35,18 @@ export default function Collector() {
         </ul>
         <DocTable
           head={['버전', '파일', '비고']}
-          rows={[[
-            'v0.1.0',
-            <a className="text-primary underline" href={`${REPO}/releases/tag/collector-v0.1.0`} target="_blank" rel="noreferrer">ismart-collector-v0.1.0-x64.exe</a>,
-            '최초 · 프리릴리스 · 미서명',
-          ]]}
+          rows={[
+            [
+              'v0.1.1',
+              <a className="text-primary underline" href={`${REPO}/releases/tag/collector-v0.1.1`} target="_blank" rel="noreferrer">ismart-collector-v0.1.1-x64.exe</a>,
+              '최신 · 프리릴리스 · 미서명',
+            ],
+            [
+              'v0.1.0',
+              <a className="text-primary underline" href={`${REPO}/releases/tag/collector-v0.1.0`} target="_blank" rel="noreferrer">ismart-collector-v0.1.0-x64.exe</a>,
+              '이전',
+            ],
+          ]}
         />
       </Section>
 
@@ -53,7 +60,7 @@ export default function Collector() {
       <Section title="무결성 검증 (받은 뒤)">
         <p>함께 올라온 <code>.sha256</code>과 비교해 파일이 변조되지 않았는지 확인합니다.</p>
         <Code>{`# PowerShell
-Get-FileHash .\\ismart-collector-v0.1.0-x64.exe -Algorithm SHA256
+Get-FileHash .\\ismart-collector-v0.1.1-x64.exe -Algorithm SHA256
 # 출력 해시가 .sha256 파일 내용과 같아야 합니다`}</Code>
       </Section>
 
@@ -63,8 +70,11 @@ Get-FileHash .\\ismart-collector-v0.1.0-x64.exe -Algorithm SHA256
           <li>관리자가 발급한 설정(이슈 번호·업로드 토큰)은 실행파일 옆 <code>ismart-collector.conf</code>로 전달됩니다(토큰은 파일에만, 바이너리에 넣지 않음).</li>
           <li>수집 범위는 기본 <b>제품 한정</b>(최소 수집), 필요 시 <code>--scope system</code>으로 전역.</li>
         </ul>
-        <Code>{`# 범위 지정 실행(예)
-ismart-collector.exe --scope system`}</Code>
+        <Code>{`# 범위 지정 실행
+ismart-collector.exe --scope system
+
+# 특정 앱과의 충돌 진단(예: VSCode) — 그 프로세스의 로드/주입 모듈을 정확히 수집
+ismart-collector.exe --scope system --target Code.exe`}</Code>
       </Section>
 
       <Section title="무엇을 수집하나 (전부 읽기 전용·수집 즉시 마스킹)">
