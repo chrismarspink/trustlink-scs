@@ -23,6 +23,7 @@ pub fn run_all(cfg: &Config) -> Vec<CollectItem> {
         ("os_info", os_info),
         ("security_software", security_software),
         ("process_modules", process_modules),
+        ("target_modules", target_modules),
         ("product_logs", product_logs),
         ("crash_dumps", crash_dumps),
     ];
@@ -84,8 +85,27 @@ fn process_modules(cfg: &Config) -> String {
     let out = run("tasklist", &["/m", "/fo", "csv"]);
     match cfg.scope {
         Scope::Product => filter_lines(&out, &profile_keywords(&cfg.profile)),
-        Scope::System => cap(&out, 12000),
+        Scope::System => cap(&out, 80000),
     }
+}
+
+/// 지정 프로세스(--target / conf targets)에 로드된 모듈 — 주입된 후킹 DLL 확인용.
+/// 범위와 무관하게 해당 프로세스만 정확히 수집(system 전체가 상한에 잘려도 놓치지 않게).
+fn target_modules(cfg: &Config) -> String {
+    if !cfg!(windows) {
+        return stub();
+    }
+    if cfg.targets.is_empty() {
+        return "(타겟 미지정 — --target <이름> 또는 conf 의 targets= 로 지정)".into();
+    }
+    let mut out = String::new();
+    for t in &cfg.targets {
+        out.push_str(&format!("=== {t} ===\n"));
+        let o = run("tasklist", &["/m", "/fi", &format!("imagename eq {t}")]);
+        out.push_str(&cap(&o, 40000));
+        out.push_str("\n\n");
+    }
+    out
 }
 
 /// 제품 로그 경로 탐색(프로파일 기준). 파일 목록만, 내용은 뒤 단계에서 선별.
@@ -131,7 +151,7 @@ fn run(program: &str, args: &[&str]) -> String {
             if s.trim().is_empty() {
                 s = String::from_utf8_lossy(&o.stderr).into_owned();
             }
-            cap(s.trim(), 16000)
+            cap(s.trim(), 400_000)
         }
         Err(e) => format!("(실행 실패: {program}: {e})"),
     }

@@ -46,6 +46,8 @@ pub struct Config {
     pub profile: String,
     /// None = 전체 카테고리 수집.
     pub categories: Option<Vec<String>>,
+    /// 모듈을 반드시 수집할 프로세스 이름들(예: Code.exe). 범위와 무관.
+    pub targets: Vec<String>,
 }
 
 impl Config {
@@ -62,6 +64,10 @@ impl Config {
             categories: kv.get("collect").map(|v| {
                 v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
             }),
+            targets: kv
+                .get("targets")
+                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_default(),
         }
     }
 

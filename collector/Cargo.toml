@@ -1,6 +1,6 @@
 [package]
 name = "ismart-collector"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "이노스마트 진단 수집기 — Windows 호환성/후킹 충돌 진단용 포터블 수집기 (1차)"
 license = "Proprietary"

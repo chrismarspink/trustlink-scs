@@ -54,7 +54,13 @@ issue_id = TL-2026-0042
 scope    = product            # product(기본) | system
 profile  = ismart-platform    # 제품 프로파일(여러 제품 지원)
 collect  = os_info,security_software,process_modules,product_logs,crash_dumps  # 생략=전체
+targets  = Code.exe           # 모듈을 반드시 수집할 프로세스(쉼표). --target 플래그로도 지정
 ```
+
+특정 앱과의 충돌을 진단할 때(예: VSCode): `ismart-collector.exe --scope system --target Code.exe`
+→ `target_modules`에 그 프로세스의 로드/주입 모듈만 정확히 담겨, 전역 목록이 상한에 잘려도 놓치지 않는다.
+
+> v0.1.1: 제품키(ProductId/DigitalProductId) 마스킹, process_modules 상한 상향, `--target` 추가, 수집 후 창 유지·결과 폴더 자동 열기.
 
 | scope | 의미 | 민감도 |
 |---|---|---|

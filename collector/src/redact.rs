@@ -12,6 +12,11 @@ pub fn mask(input: &str) -> String {
 }
 
 fn mask_line(line: &str) -> String {
+    // 레지스트리 제품키 항목(ProductId/DigitalProductId) 값 마스킹
+    if let Some(m) = mask_reg_secret(line) {
+        return m;
+    }
+
     let mut s = line.to_string();
 
     // C:\Users\<name>\...  →  C:\Users\***\...
@@ -35,6 +40,24 @@ fn mask_line(line: &str) -> String {
     }
 
     s
+}
+
+/// `    ProductId    REG_SZ    00331-...` 같은 레지스트리 제품키 줄의 값을 가린다.
+/// 이름(ProductId/DigitalProductId)과 REG 타입은 두고 값만 ***로.
+fn mask_reg_secret(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let hit = ["DigitalProductId4", "DigitalProductId", "ProductId"]
+        .iter()
+        .any(|n| trimmed.starts_with(n));
+    if !hit {
+        return None;
+    }
+    if let Some(rpos) = line.find("REG_") {
+        if let Some(sp) = line[rpos..].find(char::is_whitespace) {
+            return Some(format!("{}    ***", &line[..rpos + sp]));
+        }
+    }
+    Some(format!("{}    ***", line.trim_end()))
 }
 
 fn mask_user_path(s: &str) -> String {

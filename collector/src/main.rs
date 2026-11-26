@@ -51,6 +51,7 @@ fn print_help() {
          사용법:\n\
          \tismart-collector                     더블클릭/무인자 — 1회 진단 수집\n\
          \tismart-collector --scope system      수집 범위 지정(product|system)\n\
+         \tismart-collector --target Code.exe   특정 프로세스 모듈 수집(반복 가능)\n\
          \tismart-collector --install           상주 등록(2차)\n\
          \tismart-collector --version           버전 출력\n\
          \tismart-collector --help              도움말\n\
@@ -75,7 +76,15 @@ fn run_portable(args: &[String]) -> ExitCode {
 
     println!("이노스마트 진단 수집기 {VERSION}");
     println!("이슈 번호: {}", cfg.issue_id.as_deref().unwrap_or("(없음)"));
+    // --target <이름> : 해당 프로세스 모듈을 반드시 수집(범위 무관).
+    if let Some(t) = flag_value(args, "--target") {
+        cfg.targets.push(t.to_string());
+    }
+
     println!("수집 범위: {} · 프로파일: {}", cfg.scope.label(), cfg.profile);
+    if !cfg.targets.is_empty() {
+        println!("타겟 프로세스: {}", cfg.targets.join(", "));
+    }
     println!("수집을 시작합니다. 민감정보는 수집 즉시 가려집니다.\n");
 
     let mut items = collect::run_all(&cfg);
@@ -85,13 +94,34 @@ fn run_portable(args: &[String]) -> ExitCode {
 
     match bundle::write_bundle(&cfg, &items) {
         Ok(path) => {
-            println!("\n번들 생성 완료: {}", path);
-            println!("다음 단계(업로드/오프라인 전달)는 전달 설계에 따라 연결됩니다.");
+            println!("\n✔ 수집 완료 — 항목 {}개", items.len());
+            println!("결과 폴더: {path}");
+            open_folder(&path);
+            pause_if_interactive();
             ExitCode::SUCCESS
         }
         Err(e) => {
             eprintln!("번들 생성 실패: {e}");
+            pause_if_interactive();
             ExitCode::FAILURE
         }
+    }
+}
+
+/// 결과 폴더를 탐색기로 연다(Windows). 실패해도 무시.
+fn open_folder(path: &str) {
+    if cfg!(windows) {
+        let _ = std::process::Command::new("explorer").arg(path).spawn();
+    }
+}
+
+/// 콘솔(더블클릭 등)에서 실행됐으면 엔터를 기다려 창이 바로 닫히지 않게 한다.
+/// 파이프/자동화로 실행되면 멈추지 않는다.
+fn pause_if_interactive() {
+    use std::io::IsTerminal;
+    if std::io::stdin().is_terminal() {
+        println!("\n엔터를 누르면 창이 닫힙니다…");
+        let mut _s = String::new();
+        let _ = std::io::stdin().read_line(&mut _s);
     }
 }
