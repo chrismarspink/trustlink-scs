@@ -33,7 +33,7 @@ export function OutboxPanel({ ids, kind, refreshKey = 0, onChange, compact }: { 
     let alive = true;
     const load = () => adminOutbox().then((r) => {
       if (!alive) return;
-      setItems(r.items.filter((x) => (!ids || ids.includes(x.id)) && (!kind || x.kind === kind)));
+      setItems((r.items || []).filter((x) => (!ids || ids.includes(x.id)) && (!kind || x.kind === kind)));
     }).catch((e) => alive && setErr(String(e)));
     load();
     const t = setInterval(() => { setNow(Date.now()); load(); }, 2000);
@@ -55,7 +55,7 @@ export function OutboxPanel({ ids, kind, refreshKey = 0, onChange, compact }: { 
         <div key={it.id} className={cn('flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs', it.status === 'pending' && 'border-amber-300 bg-amber-50')}>
           <span className={cn('rounded px-1.5 py-0.5 font-medium', ST[it.status][1])}>{ST[it.status][0]}{it.status === 'pending' && ` · ${left(it, now)}초 뒤`}</span>
           {!kind && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">{KIND_KO[it.kind] || it.kind}</span>}
-          <span className="min-w-0 flex-1 truncate"><b>{it.label || it.subject}</b> <span className="text-muted-foreground">→ {(it.sent?.length ? it.sent : it.recipients).join(', ')}</span></span>
+          <span className="min-w-0 flex-1 truncate"><b>{it.label || it.subject}</b> <span className="text-muted-foreground">→ {(it.sent?.length ? it.sent : it.recipients || []).join(', ')}</span></span>
           <span className="text-muted-foreground">{new Date(it.doneAt || it.createdAt).toLocaleTimeString('ko-KR')}{it.doneBy ? ` · ${it.doneBy}` : ''}</span>
           {it.status === 'pending' && (
             <button onClick={() => cancel(it.id)} className="inline-flex items-center gap-1 rounded-md border border-amber-400 bg-white px-2 py-1 font-semibold text-amber-900 hover:bg-amber-100">
@@ -79,13 +79,14 @@ export function OutboxPanel({ ids, kind, refreshKey = 0, onChange, compact }: { 
 
 const HOLD_KO: Record<MailHold['kind'], string> = { vex: 'VEX 발행 통보', expiry: '만료 안내' };
 
+// (목록이 비면 서버가 items: null 을 준다 — 빈 배열로 받는다)
 // 승인 대기: 고객에게 갈 자동 메일은 여기서 내용을 보고 승인해야 발송함으로 간다. 반려하면 나가지 않는다.
 export function HoldPanel({ onChange }: { onChange?: () => void }) {
   const [items, setItems] = useState<MailHold[]>([]);
   const [open, setOpen] = useState('');
   const [delay, setDelay] = useState(30);
   const [err, setErr] = useState('');
-  const load = () => adminMailHold().then((r) => setItems(r.items)).catch((e) => setErr(String(e)));
+  const load = () => adminMailHold().then((r) => setItems(r.items || [])).catch((e) => setErr(String(e)));
   useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, []);
   const approve = async (h: MailHold) => {
     if (!window.confirm(`고객에게 보낼까요?\n\n${h.subject}\n→ ${h.recipients.join(', ')}\n\n발송함에서 ${delay}초 기다리며, 그 사이 취소할 수 있습니다.`)) return;
