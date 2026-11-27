@@ -47,7 +47,8 @@ type aiConfig struct {
 	JSONSchema    bool       `json:"jsonSchema"`           // 로컬 LLM json_schema 지원
 	APIKey        string     `json:"apiKey,omitempty"`     // (이전 형식) 외부 LLM 키 — 읽을 때 External 로 옮긴다
 	External      aiExternal `json:"external"`
-	SendChecklist bool       `json:"sendChecklist"` // 외부 LLM 에 체크리스트 내용 전송 허용
+	SendChecklist bool       `json:"sendChecklist"`      // 외부 LLM 에 체크리스트 내용 전송 허용
+	Fallback      bool       `json:"fallback,omitempty"` // 지정한 연결이 응답하지 않으면 다른 연결(로컬↔외부)로 대신한다
 	UpdatedBy     string     `json:"updatedBy,omitempty"`
 	UpdatedAt     string     `json:"updatedAt,omitempty"`
 }
@@ -147,6 +148,23 @@ func (c aiConfig) endpointOf(kind string) aiEndpoint {
 }
 
 func (c aiConfig) endpoint(use string) aiEndpoint { return c.endpointOf(c.useMode(use)) }
+
+// fallback: 용도의 주 연결이 실패했을 때 대신 쓸 연결. 꺼져 있거나 대신할 연결이 없으면 Kind=off.
+// 로컬 → 외부로 넘어가면 입력이 외부 서비스로 나가므로 관리자가 켠 경우에만 하고,
+// 보고서 용도는 체크리스트 전송을 허용하지 않았으면 외부로 넘기지 않는다(전송 정책을 우회하지 않게).
+func (c aiConfig) fallback(use string) aiEndpoint {
+	if !c.Fallback {
+		return aiEndpoint{Kind: "off"}
+	}
+	other := map[string]string{"local": "external", "external": "local"}[c.useMode(use)]
+	if other == "" || (other == "external" && use == "report" && !c.SendChecklist) {
+		return aiEndpoint{Kind: "off"}
+	}
+	if e := c.endpointOf(other); e.ready() {
+		return e
+	}
+	return aiEndpoint{Kind: "off"}
+}
 
 func (e aiEndpoint) ready() bool {
 	switch {
@@ -421,6 +439,7 @@ type aiConfigView struct {
 	JSONSchema    bool           `json:"jsonSchema"`
 	External      aiExternalView `json:"external"`
 	SendChecklist bool           `json:"sendChecklist"`
+	Fallback      bool           `json:"fallback"`
 	UpdatedBy     string         `json:"updatedBy,omitempty"`
 	UpdatedAt     string         `json:"updatedAt,omitempty"`
 	FromEnv       bool           `json:"fromEnv"` // 설정 파일 없이 AI_URL 환경변수 사용 중
@@ -428,7 +447,7 @@ type aiConfigView struct {
 
 func viewAIConf(c aiConfig) aiConfigView {
 	v := aiConfigView{Mode: c.Mode, ReportMode: c.useMode("report"), URL: c.URL, Model: c.Model, JSONSchema: c.JSONSchema,
-		SendChecklist: c.SendChecklist, UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt,
+		SendChecklist: c.SendChecklist, Fallback: c.Fallback, UpdatedBy: c.UpdatedBy, UpdatedAt: c.UpdatedAt,
 		External: aiExternalView{aiExternal: c.External, HasKey: c.External.APIKey != ""}}
 	if n := len(c.External.APIKey); n >= 8 {
 		v.External.KeyHint = "…" + c.External.APIKey[n-4:]
@@ -463,13 +482,14 @@ type aiConfigIn struct {
 	JSONSchema    *bool        `json:"jsonSchema"`
 	External      aiExternalIn `json:"external"`
 	SendChecklist bool         `json:"sendChecklist"`
+	Fallback      bool         `json:"fallback"`
 }
 
 func validMode(m string) bool { return m == "off" || m == "local" || m == "external" }
 
 func mergeAIConf(old aiConfig, in aiConfigIn) (aiConfig, error) {
 	c := aiConfig{Mode: in.Mode, ReportMode: firstNonEmpty(in.ReportMode, in.Mode), URL: strings.TrimSpace(in.URL), Model: strings.TrimSpace(in.Model),
-		JSONSchema: true, SendChecklist: in.SendChecklist}
+		JSONSchema: true, SendChecklist: in.SendChecklist, Fallback: in.Fallback}
 	if in.JSONSchema != nil {
 		c.JSONSchema = *in.JSONSchema
 	}
@@ -516,7 +536,10 @@ func mergeAIConf(old aiConfig, in aiConfigIn) (aiConfig, error) {
 			return c, errors.New("Claude API 키가 필요합니다")
 		}
 	}
-	if !strings.Contains(uses, "external") {
+	if c.Fallback && !(c.endpointOf("local").ready() && c.endpointOf("external").ready()) {
+		return c, errors.New("대체 연결을 켜려면 로컬 LLM 과 외부 LLM 이 모두 설정돼 있어야 합니다")
+	}
+	if !strings.Contains(uses, "external") && !c.Fallback {
 		c.SendChecklist = false
 	}
 	return c, nil
@@ -547,7 +570,7 @@ func (s *Server) apiAIConfigPut(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.sor.append(SoREvent{Actor: c.UpdatedBy, Action: "ai-config", Status: c.Mode + "/" + c.ReportMode,
 		Detail: map[string]any{"vex": c.Mode, "report": c.ReportMode, "localHost": host(c.URL), "external": c.External.Provider,
-			"externalHost": host(c.External.URL), "externalModel": c.External.Model, "hasKey": c.External.APIKey != "", "sendChecklist": c.SendChecklist}})
+			"externalHost": host(c.External.URL), "externalModel": c.External.Model, "hasKey": c.External.APIKey != "", "sendChecklist": c.SendChecklist, "fallback": c.Fallback}})
 	writeJSON(w, 200, map[string]any{"config": viewAIConf(c), "status": s.aiStatusFor("vex"), "reportStatus": s.aiStatusFor("report")})
 }
 
