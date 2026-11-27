@@ -5,36 +5,37 @@ import { ListChecks, Package, Contact, Bug, Send, Settings, BookOpen, PackageChe
 import { getSession, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-// 역할별 작업공간(시험 운영) — 로그인한 사람의 권한에 따라 메뉴 한 벌만 보인다.
+// 역할별 작업공간 — 로그인한 사람의 권한에 따라 화면(메뉴 한 벌)이 정해진다. 기본으로 켜져 있다.
 //   고객(users)           → 고객 포털
-//   개발자(developers)    → 내부 콘솔(고객·보낸 것·설정 제외)
-//   운영자(admins)        → 내부 콘솔 전체 + 자사(내부 고객)
-// 주소(경로)와 각 화면은 그대로 두고 메뉴 묶음과 탭만 바꾼다. 스위치를 끄면 기존 사이드바로 돌아간다.
-// 스위치는 브라우저마다 따로 저장한다(localStorage). 실제 접근 권한은 지금처럼 서버가 막는다.
+//   개발자(developers)    → 개발자 콘솔(고객·보낸 것·설정 없음)
+//   관리자(admins)        → 관리자 콘솔(전체) + 자사(내부 고객)
+// 주소(경로)와 각 화면은 그대로 두고 메뉴 묶음과 탭만 바꾼다. 실제 접근 권한은 지금처럼 서버가 막는다.
+// 되돌리기: 관리자는 사이드바 아래 버튼으로, 그 밖에는 주소에 ?ws=0 을 붙여 기존 사이드바로 돌아갈 수 있다
+// (브라우저마다 따로 저장, localStorage).
 
 const KEY = 'tl-ws';
 
-// 주소에 ?ws=1 / ?ws=0 을 붙여 켜고 끌 수 있다(관리자가 아닌 시험 계정용).
+// 주소에 ?ws=0 을 붙이면 기존 화면으로, ?ws=1 이면 다시 새 화면으로 바뀐다.
 try {
   const q = new URLSearchParams(window.location.search).get('ws');
-  if (q === '1') localStorage.setItem(KEY, '1');
-  else if (q === '0') localStorage.removeItem(KEY);
+  if (q === '0') localStorage.setItem(KEY, '0');
+  else if (q === '1') localStorage.removeItem(KEY);
 } catch {
-  /* 저장소를 못 쓰면 기존 화면 그대로 */
+  /* 저장소를 못 쓰면 새 화면 그대로 */
 }
 
 export function wsOn(): boolean {
   try {
-    return localStorage.getItem(KEY) === '1';
+    return localStorage.getItem(KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 }
 
 export function setWs(on: boolean) {
   try {
-    if (on) localStorage.setItem(KEY, '1');
-    else localStorage.removeItem(KEY);
+    if (on) localStorage.removeItem(KEY);
+    else localStorage.setItem(KEY, '0');
   } catch {
     return;
   }
@@ -109,7 +110,7 @@ const CONSOLE: Menu[] = [
     { to: '/admin/logs', label: '로그', who: 'admin' },
   ] },
   { id: 'help', label: '도움말·도구', icon: BookOpen, tabs: DOCS },
-  // 운영자·개발자는 자사를 내부 고객으로 보고, 고객과 같은 화면으로 먼저 확인한다.
+  // 관리자·개발자는 자사를 내부 고객으로 보고, 고객과 같은 화면으로 먼저 확인한다.
   { id: 'mine', label: '내 제품', icon: PackageCheck, section: '자사 (내부 고객)', tabs: [
     { to: '/my', label: '내 제품', who: 'login' },
   ] },
@@ -122,7 +123,7 @@ const isInternal = (s: Sess) => isAdmin(s) || !!s?.groups?.includes('developers'
 const can = (s: Sess, w: Who = 'all') =>
   w === 'all' || (w === 'login' && !!s) || (w === 'vex' && !!s?.canEditVex) || (w === 'admin' && isAdmin(s));
 
-export const wsName = (s: Sess) => (isInternal(s) ? '내부 콘솔' : '고객 포털');
+export const wsName = (s: Sess) => (isAdmin(s) ? '관리자 콘솔' : isInternal(s) ? '개발자 콘솔' : '고객 포털');
 
 function wsMenus(s: Sess): Menu[] {
   return (isInternal(s) ? CONSOLE : PORTAL)

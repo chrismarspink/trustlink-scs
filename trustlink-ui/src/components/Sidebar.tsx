@@ -182,7 +182,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
   }, []);
 
   const admin = !!sess?.groups?.includes('admins');
-  const ws = wsOn(); // 역할별 작업공간(시험 운영) — 꺼져 있으면 아래 기존 메뉴 그대로
+  const ws = wsOn(); // 역할별 작업공간(기본) — 꺼 두었으면 아래 기존 메뉴
   const can = (w: Who = 'all') => w === 'all' || (w === 'login' && !!sess) || (w === 'vex' && !!sess?.canEditVex) || (w === 'admin' && admin);
   const menus = MENUS.map((m) => ({ ...m, children: (m.children || []).filter((c) => can(c.who)) })).filter((m) => m.children.length > 0);
   // 할 일 옆 숫자: 관리자가 결정할 일(승인 대기함의 합계)
@@ -217,9 +217,9 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           </>
         )}
       </nav>
-      {(ws || admin) && (
+      {admin && (
         <button type="button" onClick={() => setWs(!ws)} className="mx-4 mb-2 text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
-          {ws ? '기존 화면으로 돌아가기' : '새 화면 써 보기 (시험)'}
+          {ws ? '기존 화면으로 돌아가기' : '새 화면으로 전환'}
         </button>
       )}
       {sess?.username && (
