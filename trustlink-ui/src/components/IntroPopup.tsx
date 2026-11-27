@@ -16,19 +16,16 @@ const today = () => new Date().toLocaleDateString('sv'); // 이 컴퓨터의 날
 
 export function IntroPopup() {
   const [open, setOpen] = useState(false);
-  const [on, setOn] = useState(false);
   const seen = useMemo(() => get(K.seen), [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const stories = useMemo(() => newsStories(seen === __APP_VERSION__ ? '' : seen), [seen]);
   useEffect(() => {
     getSession().then((s) => {
-      if (!s?.username) return;
-      setOn(true);
+      if (!s?.username) return; // 자동으로 띄우는 것만 로그인 확인 뒤에 — 물음표 단추는 권한 세션이 없어도 항상 보인다
       let once = '';
       try { once = sessionStorage.getItem('tl.intro.shown') || ''; sessionStorage.setItem('tl.intro.shown', '1'); } catch { /* 없어도 된다 */ }
       if (!once && get(K.never) !== __APP_VERSION__ && get(K.snooze) !== today()) setOpen(true); // 접속할 때 한 번
     }).catch(() => {});
   }, []);
-  if (!on) return null;
   const close = (how?: 'today' | 'never') => {
     if (how === 'today') set(K.snooze, today());
     if (how === 'never') set(K.never, __APP_VERSION__);

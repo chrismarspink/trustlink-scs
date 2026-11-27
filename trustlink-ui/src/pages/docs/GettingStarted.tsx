@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { registry, plainHttp } from '@/lib/utils';
+import { IntroScene } from '@/components/IntroScene';
 import { DocTitle, Section, Glossary, ArchDiagram, FlowDiagram, DocTable, Note } from './_shared';
 
 export default function GettingStarted() {
@@ -8,6 +9,8 @@ export default function GettingStarted() {
   return (
     <>
       <DocTitle title="시작하기" lead="TrustLink 는 납품한 소프트웨어의 신뢰 장부입니다 — 무엇을 줬고(릴리스), 누가 쓰며(고객), 그 뒤 무엇이 바뀌었고(신호), 누가 무엇을 결정해 누구에게 알렸는가(전달·기록)를 남깁니다." />
+
+      <div className="mb-6"><IntroScene /></div>
 
       <Section title="한눈에">
         <p>제품을 올려 고객에게 전달하는 일도, 그 뒤의 취약점·규제·만료도 같은 다섯 단계를 지납니다. 사람은 <b>결정</b>만 하고, 나머지는 TrustLink 가 합니다(관리자: 할 일 › 승인 대기함).</p>

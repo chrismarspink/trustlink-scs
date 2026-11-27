@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { agentRun, getSession, type Session } from '@/lib/api';
 import { useAgent } from '@/components/Agent';
+import { IntroScene } from '@/components/IntroScene';
 import { askOpen } from '@/lib/askOpen';
 import { EXT_LINKS, NOTICES, RELEASES } from '@/content/news';
 import { cn } from '@/lib/utils';
@@ -26,7 +27,7 @@ class Safe extends Component<{ children: ReactNode }, { bad: boolean }> {
 }
 
 // 첫 화면(홈): 오늘 할 일(에이전트 제안) · 묻기 · 전체 현황(관리자: 대시보드) · 공지 · 버전별 새 소식 · 바로 가기.
-// 제품 소개와 "이번에 바뀐 것"은 접속할 때 뜨는 안내 장면(IntroPopup)과 상단 도움말 아이콘으로 본다.
+// 제품 소개 장면은 홈 본문(IntroScene, 접을 수 있음)에도 있고, "이번에 바뀐 것"은 접속할 때 뜨는 안내 장면(IntroPopup)과 상단 도움말 아이콘으로 본다.
 
 type L = { to: string; label: string; desc: string; icon: LucideIcon; ext?: boolean };
 const LINKS: L[] = [
@@ -135,6 +136,8 @@ export default function Home() {
       </div>
 
       {sess && <Today />}
+
+      <IntroScene foldKey="tl.home.scene" />
 
       {admin && (
         <section aria-label="전체 현황">
