@@ -206,7 +206,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         </span>
         <span className="leading-tight">
           <span className="block text-sm font-semibold">TrustLink</span>
-          <span className="block text-[11px] text-muted-foreground">{ws ? wsName(sess) : 'Software Supply Chain'} · v{__APP_VERSION__}</span>
+          <span className="block text-[11px] text-muted-foreground">{ws && sess ? wsName(sess) : 'Software Supply Chain'} · v{__APP_VERSION__}</span>
         </span>
       </Link>
       <nav className="flex-1 space-y-0.5 overflow-y-auto pb-3" aria-label="주 메뉴">
@@ -230,6 +230,18 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-sm font-medium">{sess.username}</div>
             <div className="truncate text-xs text-muted-foreground">{roleLabel(sess.groups)}</div>
+          </div>
+          <button onClick={() => logout()} title="로그아웃" className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <LogOut size={15} />
+          </button>
+        </div>
+      )}
+      {sess === null && (
+        // 화면 로그인은 됐는데 권한 세션이 없는 상태(서버 재시작 등) — 다시 받아 오거나 로그아웃할 수 있게 한다
+        <div className="flex items-center gap-2 border-t p-3">
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="text-xs text-muted-foreground">권한 확인이 끊겼습니다</div>
+            <button type="button" onClick={() => bffLogin(window.location.pathname + window.location.search)} className="text-sm font-medium text-primary hover:underline">다시 확인</button>
           </div>
           <button onClick={() => logout()} title="로그아웃" className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
             <LogOut size={15} />
