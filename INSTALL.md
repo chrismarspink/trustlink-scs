@@ -113,3 +113,9 @@ docker compose up -d          # 바뀐 서비스만 재생성
 
 ## 6. 검증 도구
 `tools/verify.sh`(인증·RBAC 점검, 데모 계정 필요), `tools/dt-verify.sh`(DT 연동).
+
+## 7. 취약점 DB 를 한 곳에서 수집하기 (선택)
+
+여러 설치가 같은 취약점 DB 를 쓰게 하려면 수집 전용 "피드 허브"를 따로 띄우고, 각 설치의 미러가 허브에서 받게 합니다.
+폐쇄망은 허브에서 내보낸 번들을 들여옵니다. 방법은 [docs/FEED-HUB.md](docs/FEED-HUB.md) 를 보세요.
+

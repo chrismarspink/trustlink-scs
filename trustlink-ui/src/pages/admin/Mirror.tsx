@@ -190,12 +190,37 @@ export default function Mirror() {
           <div className="mb-1 text-xs text-muted-foreground">상위 미러(비우면 원본 사이트) — 폐쇄망은 DMZ 미러를 지정</div>
           <Input placeholder="http://dmz-mirror:8090" value={draft.upstream} onChange={(e) => setDraft({ ...draft, upstream: e.target.value.trim() })} />
         </label>
+        {draft.upstream && (
+          <>
+            <label className="min-w-[16rem] flex-1 text-sm">
+              <div className="mb-1 text-xs text-muted-foreground">허브 공개키(넣으면 서명·해시가 맞는 파일만 받음)</div>
+              <Input placeholder="허브에서 `mirror pubkey` 로 확인한 값" value={draft.upstreamPubKey || ''} onChange={(e) => setDraft({ ...draft, upstreamPubKey: e.target.value.trim() })} />
+            </label>
+            <label className="min-w-[14rem] flex-1 text-sm">
+              <div className="mb-1 text-xs text-muted-foreground">구독 키{p.upstreamKeySet ? ' — 저장됨(바꿀 때만 입력)' : ''}</div>
+              <Input type="password" autoComplete="off" placeholder={p.upstreamKeySet ? '••••••••' : '허브가 발급한 키(tlsub_…)'} value={draft.upstreamKey || ''} onChange={(e) => setDraft({ ...draft, upstreamKey: e.target.value.trim() })} />
+            </label>
+          </>
+        )}
         <div className="flex gap-2">
           <Button onClick={() => act(() => adminMirrorPolicy(draft).then((x) => setDraft(structuredClone(x.policy))), '정책을 저장했습니다(원장 기록).')} disabled={busy || !dirty}>저장</Button>
           <Button variant="ghost" onClick={() => setDraft(structuredClone(p))} disabled={busy || !dirty}>되돌리기</Button>
         </div>
       </div>
       {msg && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
+      {p.upstream && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {st.upstreamVerified
+            ? <>마지막으로 서명을 확인해 받아들인 허브 스냅샷: <code>{st.upstreamVerified.snapshot.slice(0, 12)}</code> · {fmt(st.upstreamVerified.generated)} · 허브 키 <code>{st.upstreamVerified.keyId}</code>{st.upstreamVerified.via === 'import' ? ' · 번들로 들여옴' : ''}</>
+            : p.upstreamPubKey ? '허브 공개키가 설정됐습니다. 다음 접속부터 서명을 확인합니다.' : '허브 공개키가 없어 상위 미러의 내용을 검증하지 않고 받습니다.'}
+        </p>
+      )}
+      {st.hub && (
+        <div className="mt-3 rounded-lg border bg-card p-3 text-sm">
+          <b>이 미러는 피드 허브입니다.</b> 받는 쪽에 넣을 공개키: <code className="break-all text-xs">{st.hub.pubKey}</code> (키 ID <code className="text-xs">{st.hub.keyId}</code>)
+          {st.hub.subscribers && <div className="mt-1 text-xs text-muted-foreground">구독자 {st.hub.subscribers.length}곳{st.hub.subscribers.length > 0 && <>: {st.hub.subscribers.map((x) => `${x.name}${x.lastSeen ? ` (마지막 접속 ${fmt(x.lastSeen)})` : ' (접속 기록 없음)'}`).join(', ')}</>}</div>}
+        </div>
+      )}
 
       <SectionTitle>미러 대상과 로컬 기준 시점</SectionTitle>
       {groups.map((g) => (

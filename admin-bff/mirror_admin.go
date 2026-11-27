@@ -32,9 +32,7 @@ func (s *Server) mirrorCall(method, p string, body []byte) (int, []byte, error) 
 		return 0, nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if method != "GET" {
-		req.Header.Set("X-Mirror-Key", mirrorKey())
-	}
+	req.Header.Set("X-Mirror-Key", mirrorKey()) // 읽기에도 보낸다(허브 모드 미러는 읽기에 키를 요구한다)
 	c := &http.Client{Timeout: 15 * time.Second}
 	resp, err := c.Do(req)
 	if err != nil {
@@ -139,6 +137,7 @@ func (s *Server) apiMirrorPolicy(w http.ResponseWriter, r *http.Request) {
 		var p map[string]any
 		_ = json.Unmarshal(body, &p)
 		delete(p, "sources")
+		delete(p, "upstreamKey") // 구독 키는 원장에 남기지 않는다
 		_ = s.sor.append(SoREvent{Actor: w.Header().Get("X-User"), Action: "mirror-policy", Status: "updated", Detail: p})
 	}
 	w.Header().Set("Content-Type", "application/json")

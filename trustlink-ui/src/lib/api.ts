@@ -302,7 +302,11 @@ export const adminVulnReanalyze = () => aj<{ requested: number; failed: number }
 export type MailStatus = { configured: boolean; host: string; port: string; from: string; allowlist: string[] };
 // 취약점 DB 미러(vuln-mirror) — 정책·상태·DT 연결
 export type MirrorSourcePolicy = { enabled: boolean; intervalH: number };
-export type MirrorPolicy = { mode: 'scheduled' | 'offline'; windowStart: string; windowEnd: string; upstream: string; minFreeGB: number; sources: Record<string, MirrorSourcePolicy> };
+export type MirrorPolicy = {
+  mode: 'scheduled' | 'offline'; windowStart: string; windowEnd: string; upstream: string; minFreeGB: number; sources: Record<string, MirrorSourcePolicy>;
+  // 피드 허브에서 받을 때: 공개키를 넣으면 서명·해시가 맞는 파일만 교체. 구독 키는 쓰기 전용(응답에는 설정 여부만)
+  upstreamPubKey?: string; upstreamKey?: string; upstreamKeySet?: boolean;
+};
 export type MirrorSource = {
   id: string; name: string; group: string; category: string; use: string; license: string; hosts: string[]; defaultIntervalH: number;
   enabled: boolean; intervalH: number; staleH: number; status: 'never' | 'running' | 'ok' | 'error'; error?: string;
@@ -312,6 +316,8 @@ export type MirrorRun = { id: string; trigger: string; start: string; end: strin
 export type MirrorStatus = {
   now: string; policy: MirrorPolicy; inWindow: boolean; nextWindow?: string; running?: string; snapshot: string;
   totalBytes: number; fileCount: number; diskFree: number; diskTotal: number; allowedHosts: string[]; sources: MirrorSource[]; runs: MirrorRun[];
+  hub?: { keyId: string; pubKey: string; subscribers?: { name: string; created: string; lastSeen?: string }[] };
+  upstreamVerified?: { keyId: string; generated: string; snapshot: string; verified: string; via: string };
 };
 export type DtMirrorProp = { name: string; value: string; mirrorValue?: string; usingMirror: boolean; original?: string };
 export type MirrorInfo = { installed: boolean; reachable?: boolean; error?: string; status?: MirrorStatus; mirrorUrl?: string; dt?: DtMirrorProp[]; dtError?: string };

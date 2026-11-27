@@ -1,0 +1,29 @@
+# TrustLink 피드 허브 — 취약점 DB 수집 전용(단독 실행). 설명: ../docs/FEED-HUB.md
+#
+# TrustLink 본체(../docker-compose.yaml)와 따로 띄운다. 본체의 vuln-mirror 와 같은 이미지·같은 프로그램이고,
+# MIRROR_HUB=1 이면 읽기에 구독 키를 요구하고 매니페스트에 서명한다.
+#  - 외부(원본 사이트) 접속은 매일 02:00~06:00(KST)에만 한다. 디스크 여유가 20GB 아래면 받지 않는다. 데이터는 10~15GB.
+#  - 포트는 기본으로 이 서버 안(127.0.0.1)에만 연다. 밖에 열 때는 HTTPS 프록시 뒤에 둔다(구독 키가 헤더로 오간다).
+name: trustlink-feed-hub
+
+services:
+  feed-hub:
+    image: ${TRUSTLINK_ADMIN_IMAGE:-jkkim7202/trustlink-admin:latest}
+    command: ["mirror"]
+    environment:
+      MIRROR_DIR: /mirror
+      MIRROR_ADDR: ":8090"
+      MIRROR_HUB: "1"
+      MIRROR_MODE: scheduled          # 첫 기동에만 적용(저장된 정책이 있으면 그 정책을 따른다)
+    ports: ["${HUB_BIND:-127.0.0.1}:${HUB_PORT:-8090}:8090"]
+    volumes: ["feed-hub:/mirror"]
+    mem_limit: ${MIRROR_MEM_LIMIT:-256m}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/_api/healthz >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  feed-hub: {}
