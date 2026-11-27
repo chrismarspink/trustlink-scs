@@ -14,8 +14,10 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -252,6 +254,10 @@ type mirrorPolicy struct {
 	Upstream    string                  `json:"upstream"`    // 비우면 원본. 지정하면 상위 미러에서 받음
 	MinFreeGB   int                     `json:"minFreeGB"`
 	Sources     map[string]sourcePolicy `json:"sources"`
+	// 피드 허브에서 받을 때(mirror_hub.go). 공개키를 넣으면 서명·해시가 맞는 파일만 교체한다.
+	UpstreamPubKey string `json:"upstreamPubKey"`
+	UpstreamKey    string `json:"upstreamKey,omitempty"` // 쓰기 전용(구독 키) — _state/upstream.key 에만 두고 정책 파일·응답에는 남기지 않는다
+	UpstreamKeySet bool   `json:"upstreamKeySet"`        // 응답 전용
 }
 
 type sourcePolicy struct {
@@ -308,6 +314,13 @@ type mirror struct {
 	running string
 	key     string
 	client  *http.Client
+	// 피드 허브(mirror_hub.go)
+	hub     bool
+	signKey ed25519.PrivateKey
+	subMu   sync.Mutex
+	subs    []subscriber
+	subMod  time.Time
+	seen    map[string]string
 }
 
 func (m *mirror) dataDir() string           { return filepath.Join(m.dir, "data") }
@@ -349,6 +362,8 @@ func (m *mirror) load() error {
 	var p mirrorPolicy
 	if readJSONFile(m.statePath("policy.json"), &p) == nil {
 		m.policy = mergePolicy(p)
+	} else if os.Getenv("MIRROR_MODE") == "scheduled" { // 저장된 정책이 없는 첫 기동에만(관리 화면이 없는 단독 허브용)
+		m.policy.Mode = "scheduled"
 	}
 	m.files = map[string]*fileEntry{}
 	_ = readJSONFile(m.statePath("manifest.json"), &m.files)
@@ -390,6 +405,7 @@ func mergePolicy(p mirrorPolicy) mirrorPolicy {
 	if p.MinFreeGB < 1 {
 		p.MinFreeGB = d.MinFreeGB
 	}
+	p.UpstreamKey, p.UpstreamKeySet = "", false
 	if p.Sources == nil {
 		p.Sources = map[string]sourcePolicy{}
 	}
@@ -484,6 +500,8 @@ type runCtx struct {
 	touched  map[string]bool
 	changed  int
 	bytes    int64
+	subKey   string              // 허브 구독 키
+	expect   map[string]snapFile // 허브가 서명한 목록. nil 이면 검증하지 않는다(공개키 미지정)
 }
 
 var errNotFound = errors.New("404")
@@ -617,6 +635,9 @@ func (r *runCtx) fetch(src, rel string, hdr map[string]string) error {
 	m := r.m
 	if r.upstream != "" {
 		src, hdr = strings.TrimRight(r.upstream, "/")+"/"+rel, nil
+		if r.subKey != "" {
+			hdr = map[string]string{subHeader: r.subKey}
+		}
 	}
 	dst := filepath.Join(m.dataDir(), filepath.FromSlash(rel))
 	r.touched[rel] = true
@@ -647,8 +668,12 @@ func (r *runCtx) fetch(src, rel string, hdr map[string]string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	if resp.StatusCode == http.StatusNotModified {
 		m.mu.Lock()
+		defer m.mu.Unlock()
+		if e, ok := r.expect[rel]; r.expect != nil && (!ok || e.SHA256 != prev.SHA256) {
+			prev.ETag, prev.LastMod = "", "" // 다음 실행에서 통째로 다시 받는다
+			return fmt.Errorf("%s: 로컬 사본이 허브 스냅샷과 다름", rel)
+		}
 		prev.Checked = now
-		m.mu.Unlock()
 		return nil
 	}
 	if resp.StatusCode == 404 {
@@ -679,13 +704,16 @@ func (r *runCtx) fetch(src, rel string, hdr map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %v", rel, err)
 	}
+	sum := hex.EncodeToString(h.Sum(nil))
+	if e, ok := r.expect[rel]; r.expect != nil && (!ok || e.SHA256 != sum) { // 서명된 목록과 다르면 교체하지 않는다
+		return fmt.Errorf("%s: 해시가 허브 스냅샷과 다름 — 교체하지 않음", rel)
+	}
 	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp.Name(), dst); err != nil {
 		return err
 	}
-	sum := hex.EncodeToString(h.Sum(nil))
 	m.mu.Lock()
 	if prev == nil || prev.SHA256 != sum {
 		r.changed++
@@ -769,7 +797,21 @@ func (m *mirror) runSource(id, trigger string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
 	defer cancel()
 	r := &runCtx{m: m, src: src, upstream: pol.Upstream, minFree: int64(pol.MinFreeGB) << 30, ctx: ctx, touched: map[string]bool{}}
-	err := src.run(r)
+	var env *snapEnvelope
+	var snapP *snapPayload
+	var err error
+	if pol.Upstream != "" {
+		r.subKey = m.upstreamKey()
+		if pol.UpstreamPubKey != "" {
+			env, snapP, r.expect, err = m.fetchSnapshot(ctx, pol, r.subKey)
+		}
+	}
+	if err == nil {
+		err = src.run(r)
+	}
+	if err == nil && env != nil {
+		m.acceptUpstream(env.KeyID, snapP, "sync")
+	}
 
 	m.mu.Lock()
 	m.running = ""
@@ -860,19 +902,21 @@ type sourceView struct {
 }
 
 type mirrorStatus struct {
-	Now          string       `json:"now"`
-	Policy       mirrorPolicy `json:"policy"`
-	InWindow     bool         `json:"inWindow"`
-	NextWindow   string       `json:"nextWindow,omitempty"`
-	Running      string       `json:"running,omitempty"`
-	Snapshot     string       `json:"snapshot"`
-	TotalBytes   int64        `json:"totalBytes"`
-	FileCount    int          `json:"fileCount"`
-	DiskFree     int64        `json:"diskFree"`
-	DiskTotal    int64        `json:"diskTotal"`
-	AllowedHosts []string     `json:"allowedHosts"`
-	Sources      []sourceView `json:"sources"`
-	Runs         []runRecord  `json:"runs"`
+	Now              string         `json:"now"`
+	Policy           mirrorPolicy   `json:"policy"`
+	InWindow         bool           `json:"inWindow"`
+	NextWindow       string         `json:"nextWindow,omitempty"`
+	Running          string         `json:"running,omitempty"`
+	Snapshot         string         `json:"snapshot"`
+	TotalBytes       int64          `json:"totalBytes"`
+	FileCount        int            `json:"fileCount"`
+	DiskFree         int64          `json:"diskFree"`
+	DiskTotal        int64          `json:"diskTotal"`
+	AllowedHosts     []string       `json:"allowedHosts"`
+	Sources          []sourceView   `json:"sources"`
+	Runs             []runRecord    `json:"runs"`
+	Hub              *hubView       `json:"hub,omitempty"`              // 이 미러가 허브일 때
+	UpstreamVerified *upstreamState `json:"upstreamVerified,omitempty"` // 마지막으로 서명 검증해 받아들인 스냅샷
 }
 
 func (m *mirror) status() mirrorStatus {
@@ -932,6 +976,12 @@ func (m *mirror) status() mirrorStatus {
 	}
 	sort.Strings(out.AllowedHosts)
 	out.Runs = m.lastRuns(30)
+	_, kerr := os.Stat(m.statePath("upstream.key"))
+	out.Policy.UpstreamKeySet = kerr == nil
+	out.UpstreamVerified = m.lastUpstream()
+	if m.hub && m.signKey != nil {
+		out.Hub = &hubView{KeyID: keyID(m.pubKey()), PubKey: base64.StdEncoding.EncodeToString(m.pubKey())}
+	}
 	return out
 }
 
@@ -964,7 +1014,15 @@ func (m *mirror) authorized(r *http.Request) bool {
 
 func (m *mirror) handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /_api/status", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, m.status()) })
+	mux.HandleFunc("GET /_api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
+	mux.HandleFunc("GET /_api/snapshot", m.snapshotHandler)
+	mux.HandleFunc("GET /_api/status", func(w http.ResponseWriter, r *http.Request) {
+		st := m.status()
+		if st.Hub != nil && m.authorized(r) { // 구독자 목록은 관리 키로 물었을 때만
+			st.Hub.Subscribers = m.subViews()
+		}
+		writeJSON(w, 200, st)
+	})
 	mux.HandleFunc("GET /_api/manifest", func(w http.ResponseWriter, r *http.Request) {
 		m.mu.Lock()
 		list := make([]*fileEntry, 0, len(m.files))
@@ -1005,6 +1063,21 @@ func (m *mirror) handler() http.Handler {
 		if p.MinFreeGB < 5 {
 			writeJSON(w, 400, map[string]string{"error": "최소 여유 공간은 5GB 이상"})
 			return
+		}
+		if p.UpstreamPubKey != "" {
+			if _, err := parsePubKey(p.UpstreamPubKey); err != nil || p.Upstream == "" {
+				writeJSON(w, 400, map[string]string{"error": "허브 공개키는 base64 32바이트이고, 상위 미러 주소와 함께 넣어야 합니다"})
+				return
+			}
+		}
+		// 구독 키: 새 값이 오면 바꾸고, 상위 미러를 비우면 지운다. 비워서 보내면 그대로 둔다.
+		if p.Upstream == "" {
+			_ = os.Remove(m.statePath("upstream.key"))
+		} else if p.UpstreamKey != "" {
+			if err := os.WriteFile(m.statePath("upstream.key"), []byte(p.UpstreamKey), 0o600); err != nil {
+				writeJSON(w, 500, map[string]string{"error": err.Error()})
+				return
+			}
 		}
 		m.mu.Lock()
 		m.policy = mergePolicy(p)
@@ -1063,7 +1136,7 @@ func (m *mirror) handler() http.Handler {
 		}
 		fs.ServeHTTP(w, r)
 	})
-	return mux
+	return m.guard(mux)
 }
 
 func runMirror() {
@@ -1071,6 +1144,19 @@ func runMirror() {
 		Proxy: http.ProxyFromEnvironment, ResponseHeaderTimeout: 2 * time.Minute, IdleConnTimeout: time.Minute}}}
 	if err := m.load(); err != nil {
 		log.Fatalf("미러 초기화 실패: %v", err)
+	}
+	if len(os.Args) > 2 { // 허브 관리 명령(구독 키·공개키·번들) — mirror_hub.go
+		if err := mirrorCLI(m, os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if m.hub = os.Getenv("MIRROR_HUB") == "1"; m.hub {
+		if err := m.loadSignKey(true); err != nil {
+			log.Fatalf("허브 서명 키: %v", err)
+		}
+		log.Printf("피드 허브 모드: 읽기에 구독 키 필요, 서명 키 ID %s", keyID(m.pubKey()))
 	}
 	go m.scheduler()
 	addr := env("MIRROR_ADDR", ":8090")
