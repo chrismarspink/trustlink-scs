@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { ListChecks, Package, Contact, Bug, Send, Settings, BookOpen, PackageCheck, Plug, Home } from 'lucide-react';
+import { ListChecks, Package, Contact, Bug, Send, Settings, BookOpen, PackageCheck, Plug, Home, Zap } from 'lucide-react';
 import { getSession, type Session } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -56,6 +56,8 @@ const DOCS: Tab[] = [
 ];
 
 const PORTAL: Menu[] = [
+  // 에이전트는 권한과 무관하게 로그인한 누구에게나 보인다(자기 권한 안의 할 일을 제안)
+  { id: 'agent', label: '에이전트', icon: Zap, tabs: [{ to: '/agent', label: '에이전트', who: 'login' }] },
   { id: 'products', label: '내 제품', icon: PackageCheck, tabs: [
     { to: '/my', label: '내 제품', who: 'login' },
     { to: '/artifacts', label: '전체 아티팩트' },
