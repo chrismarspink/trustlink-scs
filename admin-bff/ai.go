@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,16 +35,17 @@ type aiFact struct {
 }
 
 type aiMeta struct {
-	Model       string `json:"model"`
-	ModelSHA256 string `json:"modelSha256,omitempty"`
-	FactsSHA256 string `json:"factsSha256"`
-	Snapshot    string `json:"dbSnapshot,omitempty"`
-	ElapsedMs   int64  `json:"elapsedMs"`
-	Use         string `json:"use,omitempty"`      // vex / report
-	Provider    string `json:"provider,omitempty"` // llama / anthropic / openai
-	Method      string `json:"method,omitempty"`   // VEX 초안을 만든 방식: rule(규칙) / rule+card(규칙 + AI 권고문 요약) / ai-slim(축약 AI) / ai-full(전체 AI)
-	Cached      bool   `json:"cached,omitempty"`   // 저장해 둔 결과를 다시 씀
-	usage       aiUsage
+	Model        string `json:"model"`
+	ModelSHA256  string `json:"modelSha256,omitempty"`
+	FactsSHA256  string `json:"factsSha256"`
+	Snapshot     string `json:"dbSnapshot,omitempty"`
+	ElapsedMs    int64  `json:"elapsedMs"`
+	Use          string `json:"use,omitempty"`          // vex / report
+	Provider     string `json:"provider,omitempty"`     // llama / anthropic / openai
+	Method       string `json:"method,omitempty"`       // VEX 초안을 만든 방식: rule(규칙) / rule+card(규칙 + AI 권고문 요약) / ai-slim(축약 AI) / ai-full(전체 AI)
+	Cached       bool   `json:"cached,omitempty"`       // 저장해 둔 결과를 다시 씀
+	FallbackFrom string `json:"fallbackFrom,omitempty"` // 주 연결(local/external)이 실패해 다른 연결이 대신 답했을 때, 실패한 쪽
+	usage        aiUsage
 }
 
 var (
@@ -113,14 +115,6 @@ func (s *Server) aiDraftOpt(use, lang string, facts []aiFact, task string, schem
 	if !e.ready() {
 		return meta, errors.New("AI 미설정 (관리 콘솔 › AI 연결)")
 	}
-	meta.Provider = e.Provider
-	rec := aiCall{Feature: aiFeature(), Use: use, Kind: e.Kind}
-	tw := time.Now()
-	if e.Kind == "local" { // CPU 추론은 한 번에 하나(서버 슬롯 1). 외부 API 는 동시에 보내도 된다
-		aiMu.Lock()
-		defer aiMu.Unlock()
-	}
-	rec.WaitMs = time.Since(tw).Milliseconds()
 	sys, user := aiSystem, "사실:\n"+factsBlock(facts, lang)+"\n작업:\n"+task
 	if lang == "en" {
 		sys, user = aiSystemEn, "Facts:\n"+factsBlock(facts, lang)+"\nTask:\n"+task
@@ -132,11 +126,30 @@ func (s *Server) aiDraftOpt(use, lang string, facts []aiFact, task string, schem
 			sys, user = aiSystemFast+"\n\n작업:\n"+task, "사실:\n"+factsBlock(facts, lang)
 		}
 	}
-	t0 := time.Now()
-	content, model, finish, usage, err := aiChatU(e, sys, user, schema, maxTokens, 6*time.Minute)
-	meta.ElapsedMs = time.Since(t0).Milliseconds()
-	meta.usage = usage
-	rec.fill(model, meta.ElapsedMs, usage, finish, err)
+	// 한 연결에 요청한다. 로컬(CPU 추론)은 한 번에 하나(서버 슬롯 1), 외부 API 는 동시에 보내도 된다
+	call := func(e aiEndpoint) (aiCall, string, string, string, error) {
+		rec := aiCall{Feature: aiFeature(), Use: use, Kind: e.Kind}
+		tw := time.Now()
+		if e.Kind == "local" {
+			aiMu.Lock()
+			defer aiMu.Unlock()
+		}
+		rec.WaitMs = time.Since(tw).Milliseconds()
+		t0 := time.Now()
+		content, model, finish, usage, err := aiChatU(e, sys, user, schema, maxTokens, 6*time.Minute)
+		meta.ElapsedMs = time.Since(t0).Milliseconds()
+		meta.usage = usage
+		rec.fill(model, meta.ElapsedMs, usage, finish, err)
+		return rec, content, model, finish, err
+	}
+	meta.Provider = e.Provider
+	rec, content, model, finish, err := call(e)
+	if fb := aiConf().fallback(use); err != nil && fb.ready() { // 주 연결이 응답하지 않음 → 대체 연결(관리자가 켠 경우만)
+		recordAICall(rec)
+		log.Printf("ai: %s 연결 실패(%v) → %s 연결로 대신", e.Kind, err, fb.Kind)
+		meta.FallbackFrom, meta.Provider = e.Kind, fb.Provider
+		rec, content, model, finish, err = call(fb)
+	}
 	if err != nil {
 		recordAICall(rec)
 		return meta, err

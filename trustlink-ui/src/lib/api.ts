@@ -546,11 +546,11 @@ export type AIExternal = {
   hasKey: boolean; keyHint?: string;
 };
 export type AIConfig = {
-  mode: AIMode; reportMode: AIMode; url: string; model?: string; jsonSchema: boolean; external: AIExternal; sendChecklist: boolean;
+  mode: AIMode; reportMode: AIMode; url: string; model?: string; jsonSchema: boolean; external: AIExternal; sendChecklist: boolean; fallback?: boolean;
   fromEnv: boolean; updatedBy?: string; updatedAt?: string;
 };
 export type AIConfigIn = {
-  mode: AIMode; reportMode: AIMode; url: string; model: string; jsonSchema: boolean; sendChecklist: boolean;
+  mode: AIMode; reportMode: AIMode; url: string; model: string; jsonSchema: boolean; sendChecklist: boolean; fallback: boolean;
   external: { provider: AIExternal['provider']; url: string; model: string; apiKey?: string; clearKey?: boolean; jsonSchema: boolean; effort: string };
 };
 export type AITestResult = { ok: boolean; model?: string; answer?: string; elapsedMs: number; error?: string };

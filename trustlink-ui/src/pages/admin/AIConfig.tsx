@@ -24,7 +24,7 @@ const MODE_LABEL: Record<AIMode, string> = { off: '사용 안 함', local: '로�
 
 function toForm(c: AIConfig): AIConfigIn {
   return {
-    mode: c.mode, reportMode: c.reportMode || c.mode, url: c.url || '', model: c.model || '', jsonSchema: c.jsonSchema, sendChecklist: c.sendChecklist,
+    mode: c.mode, reportMode: c.reportMode || c.mode, url: c.url || '', model: c.model || '', jsonSchema: c.jsonSchema, sendChecklist: c.sendChecklist, fallback: !!c.fallback,
     external: {
       provider: c.external?.provider || 'anthropic', url: c.external?.url || '', model: c.external?.model || '',
       apiKey: '', jsonSchema: c.external?.jsonSchema ?? true, effort: c.external?.effort || ''
@@ -208,7 +208,15 @@ export default function AIConfigPage() {
         </Card>
       </div>
 
-      {usesExternal && (
+      <div className="mt-4 max-w-3xl">
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={f.fallback} onChange={(e) => set({ fallback: e.target.checked })} />
+          <span>지정한 연결이 응답하지 않으면 다른 연결로 대신하기<br />
+            <span className="text-xs text-muted-foreground">로컬 LLM 과 외부 LLM 이 모두 설정돼 있어야 켤 수 있습니다. 로컬이 끊겨 외부가 대신하면 그 요청의 입력이 외부 서비스로 나갑니다(체크리스트 내용은 아래에서 허용한 경우에만). 어느 쪽이 대신 답했는지는 원장에 남습니다.</span></span>
+        </label>
+      </div>
+
+      {(usesExternal || f.fallback) && (
         <div className="mt-4 max-w-3xl space-y-2">
           <Alert tone="warn">외부 LLM 을 쓰는 용도에서는 입력 사실(구성요소·버전·취약점·사용 맥락 또는 규제 목록·점검 결과)이 외부 서비스로 전송됩니다. 요청 기록(모델·입력 해시)은 원장에 남습니다.</Alert>
           <label className="flex items-start gap-2 text-sm">
